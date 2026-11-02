@@ -8,8 +8,8 @@
     "build": "bun --bun vite build"
   },
   "dependencies": {
-    "@kymo/contract": "workspace:*",
     "@tanstack/react-router": "catalog:",
+    "kymo": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

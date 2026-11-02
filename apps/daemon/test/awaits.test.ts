@@ -15,7 +15,7 @@ import * as Scope from "effect/Scope";
 import * as DurableClock from "effect/workflow/DurableClock";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as Workflow from "effect/workflow/Workflow";
-import { Awaits, type Await } from "../src/Awaits.ts";
+import { Awaits, type Await } from "../src/awaits.ts";
 
 const ManagerApproval = DurableDeferred.make("ManagerApproval", {
   success: Schema.Struct({ approved: Schema.Boolean }),

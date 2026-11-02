@@ -9,16 +9,15 @@ and delete the old path in the same change, with no compatibility shims.
 
 ## Layout
 
-- Workspaces live under three roots: `packages/`, `apps/`, and `plugins/`.
-- Runtime dependencies point only downward:
-  - `packages/contract` (`@kymo/contract`): types and schemas shared by the daemon, the CLI and the
-    web UI.
-  - `apps/daemon` (`@kymo/daemon`), `apps/cli` (`@kymo/cli`) and `apps/web` (`@kymo/web`) each
-    depend on `@kymo/contract`. The CLI talks to the daemon over HTTP only.
-  - Each `plugins/*` workspace depends on `@kymo/contract` and `effect` only, and default-exports
-    `Plugin.make({ name, workflows, layer })` from `@kymo/contract/Plugin`. The layer may require
-    only `WorkflowEngine`. `plugins/demo` (`@kymo/plugin-demo`) is the reference plugin.
-- Nothing under `packages/`, `apps/`, or `plugins/` imports from `design/`.
+- The repo root is the package `kymo`. It exports `src/*.ts` as `kymo/<module>` (`kymo/root`,
+  `kymo/plugin`); `effect` is a peer dependency.
+- `apps/*` are the only workspaces; each depends on `"kymo": "workspace:*"`. Import shared modules
+  as `kymo/<module>`, not by relative path into `src/`. The CLI talks to the daemon over HTTP only.
+- `examples/*` are plain directories inside the root package. A plugin default-exports
+  `Plugin.make({ name, workflows, layer })` from `kymo/plugin`; the layer may require only
+  `WorkflowEngine`. `examples/demo` is the reference plugin.
+- File names are kebab-case; `bun run lint` enforces it.
+- Nothing outside `design/` imports from `design/`.
 
 ## Reference
 
@@ -28,7 +27,7 @@ and delete the old path in the same change, with no compatibility shims.
 ## Web
 
 - `useEffect`, `useLayoutEffect` and `useInsertionEffect` are banned by `bun run lint`. Derive during
-  render or use an event handler; `useMountEffect` in `apps/web/src/useMountEffect.ts` is the only
+  render or use an event handler; `useMountEffect` in `apps/web/src/use-mount-effect.ts` is the only
   escape.
 - The URL holds navigable UI state, through TanStack Router search params.
 

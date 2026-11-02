@@ -1,10 +1,10 @@
-import * as Plugin from "@kymo/contract/Plugin";
+import * as Plugin from "kymo/plugin";
 import * as Layer from "effect/Layer";
-import * as ChargeInvoice from "./ChargeInvoice.ts";
-import * as DunningSequence from "./DunningSequence.ts";
-import * as NightlyExport from "./NightlyExport.ts";
-import * as ProvisionWorkspace from "./ProvisionWorkspace.ts";
-import * as RefundRequest from "./RefundRequest.ts";
+import * as ChargeInvoice from "./charge-invoice.ts";
+import * as DunningSequence from "./dunning-sequence.ts";
+import * as NightlyExport from "./nightly-export.ts";
+import * as ProvisionWorkspace from "./provision-workspace.ts";
+import * as RefundRequest from "./refund-request.ts";
 
 export default Plugin.make({
   name: "demo",

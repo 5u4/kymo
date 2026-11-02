@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import demo from "@kymo/plugin-demo";
+import demo from "../src/index.ts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -10,10 +10,10 @@ import * as TestClock from "effect/testing/TestClock";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as Workflow from "effect/workflow/Workflow";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
-import * as ChargeInvoice from "../src/ChargeInvoice.ts";
-import * as NightlyExport from "../src/NightlyExport.ts";
-import * as ProvisionWorkspace from "../src/ProvisionWorkspace.ts";
-import * as RefundRequest from "../src/RefundRequest.ts";
+import * as ChargeInvoice from "../src/charge-invoice.ts";
+import * as NightlyExport from "../src/nightly-export.ts";
+import * as ProvisionWorkspace from "../src/provision-workspace.ts";
+import * as RefundRequest from "../src/refund-request.ts";
 
 const engine = demo.layer.pipe(Layer.provideMerge(WorkflowEngine.layerMemory));
 

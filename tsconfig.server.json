@@ -6,8 +6,9 @@
   "include": [
     "*.ts",
     "scripts/**/*.ts",
-    "packages/*/src/**/*.ts",
-    "packages/*/test/**/*.ts",
+    "src/**/*.ts",
+    "examples/*/src/**/*.ts",
+    "examples/*/test/**/*.ts",
     "plugins/*/src/**/*.ts",
     "plugins/*/test/**/*.ts",
     "apps/*/src/**/*.ts",

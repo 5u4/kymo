@@ -3,7 +3,7 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
-import * as Root from "./Root.ts";
+import * as Root from "kymo/root";
 
 describe("Root", () => {
   it("make places every file under the root", () => {
