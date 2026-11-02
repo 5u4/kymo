@@ -23,7 +23,7 @@ const Port = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65_535 }))
 
 export const RootConfig = Schema.Struct({
   port: Port,
-  plugins: Schema.Array(Schema.NonEmptyString),
+  workflows: Schema.Array(Schema.NonEmptyString),
 });
 export type RootConfig = typeof RootConfig.Type;
 
