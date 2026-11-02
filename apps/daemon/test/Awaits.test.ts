@@ -44,6 +44,13 @@ const EscalateOrApprove = Workflow.make("EscalateOrApprove", {
   idempotencyKey: ({ id }) => id,
 });
 
+const Signoff = DurableDeferred.make("Signoff");
+
+const ApproveOrEscalateThenSignoff = Workflow.make("ApproveOrEscalateThenSignoff", {
+  payload: { id: Schema.String },
+  idempotencyKey: ({ id }) => id,
+});
+
 const workflows = Layer.mergeAll(
   Approval.toLayer(() =>
     Effect.map(DurableDeferred.await(ManagerApproval), ({ approved }) => approved),
@@ -64,6 +71,17 @@ const workflows = Layer.mergeAll(
       error: Schema.Never,
       effects: [DurableDeferred.await(Escalation), Effect.sleep("100 millis")],
     }).pipe(Effect.andThen(DurableDeferred.await(ManagerApproval))),
+  ),
+  ApproveOrEscalateThenSignoff.toLayer(() =>
+    DurableDeferred.raceAll({
+      name: "ApprovalOrEscalation",
+      success: Schema.Void,
+      error: Schema.Never,
+      effects: [
+        Effect.asVoid(DurableDeferred.await(ManagerApproval)),
+        DurableDeferred.await(Escalation),
+      ],
+    }).pipe(Effect.andThen(DurableDeferred.await(Signoff))),
   ),
 );
 
@@ -184,6 +202,36 @@ describe("Awaits", () => {
           executionId,
           workflowName: "EscalateOrApprove",
           name: "ManagerApproval",
+        },
+      ]);
+    }).pipe(Effect.provide(Layer.unwrap(Effect.map(tempDb, runtime))), Effect.scoped),
+  );
+
+  it.live("drops a wait from a race branch that lost once a completion resumes the run", () =>
+    Effect.gen(function* () {
+      const executionId = yield* ApproveOrEscalateThenSignoff.execute(
+        { id: "x" },
+        { discard: true },
+      );
+      yield* eventually(listFor(executionId), (entries) => entries.length === 2);
+
+      yield* DurableDeferred.succeed(ManagerApproval, {
+        token: DurableDeferred.tokenFromExecutionId(ManagerApproval, {
+          workflow: ApproveOrEscalateThenSignoff,
+          executionId,
+        }),
+        value: { approved: true },
+      });
+
+      const pending = yield* eventually(listFor(executionId), (entries) =>
+        entries.some((entry) => entry.name === "Signoff"),
+      );
+      assert.deepStrictEqual(pending.map(summary), [
+        {
+          _tag: "Deferred",
+          executionId,
+          workflowName: "ApproveOrEscalateThenSignoff",
+          name: "Signoff",
         },
       ]);
     }).pipe(Effect.provide(Layer.unwrap(Effect.map(tempDb, runtime))), Effect.scoped),
