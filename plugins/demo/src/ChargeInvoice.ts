@@ -4,7 +4,7 @@ import * as Schema from "effect/Schema";
 import * as Activity from "effect/workflow/Activity";
 import * as Workflow from "effect/workflow/Workflow";
 
-export const InvoiceId = Schema.String.check(Schema.isPattern(/^inv_[0-9]{4}$/));
+export const InvoiceId = Schema.String.check(Schema.isPattern(/^inv_[a-z0-9]{4}$/));
 
 export const declinedInvoiceId = "inv_0402";
 export const gatewayDownInvoiceId = "inv_0503";
@@ -36,7 +36,7 @@ export const ChargeInvoice = Workflow.make("ChargeInvoice", {
 
 export const layer = ChargeInvoice.toLayer(
   Effect.fnUntraced(function* ({ invoiceId }) {
-    const digits = invoiceId.slice("inv_".length);
+    const suffix = invoiceId.slice("inv_".length);
     yield* Activity.make({
       name: "AuthorizeCard",
       success: Schema.Struct({ authorizationId: Schema.String, last4: Schema.String }),
@@ -45,7 +45,7 @@ export const layer = ChargeInvoice.toLayer(
         Effect.andThen(
           invoiceId === declinedInvoiceId
             ? Effect.fail(new CardDeclined({ code: "insufficient_funds" }))
-            : Effect.succeed({ authorizationId: `auth_${digits}`, last4: "4242" }),
+            : Effect.succeed({ authorizationId: `auth_${suffix}`, last4: "4242" }),
         ),
       ),
     });
@@ -57,7 +57,7 @@ export const layer = ChargeInvoice.toLayer(
         Effect.andThen(
           invoiceId === gatewayDownInvoiceId
             ? Effect.fail(new GatewayUnavailable({ status: 503 }))
-            : Effect.map(DateTime.now, (capturedAt) => ({ chargeId: `ch_${digits}`, capturedAt })),
+            : Effect.map(DateTime.now, (capturedAt) => ({ chargeId: `ch_${suffix}`, capturedAt })),
         ),
       ),
     }).pipe(Activity.retry({ times: 2 }));

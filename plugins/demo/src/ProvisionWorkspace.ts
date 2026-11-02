@@ -26,8 +26,7 @@ export const ProvisionWorkspace = Workflow.make("ProvisionWorkspace", {
   idempotencyKey: ({ workspaceId }) => workspaceId,
 });
 
-const invoiceIdFor = (workspaceId: string): string =>
-  `inv_${workspaceId.slice("ws_".length).replace(/[a-z0-9]/g, (char) => String(parseInt(char, 36) % 10))}`;
+const invoiceIdFor = (workspaceId: string): string => `inv_${workspaceId.slice("ws_".length)}`;
 
 const chargeFirstInvoice = (invoiceId: string, amountCents: number) =>
   ChargeInvoice.ChargeInvoice.execute({ invoiceId, amountCents, currency: "USD" }).pipe(

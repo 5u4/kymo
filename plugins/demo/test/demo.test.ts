@@ -78,28 +78,44 @@ describe("demo plugin", () => {
     );
   }
 
-  it.effect("ProvisionWorkspace charges the first invoice through a child execution", () =>
+  it.effect("ProvisionWorkspace charges each workspace its own invoice through a child", () =>
     Effect.gen(function* () {
-      const executionId = yield* ProvisionWorkspace.ProvisionWorkspace.execute(
-        { workspaceId: "ws_8f21", plan: "team", ownerEmail: "mara@northwind.dev" },
-        { discard: true },
+      const workspaces = [
+        { workspaceId: "ws_8f21", plan: "team", amountCents: 4900 },
+        { workspaceId: "ws_8521", plan: "enterprise", amountCents: 29900 },
+      ] as const;
+      const executions = yield* Effect.forEach(workspaces, (workspace) =>
+        ProvisionWorkspace.ProvisionWorkspace.execute(
+          {
+            workspaceId: workspace.workspaceId,
+            plan: workspace.plan,
+            ownerEmail: "mara@northwind.dev",
+          },
+          { discard: true },
+        ).pipe(Effect.map((executionId) => ({ ...workspace, executionId }))),
       );
-      const result = yield* settle(
-        ProvisionWorkspace.ProvisionWorkspace.poll(executionId),
-        "Complete",
-      );
-      assert.deepStrictEqual(
-        result.exit,
-        Exit.succeed({ databaseUrl: "postgres://pg-1.internal/ws_8f21", invoiceId: "inv_8521" }),
-      );
-      const childId = yield* ChargeInvoice.ChargeInvoice.executionId({
-        invoiceId: "inv_8521",
-        amountCents: 4900,
-        currency: "USD",
-      });
-      const child = yield* settle(ChargeInvoice.ChargeInvoice.poll(childId), "Complete");
-      assert(Exit.isSuccess(child.exit));
-      assert.strictEqual(child.exit.value.chargeId, "ch_8521");
+      const childIds = new Set<string>();
+      for (const { workspaceId, amountCents, executionId } of executions) {
+        const result = yield* settle(
+          ProvisionWorkspace.ProvisionWorkspace.poll(executionId),
+          "Complete",
+        );
+        const invoiceId = `inv_${workspaceId.slice("ws_".length)}`;
+        assert.deepStrictEqual(
+          result.exit,
+          Exit.succeed({ databaseUrl: `postgres://pg-1.internal/${workspaceId}`, invoiceId }),
+        );
+        const childId = yield* ChargeInvoice.ChargeInvoice.executionId({
+          invoiceId,
+          amountCents,
+          currency: "USD",
+        });
+        childIds.add(childId);
+        const child = yield* settle(ChargeInvoice.ChargeInvoice.poll(childId), "Complete");
+        assert(Exit.isSuccess(child.exit));
+        assert.strictEqual(child.exit.value.chargeId, `ch_${workspaceId.slice("ws_".length)}`);
+      }
+      assert.strictEqual(childIds.size, workspaces.length);
     }).pipe(Effect.provide(engine)),
   );
 
@@ -144,4 +160,20 @@ describe("demo plugin", () => {
       );
     }).pipe(Effect.provide(engine)),
   );
+
+  it("NightlyExport rejects dates that are not on the calendar", () => {
+    const decode = Schema.decodeUnknownExit(NightlyExport.NightlyExport.payloadSchema);
+    for (const date of ["2026-99-99", "2026-13-01", "2026-02-30", "2025-02-29"]) {
+      const exit = decode({ date, format: "csv" });
+      assert(Exit.isFailure(exit), `${date} decoded`);
+      assert(
+        Schema.isSchemaError(Cause.squash(exit.cause)),
+        `${date} failed without a SchemaError`,
+      );
+    }
+    assert.deepStrictEqual(
+      decode({ date: "2024-02-29", format: "csv" }),
+      Exit.succeed({ date: "2024-02-29", format: "csv" }),
+    );
+  });
 });
