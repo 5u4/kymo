@@ -5,6 +5,7 @@
     "": {
       "name": "kymo",
       "devDependencies": {
+        "@effect/platform-bun": "catalog:",
         "@effect/tsgo": "catalog:",
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",

@@ -10,11 +10,12 @@ and delete the old path in the same change, with no compatibility shims.
 ## Layout
 
 - The repo root is the package `kymo`. It exports `src/*.ts` as `kymo/<module>` (`kymo/root`,
-  `kymo/workflows`); `effect` is a peer dependency.
+  `kymo/workflows`) and `plugins/gh-cli/src` as `kymo/gh-cli` and `kymo/gh-cli/<module>`; `effect`
+  is a peer dependency.
 - `apps/*` are the only workspaces; each depends on `"kymo": "workspace:*"`. Import shared modules
   as `kymo/<module>`, not by relative path into `src/`. The CLI talks to the daemon over HTTP only.
-- `examples/*` are plain directories inside the root package. `examples/demo` is the reference
-  workflow source.
+- `plugins/*` and `examples/*` are plain directories inside the root package. `plugins/gh-cli` is a
+  workflow source that ships with kymo; `examples/demo` is the reference workflow source.
 - A workflow source is a module that default-exports a Layer `satisfies Workflows` (from
   `kymo/workflows`). `RootConfig.workflows` (the `workflows` array of `kymo.json`) lists the
   sources; no daemon entry point reads it yet. `apps/daemon/src/workflow-sources.ts` imports and

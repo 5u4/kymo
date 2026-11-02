@@ -30,7 +30,9 @@
   },
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./*": "./src/*.ts",
+    "./gh-cli": "./plugins/gh-cli/src/index.ts",
+    "./gh-cli/*": "./plugins/gh-cli/src/*.ts"
   },
   "scripts": {
     "prepare": "lefthook install && effect-tsgo patch --typescript",
@@ -43,6 +45,7 @@
     "build:web": "bun run --cwd apps/web build"
   },
   "devDependencies": {
+    "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/bun": "catalog:",

@@ -16,6 +16,7 @@ import { Awaits } from "../src/awaits.ts";
 import * as WorkflowSources from "../src/workflow-sources.ts";
 import { Double } from "./fixtures/double.ts";
 import { Parent } from "./fixtures/definitions.ts";
+import { ReleaseX } from "./fixtures/project-x.ts";
 
 const fixtures = `${import.meta.dirname}/fixtures`;
 
@@ -37,6 +38,27 @@ const daemon = (workflows: ReadonlyArray<string>, root = fixtures) =>
 
 const startupError = (workflows: ReadonlyArray<string>) =>
   Effect.flip(Effect.scoped(Layer.build(daemon(workflows))));
+
+const mergedGh = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const dir = yield* fs.makeTempDirectoryScoped();
+  yield* fs.writeFileString(
+    `${dir}/gh`,
+    `#!/bin/sh\necho '{"number":12,"state":"MERGED","title":"Ship it","url":"https://github.com/5u4/x/pull/12"}'\n`,
+    { mode: 0o755 },
+  );
+  yield* Effect.acquireRelease(
+    Effect.sync(() => {
+      const path = process.env["PATH"];
+      process.env["PATH"] = `${dir}:${path}`;
+      return path;
+    }),
+    (path) =>
+      Effect.sync(() => {
+        process.env["PATH"] = path;
+      }),
+  );
+}).pipe(Effect.provide(BunFileSystem.layer));
 
 describe("workflow sources", () => {
   it.live("loads relative and ~/ sources, and a parent runs a child from another source", () =>
@@ -139,5 +161,30 @@ describe("workflow sources", () => {
         'workflow Parent is not registered; add its source to "workflows" in kymo.json',
       );
     }),
+  );
+});
+
+describe("kymo/gh-cli as a workflow source", () => {
+  it.live("lets project X wait for a merge through a child WaitForMerge", () =>
+    Effect.gen(function* () {
+      yield* mergedGh;
+      const result = yield* ReleaseX.execute({ repo: "5u4/x", number: 12 });
+      assert.strictEqual(result, "released after https://github.com/5u4/x/pull/12");
+    }).pipe(Effect.provide(daemon(["kymo/gh-cli", "./project-x.ts"])), Effect.scoped),
+  );
+
+  it.live("fails project X at once when kymo/gh-cli is not a source", () =>
+    Effect.gen(function* () {
+      yield* mergedGh;
+      const exit = yield* Effect.exit(
+        ReleaseX.execute({ repo: "5u4/x", number: 12 }).pipe(Effect.timeout("5 seconds")),
+      );
+      assert(Exit.isFailure(exit));
+      const defect = Cause.squash(exit.cause);
+      assert.strictEqual(
+        defect instanceof Error && defect.message,
+        'workflow WaitForMerge is not registered; add its source to "workflows" in kymo.json',
+      );
+    }).pipe(Effect.provide(daemon(["./project-x.ts"])), Effect.scoped),
   );
 });
