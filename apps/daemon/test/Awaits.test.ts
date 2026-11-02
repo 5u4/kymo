@@ -37,6 +37,13 @@ const RaceThenApprove = Workflow.make("RaceThenApprove", {
   idempotencyKey: ({ id }) => id,
 });
 
+const Escalation = DurableDeferred.make("Escalation");
+
+const EscalateOrApprove = Workflow.make("EscalateOrApprove", {
+  payload: { id: Schema.String },
+  idempotencyKey: ({ id }) => id,
+});
+
 const workflows = Layer.mergeAll(
   Approval.toLayer(() =>
     Effect.map(DurableDeferred.await(ManagerApproval), ({ approved }) => approved),
@@ -48,6 +55,14 @@ const workflows = Layer.mergeAll(
       success: Schema.String,
       error: Schema.Never,
       effects: [Effect.succeed("quote")],
+    }).pipe(Effect.andThen(DurableDeferred.await(ManagerApproval))),
+  ),
+  EscalateOrApprove.toLayer(() =>
+    DurableDeferred.raceAll({
+      name: "EscalationOrTimeout",
+      success: Schema.Void,
+      error: Schema.Never,
+      effects: [DurableDeferred.await(Escalation), Effect.sleep("100 millis")],
     }).pipe(Effect.andThen(DurableDeferred.await(ManagerApproval))),
   ),
 );
@@ -152,6 +167,24 @@ describe("Awaits", () => {
       const pending = yield* eventually(listFor(executionId), (entries) => entries.length > 0);
       assert.deepStrictEqual(pending.map(summary), [
         { _tag: "Deferred", executionId, workflowName: "RaceThenApprove", name: "ManagerApproval" },
+      ]);
+    }).pipe(Effect.provide(Layer.unwrap(Effect.map(tempDb, runtime))), Effect.scoped),
+  );
+
+  it.live("drops a wait from a race branch that lost", () =>
+    Effect.gen(function* () {
+      const executionId = yield* EscalateOrApprove.execute({ id: "l" }, { discard: true });
+
+      const pending = yield* eventually(listFor(executionId), (entries) =>
+        entries.some((entry) => entry.name === "ManagerApproval"),
+      );
+      assert.deepStrictEqual(pending.map(summary), [
+        {
+          _tag: "Deferred",
+          executionId,
+          workflowName: "EscalateOrApprove",
+          name: "ManagerApproval",
+        },
       ]);
     }).pipe(Effect.provide(Layer.unwrap(Effect.map(tempDb, runtime))), Effect.scoped),
   );

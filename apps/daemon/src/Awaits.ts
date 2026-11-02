@@ -27,7 +27,13 @@ export type Await =
       readonly since: DateTime.Utc;
     };
 
-type ByExecution = HashMap.HashMap<string, HashMap.HashMap<string, Await>>;
+type Recorded = {
+  readonly wait: Await;
+  // DurableDeferred.raceAll releases a losing branch's waits from this map without telling us.
+  readonly awaited: ReadonlyMap<string, number>;
+};
+
+type ByExecution = HashMap.HashMap<string, HashMap.HashMap<string, Recorded>>;
 
 const clockPrefix = "DurableClock/";
 
@@ -51,21 +57,25 @@ export class Awaits extends Context.Service<
         Effect.flatMap(DateTime.now, (since) =>
           Ref.update(ref, (byExecution) => {
             const waits = Option.getOrElse(HashMap.get(byExecution, instance.executionId), () =>
-              HashMap.empty<string, Await>(),
+              HashMap.empty<string, Recorded>(),
             );
-            if (HashMap.has(waits, deferred.name)) return byExecution;
-            const base = {
-              executionId: instance.executionId,
-              workflowName: instance.workflow._tag,
-              since,
-            };
-            const entry: Await = deferred.name.startsWith(clockPrefix)
-              ? { _tag: "Clock", ...base, name: deferred.name.slice(clockPrefix.length) }
-              : { _tag: "Deferred", ...base, name: deferred.name, deferred };
+            const wait = Option.getOrElse(
+              Option.map(HashMap.get(waits, deferred.name), (recorded) => recorded.wait),
+              (): Await => {
+                const base = {
+                  executionId: instance.executionId,
+                  workflowName: instance.workflow._tag,
+                  since,
+                };
+                return deferred.name.startsWith(clockPrefix)
+                  ? { _tag: "Clock", ...base, name: deferred.name.slice(clockPrefix.length) }
+                  : { _tag: "Deferred", ...base, name: deferred.name, deferred };
+              },
+            );
             return HashMap.set(
               byExecution,
               instance.executionId,
-              HashMap.set(waits, deferred.name, entry),
+              HashMap.set(waits, deferred.name, { wait, awaited: instance.awaitedDeferreds }),
             );
           }),
         );
@@ -112,7 +122,9 @@ export class Awaits extends Context.Service<
 
       const list = Effect.map(Ref.get(ref), (byExecution) =>
         Array.from(HashMap.values(byExecution)).flatMap((waits) =>
-          Array.from(HashMap.values(waits)),
+          Array.from(waits).flatMap(([name, { wait, awaited }]) =>
+            awaited.has(name) ? [wait] : [],
+          ),
         ),
       );
 
