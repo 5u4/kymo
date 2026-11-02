@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import * as Activity from "effect/workflow/Activity";
 import * as DurableClock from "effect/workflow/DurableClock";
 import * as Workflow from "effect/workflow/Workflow";
-import * as ChargeInvoice from "./ChargeInvoice.ts";
+import * as ChargeInvoice from "./charge-invoice.ts";
 
 const rounds = [1, 2, 3] as const;
 

@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "import"],
   "jsPlugins": ["eslint-plugin-better-tailwindcss"],
-  "ignorePatterns": ["design/**", "repos/**", "**/dist/**", "apps/web/src/routeTree.gen.ts"],
+  "ignorePatterns": ["design/**", "repos/**", "**/dist/**", "apps/web/src/route-tree.gen.ts"],
   "options": {
     "typeAware": true
   },
@@ -23,6 +23,7 @@
       }
     ],
     "typescript/no-explicit-any": "error",
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
     "typescript/no-non-null-assertion": "error",
     "eslint/no-restricted-imports": [
       "error",
@@ -113,7 +114,7 @@
       }
     },
     {
-      "files": ["apps/web/src/useMountEffect.ts"],
+      "files": ["apps/web/src/use-mount-effect.ts"],
       "plugins": ["react"],
       "rules": {
         "eslint/no-restricted-imports": [

@@ -4,9 +4,7 @@
   "private": true,
   "workspaces": {
     "packages": [
-      "packages/*",
-      "apps/*",
-      "plugins/*"
+      "apps/*"
     ],
     "catalog": {
       "@effect/platform-bun": "4.1.2",
@@ -31,6 +29,9 @@
     }
   },
   "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
   "scripts": {
     "prepare": "lefthook install && effect-tsgo patch --typescript",
     "typecheck": "effect-tsgo tsc --build --noEmit tsconfig.json",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:",
+    "@effect/vitest": "catalog:",
     "@types/bun": "catalog:",
     "effect": "catalog:",
     "eslint-plugin-better-tailwindcss": "4.10.0",
@@ -53,5 +55,8 @@
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
   }
 }

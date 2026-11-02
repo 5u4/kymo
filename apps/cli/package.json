@@ -5,9 +5,9 @@
   "type": "module",
   "dependencies": {
     "@effect/platform-bun": "catalog:",
-    "@kymo/contract": "workspace:*",
     "@toon-format/toon": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "kymo": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:"

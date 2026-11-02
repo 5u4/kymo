@@ -6,8 +6,8 @@
   "dependencies": {
     "@effect/platform-bun": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
-    "@kymo/contract": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "kymo": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:"
