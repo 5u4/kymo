@@ -109,22 +109,35 @@ describe("workflow sources", () => {
     }).pipe(Effect.provide(daemon(["./parent.ts"])), Effect.scoped),
   );
 
-  it.live("runs nothing until every source is loaded", () =>
+  for (const workflows of [
+    ["./parent.ts", "./starts-parent.ts", "./child.ts"],
+    ["./starts-parent.ts", "./parent.ts", "./child.ts"],
+  ]) {
+    it.live(`runs nothing until every source is loaded: ${workflows.join(", ")}`, () =>
+      Effect.gen(function* () {
+        const result = yield* Parent.poll(yield* Parent.executionId({ id: "startup" })).pipe(
+          Effect.repeat({
+            until: (result) => Option.isSome(result) && result.value._tag === "Complete",
+            schedule: Schedule.spaced("20 millis"),
+          }),
+          Effect.timeout("10 seconds"),
+        );
+        assert.deepStrictEqual(
+          Option.map(result, (r) => r._tag === "Complete" && r.exit),
+          Option.some(Exit.succeed("child:startup")),
+        );
+      }).pipe(Effect.provide(daemon(workflows)), Effect.scoped),
+    );
+  }
+
+  it.live("fails startup when a source starts a workflow no source registers", () =>
     Effect.gen(function* () {
-      const result = yield* Parent.poll(yield* Parent.executionId({ id: "startup" })).pipe(
-        Effect.repeat({
-          until: (result) => Option.isSome(result) && result.value._tag === "Complete",
-          schedule: Schedule.spaced("20 millis"),
-        }),
-        Effect.timeout("10 seconds"),
+      const error = yield* startupError(["./starts-parent.ts", "./child.ts"]);
+      assert.instanceOf(error, WorkflowSources.WorkflowNotRegistered);
+      assert.strictEqual(
+        error.message,
+        'workflow Parent is not registered; add its source to "workflows" in kymo.json',
       );
-      assert.deepStrictEqual(
-        Option.map(result, (r) => r._tag === "Complete" && r.exit),
-        Option.some(Exit.succeed("child:startup")),
-      );
-    }).pipe(
-      Effect.provide(daemon(["./parent.ts", "./starts-parent.ts", "./child.ts"])),
-      Effect.scoped,
-    ),
+    }),
   );
 });

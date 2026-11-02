@@ -110,18 +110,27 @@ const load = (root: string, source: string) =>
 export const layer = (options: {
   readonly root: string;
   readonly workflows: ReadonlyArray<string>;
-}): Layer.Layer<never, WorkflowSourceError | DuplicateWorkflow, WorkflowEngine.WorkflowEngine> =>
+}): Layer.Layer<
+  never,
+  WorkflowSourceError | DuplicateWorkflow | WorkflowNotRegistered,
+  WorkflowEngine.WorkflowEngine
+> =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const engine = yield* WorkflowEngine.WorkflowEngine;
       const registered = new Map<string, Registered>();
+      let startedWhileLoading: Set<string> | undefined = new Set<string>();
 
       const execute: WorkflowEngine.WorkflowEngine["Service"]["execute"] = (workflow, execution) =>
-        Effect.suspend(() =>
-          registered.has(workflow._tag)
+        Effect.suspend(() => {
+          if (startedWhileLoading !== undefined) {
+            startedWhileLoading.add(workflow._tag);
+            return engine.execute(workflow, execution);
+          }
+          return registered.has(workflow._tag)
             ? engine.execute(workflow, execution)
-            : Effect.die(new WorkflowNotRegistered({ workflow: workflow._tag })),
-        );
+            : Effect.die(new WorkflowNotRegistered({ workflow: workflow._tag }));
+        });
 
       const sources = yield* Effect.forEach(options.workflows, (source) =>
         Effect.map(load(options.root, source), (workflows) => ({ source, workflows })),
@@ -171,6 +180,11 @@ export const layer = (options: {
           ),
         { discard: true },
       );
+      const missing = [...startedWhileLoading].find((workflow) => !registered.has(workflow));
+      if (missing !== undefined) {
+        return yield* new WorkflowNotRegistered({ workflow: missing });
+      }
+      startedWhileLoading = undefined;
       yield* Effect.forEach(registered.values(), ({ register }) => register, { discard: true });
     }),
   ).pipe(Layer.provide(BunServices.layer));
