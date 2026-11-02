@@ -14,16 +14,31 @@ and delete the old path in the same change, with no compatibility shims.
   and `kymo/gh-cli/<module>`; `effect` is a peer dependency pinned to `4.1.2`.
 - `apps/daemon` and `apps/cli` are plain directories of the root package, whose `dependencies` hold
   their runtime packages at literal versions, because a git install of kymo cannot resolve `catalog:`.
-  `apps/web` is the only workspace and depends on `"kymo": "workspace:*"`. Import shared modules as
-  `kymo/<module>`, not by relative path into `src/`. The CLI talks to the daemon over HTTP only.
+  The package's `bin.kymo` is `apps/cli/src/main.ts`. `apps/web` is the only workspace and depends
+  on `"kymo": "workspace:*"`. Import shared modules as `kymo/<module>`, not by relative path into
+  `src/`.
+- The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
+  root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
+  `apps/cli/src/main.ts` tags each command `Lifecycle` (`start`, `stop`, `restart`) or `Daemon`
+  (bare `kymo` today); add every new command as `Daemon`, which fails with the same "not running"
+  error while no daemon answers.
+- A root (`--root`, default `~/.kymo`) holds `kymo.json`, `kymo.db`, `daemon.log` (the daemon's
+  stdout and stderr when the CLI starts it), `owner/` and `daemon.json`. A daemon claims the root
+  with a symlink in `owner/` (`kymo/ownership`) before it opens `kymo.db`, so two daemons never
+  share one database, writes `daemon.json` (its pid and bound port) once its server listens, and
+  removes its claim and `daemon.json` on SIGTERM or SIGINT. The CLI derives `Running` or `Stopped`
+  from `daemon.json`, the pid's liveness and `GET /api/health` on every run; `kymo stop` also ends
+  a daemon that still owns the root but does not answer.
 - `plugins/*` and `examples/*` are plain directories inside the root package. `plugins/gh-cli` is a
   workflow source that ships with kymo; `examples/demo` is the reference workflow source.
 - A workflow source is a module that default-exports a Layer `satisfies Workflows` (from
   `kymo/workflows`). `RootConfig.workflows` (the `workflows` array of `kymo.json`) lists the
-  sources; no daemon entry point reads it yet. `apps/daemon/src/workflow-sources.ts` imports and
-  builds them, providing `WorkflowEngine`, `ChildProcessSpawner`, `FileSystem` and `Path`. Once that
-  module is loaded, any `effect` or `kymo` file the process loads from a `node_modules` directory
-  other than the daemon's own is replaced by the daemon's copy.
+  sources. `apps/daemon/src/workflow-sources.ts` imports and builds them, providing
+  `WorkflowEngine`, `ChildProcessSpawner`, `FileSystem` and `Path`. Once that module is loaded, any
+  `effect` or `kymo` file the process loads from a `node_modules` directory other than the daemon's
+  own is replaced by the daemon's copy. Before it imports a path source, it fails startup if the
+  source's directory resolves a `kymo` whose exported `.ts` files differ in content from the
+  daemon's, or an `effect` with another version.
 - File names are kebab-case; `bun run lint` enforces it.
 - Nothing outside `design/` imports from `design/`.
 

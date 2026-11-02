@@ -1,8 +1,12 @@
+import * as BunCrypto from "@effect/platform-bun/BunCrypto";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Config from "effect/Config";
 import type * as Context from "effect/Context";
+import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
@@ -52,6 +56,28 @@ export class WorkflowNotRegistered extends Schema.TaggedError<WorkflowNotRegiste
   }
 }
 
+const KymoCopy = Schema.Struct({ path: Schema.String, digest: Schema.String });
+
+export class KymoVersionMismatch extends Schema.TaggedError<KymoVersionMismatch>()(
+  "KymoVersionMismatch",
+  { source: Schema.String, daemon: KymoCopy, resolved: KymoCopy },
+) {
+  override get message() {
+    return `workflow source ${this.source} resolves kymo at ${this.resolved.path} (content ${this.resolved.digest.slice(0, 12)}), but the daemon runs kymo at ${this.daemon.path} (content ${this.daemon.digest.slice(0, 12)}); install the daemon's kymo commit in that project`;
+  }
+}
+
+const EffectCopy = Schema.Struct({ path: Schema.String, version: Schema.String });
+
+export class EffectVersionMismatch extends Schema.TaggedError<EffectVersionMismatch>()(
+  "EffectVersionMismatch",
+  { source: Schema.String, daemon: EffectCopy, resolved: EffectCopy },
+) {
+  override get message() {
+    return `workflow source ${this.source} resolves effect ${this.resolved.version} at ${this.resolved.path}, but the daemon runs effect ${this.daemon.version} at ${this.daemon.path}; install effect ${this.daemon.version} in that project`;
+  }
+}
+
 type Registered = {
   readonly workflow: Workflow.Any;
   readonly source: string;
@@ -71,20 +97,25 @@ const resolve = (root: string, source: string) =>
     return source;
   });
 
+const packageDir = (name: string, from: string) =>
+  Bun.resolveSync(`${name}/package.json`, from).slice(0, -"/package.json".length);
+
+const own = {
+  effect: packageDir("effect", import.meta.dirname),
+  kymo: packageDir("kymo", import.meta.dirname),
+};
+
 Bun.plugin({
   name: "kymo-single-copy",
   setup: (build) => {
-    for (const name of ["effect", "kymo"]) {
-      const own = Bun.resolveSync(`${name}/package.json`, import.meta.dirname).replace(
-        /package\.json$/,
-        "",
-      );
-      const dir = `/node_modules/${name}/`;
+    for (const [name, dir] of Object.entries(own)) {
+      const prefix = `${dir}/`;
+      const segment = `/node_modules/${name}/`;
       // Bun's runtime onResolve does not fire for bare specifiers; onLoad does, on realpaths.
       build.onLoad(
-        { filter: new RegExp(`^(?!${RegExp.escape(own)}).*${dir}(?!.*/node_modules/)`) },
+        { filter: new RegExp(`^(?!${RegExp.escape(prefix)}).*${segment}(?!.*/node_modules/)`) },
         async ({ path }) => ({
-          exports: await import(own + path.slice(path.lastIndexOf(dir) + dir.length)),
+          exports: await import(prefix + path.slice(path.lastIndexOf(segment) + segment.length)),
           loader: "object",
         }),
       );
@@ -92,9 +123,79 @@ Bun.plugin({
   },
 });
 
+const Manifest = Schema.fromJsonString(
+  Schema.Struct({
+    version: Schema.String,
+    exports: Schema.optional(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
+  }),
+);
+
+const readManifest = (dir: string) =>
+  FileSystem.FileSystem.use((fs) => fs.readFileString(`${dir}/package.json`)).pipe(
+    Effect.flatMap(Schema.decodeEffect(Manifest)),
+  );
+
+const kymoDigest = (dir: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const digest = yield* Digest.Digest;
+    const manifest = yield* readManifest(dir);
+    const reached = yield* Effect.forEach(
+      Object.values(manifest.exports ?? {}).filter(Predicate.isNotNull),
+      (target) => fs.glob(target.replace(/^\.\//, "").replace("*", "**/*"), { root: dir }),
+    );
+    const files = Array.from(new Set(reached.flat()))
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+      .toSorted();
+    const hashes = yield* Effect.forEach(files, (file) =>
+      fs.readFile(`${dir}/${file}`).pipe(
+        Effect.flatMap((bytes) => digest.digestHex(Digest.sha256, bytes)),
+        Effect.map((hash) => `${file} ${hash}`),
+      ),
+    );
+    return yield* digest.digestHex(Digest.sha256, new TextEncoder().encode(hashes.join("\n")));
+  });
+
+const handshake = (source: string, file: string) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const from = path.dirname(file);
+    const kymo = yield* Effect.option(Effect.try(() => packageDir("kymo", from)));
+    if (Option.isSome(kymo) && kymo.value !== own.kymo) {
+      const daemon = { path: own.kymo, digest: yield* Effect.orDie(kymoDigest(own.kymo)) };
+      const resolved = {
+        path: kymo.value,
+        digest: yield* kymoDigest(kymo.value).pipe(Effect.orElseSucceed(() => "unreadable")),
+      };
+      if (resolved.digest !== daemon.digest) {
+        return yield* new KymoVersionMismatch({ source, daemon, resolved });
+      }
+    }
+    const effect = yield* Effect.option(Effect.try(() => packageDir("effect", from)));
+    if (Option.isSome(effect) && effect.value !== own.effect) {
+      const daemon = {
+        path: own.effect,
+        version: (yield* Effect.orDie(readManifest(own.effect))).version,
+      };
+      const resolved = {
+        path: effect.value,
+        version: yield* readManifest(effect.value).pipe(
+          Effect.map((manifest) => manifest.version),
+          Effect.orElseSucceed(() => "unreadable"),
+        ),
+      };
+      if (resolved.version !== daemon.version) {
+        return yield* new EffectVersionMismatch({ source, daemon, resolved });
+      }
+    }
+  });
+
 const load = (root: string, source: string) =>
   Effect.gen(function* () {
     const specifier = yield* resolve(root, source);
+    if ((yield* Path.Path).isAbsolute(specifier)) {
+      yield* handshake(source, specifier);
+    }
     const module = yield* Effect.tryPromise((): Promise<unknown> => import(specifier));
     const exported = Predicate.hasProperty(module, "default") ? module.default : undefined;
     if (!Layer.isLayer(exported)) {
@@ -112,7 +213,11 @@ export const layer = (options: {
   readonly workflows: ReadonlyArray<string>;
 }): Layer.Layer<
   never,
-  WorkflowSourceError | DuplicateWorkflow | WorkflowNotRegistered,
+  | WorkflowSourceError
+  | DuplicateWorkflow
+  | WorkflowNotRegistered
+  | KymoVersionMismatch
+  | EffectVersionMismatch,
   WorkflowEngine.WorkflowEngine
 > =>
   Layer.effectDiscard(
@@ -187,4 +292,4 @@ export const layer = (options: {
       startedWhileLoading = undefined;
       yield* Effect.forEach(registered.values(), ({ register }) => register, { discard: true });
     }),
-  ).pipe(Layer.provide(BunServices.layer));
+  ).pipe(Layer.provide([BunServices.layer, BunCrypto.layerDigest]));

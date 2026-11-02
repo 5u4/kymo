@@ -24,7 +24,8 @@ bun add github:5u4/kymo#<sha> effect@4.1.2
 
 These installs serve typechecking. At runtime the daemon loads its own `effect` and `kymo` in place
 of the copies in X's `node_modules`, so pin `<sha>` to the kymo commit the daemon runs and `effect`
-to the daemon's version.
+to the daemon's version. The daemon refuses to start when X's `kymo` differs from its own or X's
+`effect` has another version, and its error names both copies.
 
 ## Wait for a merge from your own workflow
 
@@ -55,8 +56,8 @@ export default Release.toLayer(({ repo, number }) =>
 
 ## List both sources in kymo.json
 
-List `kymo/gh-cli` next to your own file in `~/.kymo/kymo.json`. `kymo start`, which reads this
-file, is not built yet.
+List `kymo/gh-cli` next to your own file in `~/.kymo/kymo.json`. `kymo start` creates this file
+when it is missing and loads its sources; run `kymo restart` after you edit it.
 
 ```json
 {

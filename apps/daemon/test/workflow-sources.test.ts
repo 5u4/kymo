@@ -102,7 +102,7 @@ describe("workflow sources", () => {
       const fs = yield* FileSystem.FileSystem;
       const project = yield* fs.makeTempDirectoryScoped();
       yield* installOwnCopy(project, "effect", ["dist"]);
-      yield* installOwnCopy(project, "kymo", ["src"]);
+      yield* installOwnCopy(project, "kymo", ["src", "plugins"]);
       yield* fs.writeFileString(
         `${project}/kymo.ts`,
         `${yield* fs.readFileString(`${fixtures}/double.ts`)}export { RootConfig } from "kymo/root";\n`,
