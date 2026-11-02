@@ -4,8 +4,12 @@
   "workspaces": {
     "": {
       "name": "kymo",
+      "dependencies": {
+        "@effect/platform-bun": "4.1.2",
+        "@effect/sql-sqlite-bun": "4.1.2",
+        "@toon-format/toon": "4.4.0",
+      },
       "devDependencies": {
-        "@effect/platform-bun": "catalog:",
         "@effect/tsgo": "catalog:",
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",
@@ -21,32 +25,6 @@
       },
       "peerDependencies": {
         "effect": "4.1.2",
-      },
-    },
-    "apps/cli": {
-      "name": "@kymo/cli",
-      "version": "0.1.0",
-      "dependencies": {
-        "@effect/platform-bun": "catalog:",
-        "@toon-format/toon": "catalog:",
-        "effect": "catalog:",
-        "kymo": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-      },
-    },
-    "apps/daemon": {
-      "name": "@kymo/daemon",
-      "version": "0.1.0",
-      "dependencies": {
-        "@effect/platform-bun": "catalog:",
-        "@effect/sql-sqlite-bun": "catalog:",
-        "effect": "catalog:",
-        "kymo": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
       },
     },
     "apps/web": {
@@ -70,14 +48,11 @@
     },
   },
   "catalog": {
-    "@effect/platform-bun": "4.1.2",
-    "@effect/sql-sqlite-bun": "4.1.2",
     "@effect/tsgo": "0.63.0",
     "@effect/vitest": "4.1.2",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/router-plugin": "1.168.48",
-    "@toon-format/toon": "4.4.0",
     "@types/bun": "1.4.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -160,10 +135,6 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "", {}, "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
-
-    "@kymo/cli": ["@kymo/cli@workspace:apps/cli"],
-
-    "@kymo/daemon": ["@kymo/daemon@workspace:apps/daemon"],
 
     "@kymo/web": ["@kymo/web@workspace:apps/web"],
 
