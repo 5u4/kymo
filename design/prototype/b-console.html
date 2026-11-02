@@ -1,0 +1,2603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>kymo · console</title>
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-sunk: oklch(0.135 0.004 75);
+  --bg: oklch(0.158 0.005 75);
+  --panel: oklch(0.172 0.005 75);
+  --raised: oklch(0.205 0.006 75);
+  --hover: oklch(0.212 0.006 75);
+  --sel: oklch(0.238 0.007 75);
+  --line-soft: oklch(0.225 0.006 75);
+  --line: oklch(0.285 0.007 75);
+  --line-strong: oklch(0.36 0.008 75);
+  --fg: oklch(0.945 0.012 85);
+  --fg-2: oklch(0.80 0.010 80);
+  --fg-3: oklch(0.645 0.010 80);
+  --fg-4: oklch(0.47 0.008 80);
+  --run: oklch(0.80 0.115 215);
+  --sus: oklch(0.84 0.135 82);
+  --ok: oklch(0.80 0.13 152);
+  --fail: oklch(0.71 0.17 28);
+  --intr: oklch(0.76 0.075 305);
+  --num: oklch(0.83 0.065 245);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t1: 140ms; --t2: 220ms; --t3: 340ms;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --cmd-h: 52px;
+  --drawer-h: min(30vh, 260px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark;-webkit-text-size-adjust:100%;background:var(--bg-sunk)}
+body{
+  height:100vh;height:100dvh;overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;
+  background:var(--bg);color:var(--fg);
+  font:400 13px/1.45 var(--sans);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums;
+}
+button,input,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;text-align:inherit}
+a{color:inherit}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.005em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px;border-radius:6px}
+::selection{background:oklch(0.94 0.012 85 / .22)}
+kbd{
+  font:500 10.5px/1 var(--mono);color:var(--fg-3);
+  display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;
+  border-radius:5px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line), 0 1px 0 var(--line-soft);
+}
+.g{width:14px;height:14px;flex:none;display:block}
+.s-running{color:var(--run)} .s-suspended{color:var(--sus)} .s-succeeded{color:var(--ok)} .s-failed{color:var(--fail)} .s-interrupted{color:var(--intr)}
+.sg{position:relative;display:inline-grid;place-items:center;width:16px;height:16px;flex:none}
+.sg.s-running::after{
+  content:"";position:absolute;inset:1px;border-radius:50%;border:1px solid currentColor;
+  animation:ping 1.8s var(--ease) infinite;
+}
+@keyframes ping{0%{transform:scale(.45);opacity:.9}70%,100%{transform:scale(1.15);opacity:0}}
+
+/* ───────── header ───────── */
+.top{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:18px;
+  min-height:44px;padding:0 10px 0 16px;background:var(--bg-sunk);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand svg{width:44px;height:16px;color:var(--fg-3)}
+.brand .tip{transform-box:fill-box;transform-origin:center;animation:stylus 2.4s var(--ease) infinite}
+@keyframes stylus{0%,100%{opacity:1}50%{opacity:.25}}
+.wordmark{font:600 15px/1 var(--mono);letter-spacing:-0.04em}
+.server{display:flex;align-items:center;gap:10px;min-width:0;font:400 11.5px/1 var(--mono);color:var(--fg-3);white-space:nowrap;overflow:hidden}
+.server .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in oklch, var(--ok) 18%, transparent);flex:none}
+.server.down .dot{background:var(--fail);box-shadow:0 0 0 3px color-mix(in oklch, var(--fail) 22%, transparent)}
+.server.down .app{color:var(--fail)}
+.server.wait .dot{background:var(--fg-4);box-shadow:none}
+.server .app{color:var(--fg-2);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server .sep{color:var(--fg-4)}
+.top-r{display:flex;align-items:center;gap:4px}
+.ghost-btn{
+  height:28px;padding:0 9px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;
+  color:var(--fg-3);font:500 12px/1 var(--sans);
+  transition-property:background-color,color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.ghost-btn:hover{background:var(--hover);color:var(--fg)}
+.ghost-btn:active{transform:scale(.96)}
+.ghost-btn[aria-expanded="true"]{background:var(--sel);color:var(--fg)}
+.states{
+  grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 0 10px;
+  font:400 11.5px/1 var(--mono);
+}
+.states[hidden]{display:none}
+.states .lbl{color:var(--fg-3);margin-right:4px;font-family:var(--sans);font-size:12px}
+.states a,.states button{
+  height:24px;padding:0 9px;border-radius:6px;display:inline-flex;align-items:center;
+  color:var(--fg-2);text-decoration:none;box-shadow:inset 0 0 0 1px var(--line-soft);
+  transition-property:background-color,color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.states a:hover,.states button:hover{background:var(--hover);color:var(--fg)}
+.states a[aria-current="true"]{background:var(--fg);color:var(--bg);box-shadow:none}
+.states button[aria-pressed="true"]{color:var(--fail);box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 50%, transparent)}
+.states .note{color:var(--fg-4);margin-left:auto}
+
+/* ───────── panes ───────── */
+main{display:grid;grid-template-columns:272px minmax(360px,416px) minmax(0,1fr);min-height:0;position:relative}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line-soft)}
+.pane:last-child{border-right:0}
+.pane-wf{background:var(--bg-sunk)}
+.pane-list{background:var(--bg)}
+.pane-detail{background:var(--panel)}
+.pane-head{
+  flex:none;height:40px;display:flex;align-items:center;gap:8px;padding:0 14px 0 16px;
+  border-bottom:1px solid var(--line-soft);
+}
+.pane-title{font:500 12px/1 var(--sans);color:var(--fg-3);letter-spacing:.01em;transition:color var(--t1) var(--ease)}
+.pane.active .pane-title{color:var(--fg)}
+.pane-count{font:400 11.5px/1 var(--mono);color:var(--fg-4)}
+.pane-head .sp{flex:1}
+.pane-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.back{display:none}
+
+/* workflows */
+.wf-list{padding:6px 0}
+.wf{
+  position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;align-items:center;
+  width:calc(100% - 12px);margin:1px 6px;padding:10px 10px 10px 12px;border-radius:9px;
+  transition-property:background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.wf:hover{background:var(--hover)}
+.wf[aria-selected="true"]{background:var(--sel)}
+.wf:focus-visible{outline-offset:-2px}
+.wf-name{font:500 13px/1.2 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wf-all .wf-name{color:var(--fg-2)}
+.wf-total{font:400 11.5px/1 var(--mono);color:var(--fg-3)}
+.trace{grid-column:1/-1;display:flex;gap:2px;height:3px}
+.trace i{display:block;height:100%;border-radius:2px;background:currentColor;min-width:3px}
+.trace.zero{background:repeating-linear-gradient(90deg,var(--line) 0 4px,transparent 4px 8px);border-radius:2px}
+.wf-counts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 11px;font:400 11px/1 var(--mono);color:var(--fg-3)}
+.wf-counts span{display:inline-flex;align-items:center;gap:4px}
+.wf-counts .g{width:11px;height:11px}
+.wf-counts .z{color:var(--fg-4)}
+.wf-x{
+  position:absolute;right:8px;top:7px;height:24px;padding:0 8px;border-radius:6px;
+  display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1 var(--sans);color:var(--fg-2);
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line);opacity:0;
+  transition-property:opacity,background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.wf:hover .wf-x,.wf[aria-selected="true"] .wf-x,.wf-x:focus-visible,.wf:focus-visible .wf-x{opacity:1}
+.wf-x:hover{background:var(--hover);color:var(--fg)}
+.wf-x:active{transform:scale(.96)}
+.wf:hover .wf-total,.wf[aria-selected="true"] .wf-total{opacity:0}
+.wf-all .wf-x{display:none}
+.wf-all.wf:hover .wf-total,.wf-all[aria-selected="true"] .wf-total{opacity:1}
+.tiles{display:none}
+.engine{margin:14px 16px 18px;padding-top:14px;border-top:1px solid var(--line-soft);font:400 11px/1.65 var(--mono);color:var(--fg-3)}
+.engine b{font-weight:500;color:var(--fg-2)}
+.engine .k{color:var(--fg-4)}
+
+/* executions list */
+.tools{flex:none;padding:10px 12px 10px 14px;border-bottom:1px solid var(--line-soft);display:grid;gap:9px}
+.search{position:relative;display:flex;align-items:center}
+.search input{
+  width:100%;height:30px;border-radius:7px;padding:0 34px 0 11px;border:0;
+  background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);
+  font:400 12.5px/1 var(--mono);
+  transition-property:box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.search input::placeholder{color:var(--fg-4)}
+.search input:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--fg-3), 0 0 0 3px oklch(0.94 0.012 85 / .08)}
+.search .lead{position:absolute;left:10px;color:var(--fg-4);font:400 12px/1 var(--mono);pointer-events:none}
+.search kbd{position:absolute;right:7px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{
+  flex:none;height:24px;padding:0 7px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;
+  font:400 11.5px/1 var(--mono);color:var(--fg-3);
+  transition-property:background-color,color,box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.chip .g{width:11px;height:11px}
+.chip b{font-weight:400;color:var(--fg-4)}
+.chip:hover{background:var(--hover);color:var(--fg)}
+.chip:active{transform:scale(.96)}
+.chip[aria-pressed="true"]{background:var(--sel);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.chip[aria-pressed="true"] b{color:var(--fg-3)}
+.ex{
+  position:relative;display:grid;grid-template-columns:16px minmax(0,1fr) auto;column-gap:10px;row-gap:3px;align-items:center;
+  width:100%;padding:10px 14px 11px 14px;border-bottom:1px solid var(--line-soft);
+  transition-property:background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.ex:hover{background:var(--hover)}
+.ex[aria-selected="true"]{background:var(--sel)}
+.ex[aria-selected="true"]::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:0 2px 2px 0;background:var(--fg)}
+.ex:focus-visible{outline-offset:-2px;border-radius:0}
+.ex .sg{grid-row:1/3}
+.ex-id{font:400 12.5px/1.2 var(--mono);color:var(--fg-3);overflow:hidden;white-space:nowrap}
+.ex-id b{font-weight:500;color:var(--fg)}
+.ex-t{font:400 11px/1 var(--mono);color:var(--fg-3);white-space:nowrap}
+.ex-sub{grid-column:2/4;display:flex;align-items:center;gap:8px;min-width:0;font:400 12px/1.2 var(--sans);color:var(--fg-2)}
+.ex-sub .key{font:400 11px/1.2 var(--mono);color:var(--fg-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tag{
+  flex:none;display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;
+  font:500 10.5px/1 var(--mono);color:currentColor;background:color-mix(in oklch, currentColor 12%, transparent);
+}
+.ex-sub .tag{color:var(--sus)}
+.ex.pending .sg{animation:breathe 1s var(--ease) infinite alternate}
+@keyframes breathe{from{opacity:1}to{opacity:.3}}
+.ex.enter{animation:rowIn var(--t3) var(--ease) both}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.ex.flash::after{content:"";position:absolute;inset:0;background:var(--fg);opacity:0;pointer-events:none;animation:flash 700ms var(--ease)}
+@keyframes flash{0%{opacity:.09}100%{opacity:0}}
+
+/* empty / blank states */
+.blank{padding:44px 24px;display:grid;gap:12px;justify-items:start;max-width:420px}
+.blank .big{font:500 15px/1.35 var(--sans);color:var(--fg);text-wrap:balance}
+.blank p{color:var(--fg-3);font-size:12.5px;line-height:1.55;text-wrap:pretty}
+.blank .cli{margin-top:2px}
+.blank .row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* skeleton */
+.sk{position:relative;overflow:hidden;background:var(--raised);border-radius:4px;display:block}
+.sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,oklch(1 0 0 / .045),transparent);animation:shim 1.3s var(--ease) infinite}
+@keyframes shim{to{transform:translateX(100%)}}
+.sk-row{display:grid;grid-template-columns:16px 1fr 44px;gap:8px 10px;padding:13px 14px;border-bottom:1px solid var(--line-soft)}
+.sk-row .sk:nth-child(1){width:12px;height:12px;border-radius:50%;grid-row:1/3;align-self:center}
+.sk-row .sk:nth-child(2){height:10px;width:62%}
+.sk-row .sk:nth-child(3){height:10px}
+.sk-row .sk:nth-child(4){grid-column:2/4;height:8px;width:44%}
+
+/* ───────── detail ───────── */
+.detail{padding:26px 36px 56px;max-width:940px}
+.crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:400 12.5px/1.3 var(--sans);color:var(--fg-3)}
+.crumb .wfname{color:var(--fg-2);font-weight:500}
+.crumb .lnk{display:inline-flex;align-items:center;gap:5px;font:400 11.5px/1 var(--mono);color:var(--fg-3);padding:4px 7px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--line-soft);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.crumb .lnk:hover{background:var(--hover);color:var(--fg)}
+.crumb .lnk .g{width:12px;height:12px}
+.d-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px 24px;flex-wrap:wrap;margin-top:12px}
+.d-id{font:500 30px/1.05 var(--mono);letter-spacing:-0.035em;display:flex;flex-wrap:wrap}
+.d-id span{margin-right:.2em}
+.d-id span:nth-child(n+3){color:var(--fg-2)}
+.d-id span:last-child{margin-right:0}
+.d-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;
+  font:500 12px/1 var(--mono);color:currentColor;
+  background:color-mix(in oklch, currentColor 11%, transparent);box-shadow:inset 0 0 0 1px color-mix(in oklch, currentColor 30%, transparent);
+}
+.badge .why{color:var(--fg-2);font-weight:400}
+.badge.bump{animation:bump var(--t3) var(--ease)}
+@keyframes bump{0%{transform:scale(.96);opacity:.4}100%{transform:none;opacity:1}}
+.since{font:400 12px/1 var(--mono);color:var(--fg-3)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{
+  height:32px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font:500 12.5px/1 var(--sans);color:var(--fg);white-space:nowrap;
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line), 0 1px 0 oklch(0 0 0 / .25);
+  transition-property:background-color,box-shadow,color,opacity;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.btn:hover{background:var(--hover);box-shadow:inset 0 0 0 1px var(--line-strong), 0 1px 0 oklch(0 0 0 / .25)}
+.btn:active{transform:scale(.96)}
+.btn[disabled]{opacity:.55;cursor:default;transform:none}
+.btn kbd{background:transparent;box-shadow:inset 0 0 0 1px currentColor;color:inherit;opacity:.45}
+.btn-primary{background:var(--fg);color:var(--bg);box-shadow:0 1px 0 oklch(0 0 0 / .3)}
+.btn-primary:hover{background:oklch(1 0 0);box-shadow:0 1px 0 oklch(0 0 0 / .3)}
+.btn-danger{color:var(--fail);box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 40%, transparent)}
+.btn-danger:hover{background:color-mix(in oklch, var(--fail) 10%, var(--raised));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 60%, transparent)}
+.btn-danger.solid{background:var(--fail);color:oklch(0.16 0.02 28);box-shadow:none}
+.btn-danger.solid:hover{background:oklch(0.76 0.17 28)}
+.spin{width:12px;height:12px;border-radius:50%;border:1.5px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(1turn)}}
+.cli{
+  display:inline-flex;align-items:center;gap:8px;max-width:100%;
+  font:400 11.5px/1.3 var(--mono);color:var(--fg-3);
+}
+.cli .p{color:var(--fg-4)}
+.cli code{font:inherit;color:var(--fg-2);overflow-wrap:anywhere}
+.cli button{color:var(--fg-4);height:20px;padding:0 6px;border-radius:5px;font:inherit;font-size:10.5px;transition:color var(--t1) var(--ease),background-color var(--t1) var(--ease)}
+.cli button:hover{color:var(--fg);background:var(--hover)}
+.ops-cli{display:flex;flex-direction:column;gap:4px;margin-top:10px;align-items:flex-end}
+.note{margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--fg-2);font-size:12.5px;line-height:1.55;text-wrap:pretty}
+.note b{color:var(--fg);font-weight:500}
+.note code{font:400 11.5px/1 var(--mono);color:var(--fg)}
+.meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 20px;margin-top:22px;padding:14px 0 2px;border-top:1px solid var(--line-soft)}
+.meta dt{font:400 11.5px/1.2 var(--sans);color:var(--fg-3);margin-bottom:5px}
+.meta dd{font:400 12.5px/1.35 var(--mono);color:var(--fg);overflow-wrap:anywhere}
+.meta dd .sub{display:block;color:var(--fg-3);font-size:11.5px}
+.sec{display:grid;grid-template-columns:116px minmax(0,1fr);gap:8px 24px;padding:22px 0;border-top:1px solid var(--line-soft)}
+.sec:first-of-type{margin-top:20px}
+.sec-h{font:500 12.5px/1.3 var(--sans);color:var(--fg-2)}
+.sec-h small{display:block;margin-top:3px;font:400 11.5px/1.3 var(--mono);color:var(--fg-4)}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 18px;font:400 12.5px/1.45 var(--mono)}
+.kv dt{color:var(--fg-3)}
+.kv dd{color:var(--fg);overflow-wrap:anywhere}
+.v-s{color:var(--fg)} .v-n{color:var(--num)} .v-b{color:var(--num)} .v-null{color:var(--fg-4)}
+.v-k{color:var(--fg-3)}
+
+/* journal ledger */
+.ledger{display:grid;gap:1px;margin:-6px -8px 0}
+.jrow{
+  display:grid;grid-template-columns:62px 16px minmax(120px,184px) minmax(80px,1fr) 66px;column-gap:10px;row-gap:2px;align-items:center;
+  width:100%;padding:7px 8px;border-radius:7px;position:relative;
+  transition-property:background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+button.jrow:hover{background:var(--hover)}
+.jrow[aria-expanded="true"]{background:var(--bg)}
+.jrow .off{font:400 11px/1 var(--mono);color:var(--fg-4);text-align:right}
+.jrow .nm{display:flex;align-items:baseline;gap:7px;min-width:0}
+.jrow .nm .n{font:500 12.5px/1.3 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jrow .nm .kind{font:400 10.5px/1 var(--mono);color:var(--fg-4);white-space:nowrap}
+.att{font:500 10.5px/1 var(--mono);color:var(--fg-3);padding:2px 5px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line);white-space:nowrap}
+.att.retry{color:var(--sus);box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--sus) 35%, transparent)}
+.jrow .du{font:400 11.5px/1 var(--mono);color:var(--fg-2);text-align:right;white-space:nowrap}
+.jrow .ex2{grid-column:3/-1;font:400 11.5px/1.35 var(--mono);color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.jrow .ex2 .ok{color:var(--ok)} .jrow .ex2 .bad{color:var(--fail)} .jrow .ex2 .wt{color:var(--sus)} .jrow .ex2 .ir{color:var(--intr)}
+.track{position:relative;height:14px;color:var(--fg-3)}
+.track::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line-soft)}
+.track .bar{position:absolute;top:4px;height:6px;border-radius:2px;background:currentColor;min-width:2px}
+.track .bar.dash{background:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px);opacity:.85}
+.track .now{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--fg-3)}
+.track .tipdot{position:absolute;top:3px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:currentColor;animation:breathe .9s var(--ease) infinite alternate}
+.jrow.wait .gc,.jrow.child .gc{color:var(--fg-3)}
+.jrow.wait.waiting .gc{color:var(--sus)}
+.jrow .gc{display:grid;place-items:center;position:relative;height:16px}
+.jrow.cont .gc::before{content:"";position:absolute;left:50%;bottom:calc(100% + 3px);height:22px;width:1px;background:color-mix(in oklch, var(--sus) 45%, transparent)}
+.jrow.end{color:var(--fg-3)}
+.jrow.end .nm .n{font-weight:400;color:var(--fg-2)}
+.jx{margin:2px 0 8px 98px;padding:12px 14px;border-radius:8px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-soft)}
+.jx[hidden]{display:none}
+.jx .lbl{font:400 11px/1 var(--sans);color:var(--fg-3);margin-bottom:8px}
+.jx .times{font:400 11px/1.6 var(--mono);color:var(--fg-4);margin-top:8px}
+.tree{font:400 12.5px/1.75 var(--mono);color:var(--fg);overflow-x:auto}
+.tree .tl{white-space:pre}
+.tree .br{color:var(--fg-4)}
+.tree .tg{font-weight:500}
+.tree .root{color:var(--fg-2)}
+.tree pre{font:400 11.5px/1.6 var(--mono);color:var(--fg-3);white-space:pre;margin:2px 0 0}
+.verdict{font:500 17px/1.3 var(--sans);letter-spacing:-0.01em;margin-bottom:10px;text-wrap:balance}
+.verdict .m{font-weight:500}
+.verdict + p{color:var(--fg-3);font-size:12.5px;line-height:1.55;margin:-4px 0 12px;max-width:60ch;text-wrap:pretty}
+.comp{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-soft)}
+.comp:last-child{border-bottom:0}
+.comp .n{font:500 12.5px/1.3 var(--sans)}
+.comp .n .for{font:400 11.5px/1 var(--mono);color:var(--fg-3);margin-left:6px}
+.comp .st{font:400 11.5px/1 var(--mono);color:var(--fg-3);text-align:right}
+.comp .st.ran{color:var(--ok)}
+.comp .ex2{grid-column:2/-1;font:400 11.5px/1.3 var(--mono);color:var(--fg-4)}
+.muted{color:var(--fg-3);font-size:12.5px}
+
+/* alerts & notices */
+.alert{
+  margin-top:16px;padding:12px 14px;border-radius:10px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:start;
+  background:color-mix(in oklch, var(--fail) 7%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 35%, transparent);
+  animation:rowIn var(--t2) var(--ease) both;
+}
+.alert .code{font:500 12.5px/1.3 var(--mono);color:var(--fail)}
+.alert .msg{grid-column:1;font:400 12.5px/1.5 var(--sans);color:var(--fg-2);text-wrap:pretty}
+.alert .msg code{font:400 11.5px/1 var(--mono);color:var(--fg)}
+.alert .acts{grid-row:1/3;grid-column:2;display:flex;gap:6px}
+.alert.info{background:color-mix(in oklch, var(--ok) 6%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--ok) 30%, transparent)}
+.alert.info .code{color:var(--ok)}
+.alert.dedup{background:color-mix(in oklch, var(--sus) 6%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--sus) 35%, transparent)}
+.alert.dedup .code{color:var(--sus)}
+.confirm{
+  margin-top:18px;border-radius:12px;padding:16px 18px;background:var(--bg);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 40%, transparent), 0 12px 32px oklch(0 0 0 / .35);
+  animation:rowIn var(--t2) var(--ease) both;
+}
+.confirm h3{font:500 15px/1.35 var(--sans);text-wrap:balance}
+.confirm h3 .m{font-weight:500}
+.confirm > p{color:var(--fg-3);font-size:12.5px;margin-top:4px}
+.confirm .lst{margin-top:14px;display:grid;gap:6px}
+.confirm .lst-h{font:400 11.5px/1.3 var(--sans);color:var(--fg-3)}
+.confirm ol,.confirm ul{list-style:none;display:grid;gap:2px}
+.confirm li{display:grid;grid-template-columns:22px 16px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;background:var(--panel);font:400 12.5px/1.3 var(--sans)}
+.confirm li .i{font:400 11px/1 var(--mono);color:var(--fg-4);text-align:right}
+.confirm li .r{font:400 11.5px/1 var(--mono);color:var(--fg-3)}
+.confirm li .m{font-size:12px}
+.confirm .none{font-size:12.5px;color:var(--fg-3);padding:6px 0}
+.confirm .foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
+
+/* not found / down */
+.void{padding:56px 36px;max-width:620px}
+.void .code{font:500 12px/1 var(--mono);color:var(--fail);letter-spacing:.02em}
+.void h2{font:500 30px/1.12 var(--sans);letter-spacing:-0.03em;margin-top:14px;text-wrap:balance}
+.void h2 .m{font-weight:500;letter-spacing:-0.04em}
+.void p{color:var(--fg-3);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:56ch;text-wrap:pretty}
+.void p code{font:400 12.5px/1 var(--mono);color:var(--fg)}
+.void .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:22px}
+.void .near{margin-top:26px;display:grid;gap:4px}
+.void .near .h{font:400 11.5px/1 var(--sans);color:var(--fg-3);margin-bottom:6px}
+.near-i{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font:400 12.5px/1 var(--mono);color:var(--fg-2);transition:background-color var(--t1) var(--ease)}
+.near-i:hover{background:var(--hover);color:var(--fg)}
+.near-i .w{font-family:var(--sans);color:var(--fg-3)}
+.down{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:48px;align-content:center;padding:40px clamp(28px,6vw,96px);background:var(--bg)}
+.down[hidden]{display:none}
+.down .void{padding:0}
+.down h2{font-size:44px}
+.down .steps{align-self:center;padding:20px 22px;border-radius:14px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);font:400 12px/1.75 var(--mono);color:var(--fg-3)}
+.down .steps b{color:var(--fg);font-weight:500}
+.down .steps .c{color:var(--fg-4)}
+.down .steps .e{color:var(--fail)}
+main.is-down > .pane{display:none}
+
+/* execute form */
+.xf{display:grid;gap:18px;margin-top:22px}
+.f{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 20px;align-items:start}
+.f-l{padding-top:8px;font:500 12.5px/1.3 var(--mono);color:var(--fg)}
+.f-l .rq{display:block;margin-top:4px;font:400 11px/1 var(--sans);color:var(--fg-3)}
+.f-l .rq.req{color:var(--fg-2)}
+.f-l .rq.req::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--fg);margin-right:5px;vertical-align:1px}
+.f-c{display:grid;gap:6px;min-width:0}
+.in{
+  width:100%;height:34px;padding:0 11px;border-radius:8px;border:0;
+  background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line);
+  font:400 13px/1 var(--mono);color:var(--fg);
+  transition-property:box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+textarea.in{height:auto;min-height:68px;padding:9px 11px;line-height:1.5;resize:vertical;font-size:12.5px}
+.in::placeholder{color:var(--fg-4)}
+.in:hover{box-shadow:inset 0 0 0 1px var(--line-strong)}
+.in:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--fg-3), 0 0 0 3px oklch(0.94 0.012 85 / .09);border-radius:8px}
+.in[aria-invalid="true"]{box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 70%, transparent)}
+.in[aria-invalid="true"]:focus-visible{box-shadow:inset 0 0 0 1px var(--fail), 0 0 0 3px color-mix(in oklch, var(--fail) 18%, transparent)}
+.f-h{display:flex;gap:10px;justify-content:space-between;font:400 11.5px/1.35 var(--mono);color:var(--fg-4);min-height:15px}
+.f-h .err{color:var(--fail);font-family:var(--sans)}
+.f-h .okm{color:var(--ok)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line);justify-self:start;max-width:100%;overflow-x:auto}
+.seg button{
+  height:28px;padding:0 12px;border-radius:7px;font:400 12.5px/1 var(--mono);color:var(--fg-3);white-space:nowrap;
+  transition-property:background-color,color,box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-checked="true"]{background:var(--raised);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line-strong), 0 1px 2px oklch(0 0 0 / .4)}
+.seg button:focus-visible{outline-offset:-2px}
+.seg.invalid{box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 70%, transparent)}
+.keycard{
+  border-radius:12px;padding:14px 16px;display:grid;gap:6px;background:var(--bg);
+  box-shadow:inset 0 0 0 1px var(--line-soft);
+  transition-property:box-shadow,background-color;transition-duration:var(--t2);transition-timing-function:var(--ease);
+}
+.keycard .k1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font:400 12px/1.4 var(--mono);color:var(--fg-3)}
+.keycard .k1 .val{font:500 16px/1.2 var(--mono);color:var(--fg);letter-spacing:-0.02em}
+.keycard .k1 .val.pend{color:var(--fg-4);font-weight:400}
+.keycard .k2{font:400 12.5px/1.5 var(--sans);color:var(--fg-2);text-wrap:pretty}
+.keycard .k2 b{font-weight:500;color:var(--fg)}
+.keycard.dedup{background:color-mix(in oklch, var(--sus) 6%, var(--bg));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--sus) 40%, transparent)}
+.keycard.dedup .k2{color:var(--fg)}
+.keycard.dedup .k2 .lead{color:var(--sus)}
+.keycard.fresh .k2 .lead{color:var(--ok)}
+.keycard .open{font:500 12px/1 var(--mono);color:var(--fg);text-decoration:underline;text-decoration-color:var(--fg-4);text-underline-offset:3px}
+.keycard .open:hover{text-decoration-color:var(--fg)}
+.sw-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center}
+.sw{width:32px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background-color var(--t2) var(--ease)}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--fg-2);transition-property:transform,background-color;transition-duration:var(--t2);transition-timing-function:var(--ease)}
+.sw[aria-checked="true"]{background:var(--fg)}
+.sw[aria-checked="true"]::after{transform:translateX(12px);background:var(--bg)}
+.sw:focus-visible{outline-offset:3px;border-radius:999px}
+.sw-l{font:500 12.5px/1.3 var(--mono)}
+.sw-d{grid-column:2;font:400 12px/1.5 var(--sans);color:var(--fg-3);text-wrap:pretty}
+.pj{border-radius:10px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);overflow:hidden}
+.pj .h{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line-soft);font:400 11px/1 var(--mono);color:var(--fg-3)}
+.pj pre{padding:10px 12px;font:400 12px/1.6 var(--mono);color:var(--fg-2);overflow-x:auto;white-space:pre}
+.form-acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sig{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font:400 11.5px/1.4 var(--mono);color:var(--fg-3)}
+.sig b{font-weight:400;color:var(--fg-2)}
+.sig .ann{color:var(--sus)}
+.d-desc{color:var(--fg-2);font-size:13.5px;line-height:1.55;margin-top:8px;max-width:62ch;text-wrap:pretty}
+.d-wf{font:500 28px/1.1 var(--sans);letter-spacing:-0.03em;margin-top:10px}
+
+/* ───────── output drawer + command line ───────── */
+.drawer{display:none;flex-direction:column;height:var(--drawer-h);background:var(--bg-sunk);border-top:1px solid var(--line);min-height:0}
+body.drawer-open .drawer{display:flex}
+@media (min-width: 761px){
+  /* peek: the last command and its one-line summary; click to expand */
+  body:not(.drawer-open) .drawer{display:flex;height:auto;cursor:pointer;transition:background-color var(--t1) var(--ease)}
+  body:not(.drawer-open) .drawer:hover{background:var(--bg)}
+  body:not(.drawer-open) .dr-h{display:none}
+  body:not(.drawer-open) .out{overflow:hidden;padding:3px 0}
+  body:not(.drawer-open) .blk{border-top:0;padding-top:4px;padding-bottom:4px}
+  body:not(.drawer-open) .blk:not(.last){display:none}
+  body:not(.drawer-open) .blk.last .ln:not(.sum):not(.pend){display:none}
+  body:not(.drawer-open) .ln{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+.dr-h{flex:none;height:30px;display:flex;align-items:center;gap:10px;padding:0 10px 0 16px;border-bottom:1px solid var(--line-soft);font:400 11.5px/1 var(--sans);color:var(--fg-3)}
+.dr-h .t{color:var(--fg-2);font-weight:500}
+.dr-h .sp{flex:1}
+.dr-h button{height:22px;padding:0 7px;border-radius:5px;color:var(--fg-3);font:400 11px/1 var(--mono);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.dr-h button:hover{background:var(--hover);color:var(--fg)}
+.grab{display:none}
+.out{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:6px 0 10px;font:400 12px/1.62 var(--mono);scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.blk{padding:6px 16px 6px 14px;border-left:2px solid transparent}
+.blk.last{border-left-color:var(--line-strong)}
+.blk + .blk{border-top:1px dashed var(--line-soft)}
+.blk-c{display:flex;align-items:baseline;gap:8px}
+.blk-c .p{color:var(--fg-4)}
+.blk-c .c{color:var(--fg);font-weight:500;overflow-wrap:anywhere}
+.blk-c .src{font-size:10.5px;color:var(--fg-4);padding:1px 5px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line-soft);flex:none}
+.blk-c .src.ui{color:var(--fg-3)}
+.blk-c .tm{margin-left:auto;color:var(--fg-4);font-size:11px;flex:none}
+.ln{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg-2);animation:lnIn var(--t2) var(--ease) both;animation-delay:calc(var(--i, 0) * 16ms)}
+@keyframes lnIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ln.pend{color:var(--fg-3)}
+.dots i{font-style:normal;animation:breathe .6s var(--ease) infinite alternate}
+.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+.t-k{color:var(--fg-3)} .t-n{color:var(--num)} .t-f{color:var(--fg-4)} .t-p{color:var(--fg-4)}
+.t-e{color:var(--fail);font-weight:500} .t-c{color:var(--fg-4)} .t-v{color:var(--fg)}
+.t-null{color:var(--fg-4)}
+.t-id,.t-cmd{color:var(--fg);text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px;border-radius:3px;font:inherit;transition:text-decoration-color var(--t1) var(--ease)}
+.t-id:hover,.t-cmd:hover{text-decoration-color:var(--fg)}
+.t-cmd{color:var(--fg-2)}
+.cmd{
+  position:relative;height:var(--cmd-h);display:flex;align-items:center;gap:10px;padding:0 10px 0 16px;
+  background:var(--bg-sunk);border-top:1px solid var(--line);
+}
+.cmd::before{content:"";position:absolute;left:0;right:0;top:-1px;height:1px;background:var(--fg-3);transform:scaleX(0);transform-origin:left;transition:transform var(--t3) var(--ease)}
+.cmd:focus-within::before,.cmd.echoing::before{transform:scaleX(1)}
+.prompt{display:flex;align-items:center;gap:7px;font:400 12.5px/1 var(--mono);color:var(--fg-4);flex:none;white-space:nowrap}
+.prompt .host{color:var(--fg-3)}
+.prompt .ch{color:var(--fg);font-weight:600}
+.cmd-w{position:relative;flex:1;min-width:0;height:36px}
+.cmd-in,.ghost{position:absolute;inset:0;font:400 13.5px/36px var(--mono);letter-spacing:-0.005em;white-space:pre;padding:0}
+.cmd-in{width:100%;border:0;background:transparent;color:var(--fg);caret-color:var(--fg);outline:0}
+.cmd-in::placeholder{color:var(--fg-4)}
+.cmd-in:focus-visible{outline:0}
+.ghost{pointer-events:none;overflow:hidden;color:transparent}
+.ghost .rest{color:var(--fg-4)}
+.ghost .caret{display:inline-block;width:.6em;height:17px;vertical-align:-3px;background:var(--fg);animation:blink 1.1s steps(1) infinite}
+.cmd:focus-within .ghost .caret{display:none}
+.cmd.echoing .ghost .caret{display:inline-block;animation:none}
+.cmd.echoing .cmd-in::placeholder,.cmd:not(:focus-within) .cmd-in::placeholder{color:transparent}
+@keyframes blink{50%{opacity:0}}
+.ret{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;color:var(--fg-4);flex:none;transition:color var(--t1) var(--ease)}
+.ret .g{width:15px;height:15px}
+.cmd.enter .ret{color:var(--fg);animation:press 220ms var(--ease)}
+@keyframes press{0%{transform:scale(.8)}100%{transform:none}}
+.cmd .hint{display:flex;align-items:center;gap:6px;font:400 11px/1 var(--sans);color:var(--fg-4);flex:none}
+.out-t{position:relative;height:28px;padding:0 9px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;color:var(--fg-3);font:500 12px/1 var(--sans);flex:none;transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.out-t:hover{background:var(--hover);color:var(--fg)}
+.out-t:active{transform:scale(.96)}
+.out-t .g{width:12px;height:12px;transition:transform var(--t2) var(--ease)}
+body.drawer-open .out-t .g{transform:rotate(180deg)}
+.out-t .badge-n{min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fg);color:var(--bg);font:600 10px/16px var(--mono);text-align:center}
+.out-t .badge-n:empty{display:none}
+.cands{
+  position:absolute;left:12px;right:12px;bottom:calc(100% + 6px);z-index:5;
+  display:flex;flex-direction:column;padding:4px;border-radius:10px;max-width:640px;
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line), 0 16px 40px oklch(0 0 0 / .5);
+  animation:rowIn var(--t1) var(--ease) both;
+}
+.cands[hidden]{display:none}
+.cand{display:flex;align-items:center;gap:10px;height:28px;padding:0 9px;border-radius:6px;font:400 12.5px/1 var(--mono);color:var(--fg-2);text-align:left}
+.cand[aria-selected="true"],.cand:hover{background:var(--sel);color:var(--fg)}
+.cand .w{font:400 12px/1 var(--sans);color:var(--fg-3);margin-left:auto}
+.cand .g{width:12px;height:12px}
+.cands .ch{display:flex;justify-content:space-between;padding:4px 9px 6px;font:400 10.5px/1 var(--sans);color:var(--fg-4)}
+.scrim{display:none}
+
+/* help dialog */
+dialog.keys{
+  margin:auto;width:min(620px,calc(100vw - 32px));border:0;border-radius:16px;padding:22px 24px 20px;color:var(--fg);
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line), 0 30px 80px oklch(0 0 0 / .6);
+}
+dialog.keys[open]{animation:pop var(--t2) var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(4px)}to{opacity:1;transform:none}}
+dialog.keys::backdrop{background:oklch(0.1 0 0 / .55)}
+.keys h2{font:500 16px/1.3 var(--sans)}
+.keys .lead{color:var(--fg-3);font-size:12.5px;margin-top:4px}
+.keys .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px;margin-top:18px}
+.keys h3{font:500 11.5px/1 var(--sans);color:var(--fg-3);margin-bottom:8px}
+.keys dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;align-items:center;font-size:12.5px;color:var(--fg-2)}
+.keys dt{display:flex;gap:3px}
+.keys .x{position:absolute;top:14px;right:14px}
+
+/* ───────── reduced motion ───────── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:1ms !important;animation-iteration-count:1 !important;transition-duration:1ms !important}
+  .sg.s-running::after{display:none}
+  .sk::after{display:none}
+  .sk{opacity:.7}
+  .ghost .caret{animation:none}
+  .brand .tip{animation:none}
+  .ln{animation:fadeOnly 160ms linear both !important;animation-delay:0ms !important}
+  .ex.pending .sg,.track .tipdot,.dots i{animation:none !important}
+  .spin{animation:none !important;border-right-color:currentColor;opacity:.6}
+  @keyframes fadeOnly{from{opacity:.35}to{opacity:1}}
+}
+
+/* ───────── mobile: its own composition ───────── */
+@media (max-width: 760px){
+  :root{--cmd-h:58px}
+  body{grid-template-rows:auto minmax(0,1fr) auto;font-size:14px}
+  .top{grid-template-columns:auto 1fr auto;padding:0 6px 0 14px;min-height:48px;padding-top:env(safe-area-inset-top)}
+  .server .opt,.server .st{display:none}
+  .server{justify-content:flex-end}
+  main{display:block;overflow:hidden}
+  .pane{position:absolute;inset:0;display:none;border-right:0}
+  main[data-screen="workflows"] .pane-wf,main[data-screen="list"] .pane-list,main[data-screen="detail"] .pane-detail{display:flex}
+  .pane.in-fwd{animation:inFwd var(--t3) var(--ease) both}
+  .pane.in-back{animation:inBack var(--t3) var(--ease) both}
+  @keyframes inFwd{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+  @keyframes inBack{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+  .pane-head{height:50px;padding:0 10px 0 6px}
+  .pane-wf .pane-head{padding-left:16px}
+  .pane-title{font-size:15px;color:var(--fg)}
+  .back{display:inline-flex;align-items:center;gap:2px;height:40px;padding:0 10px 0 4px;border-radius:9px;color:var(--fg-2);font:500 14px/1 var(--sans)}
+  .back .g{width:18px;height:18px}
+  .back:active{background:var(--hover)}
+  .pane-detail .pane-title{display:none}
+  .pane-list .pane-title{font-size:13px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pane-wf{background:var(--bg)}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 14px 4px}
+  .tile{display:grid;gap:8px;padding:14px 14px 13px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-soft);text-align:left;transition:background-color var(--t1) var(--ease)}
+  .tile:active{transform:scale(.96)}
+  .tile .n{font:500 34px/1 var(--mono);letter-spacing:-0.05em;color:var(--fg)}
+  .tile .l{display:flex;align-items:center;gap:6px;font:500 13px/1 var(--sans)}
+  .tile.wide{grid-column:1/-1;grid-template-columns:repeat(3,1fr);gap:0;padding:0;overflow:hidden}
+  .tile.wide button{display:grid;gap:7px;padding:13px 14px;text-align:left;border-right:1px solid var(--line-soft)}
+  .tile.wide button:last-child{border-right:0}
+  .tile.wide button:active{background:var(--hover)}
+  .tile.wide .n{font-size:22px}
+  .tile.wide .l{font-size:12px}
+  .tiles-h{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px 2px;font:400 12px/1.3 var(--sans);color:var(--fg-3)}
+  .wf-list{padding:10px 8px}
+  .wf{width:calc(100% - 4px);margin:2px;padding:14px 12px 14px 14px;gap:9px 10px}
+  .wf-name{font-size:15px}
+  .wf-x{opacity:1;position:static;grid-column:2;grid-row:1;height:30px}
+  .wf .wf-total{display:none}
+  .wf-all .wf-total{display:block}
+  .engine{font-size:11.5px;margin:6px 16px 24px}
+  .ex{padding:13px 16px 14px;row-gap:5px}
+  .ex-id{font-size:13.5px}
+  .ex-sub{font-size:13px}
+  .tools{padding:10px 14px}
+  .search input{height:38px;font-size:14px}
+  .search kbd{display:none}
+  .chip{height:32px;padding:0 11px;font-size:12.5px}
+  .detail{padding:18px 16px 40px}
+  .d-id{font-size:23px;letter-spacing:-0.04em}
+  .d-head{display:block}
+  .actions{margin-top:16px}
+  .actions .btn{flex:1;height:42px;font-size:14px}
+  .actions .btn kbd{display:none}
+  .ops-cli{align-items:flex-start}
+  .meta{grid-template-columns:1fr 1fr}
+  .sec{grid-template-columns:1fr;gap:12px;padding:20px 0}
+  .jrow{grid-template-columns:16px minmax(0,1fr) auto;row-gap:4px;padding:9px 6px}
+  .jrow .off{display:none}
+  .jrow .gc{grid-row:1}
+  .jrow .nm{grid-column:2}
+  .jrow .du{grid-column:3;grid-row:1}
+  .jrow .track{grid-column:2/-1;grid-row:2}
+  .jrow .ex2{grid-column:2/-1;grid-row:3}
+  .jx{margin-left:0}
+  .ledger{margin:0 -6px}
+  .f{grid-template-columns:1fr;gap:6px}
+  .f-l{padding-top:0;display:flex;align-items:baseline;gap:8px}
+  .f-l .rq{display:inline;margin:0}
+  .in{height:42px;font-size:15px}
+  .seg button{height:34px;font-size:13.5px}
+  .void{padding:36px 18px}
+  .void h2{font-size:25px}
+  .down{display:block;padding:32px 18px;overflow:auto}
+  .down h2{font-size:30px}
+  .down .steps{margin-top:28px}
+  main.is-down .down{position:absolute;inset:0}
+  .cmd{padding:0 6px 0 12px;height:auto;min-height:var(--cmd-h);padding-bottom:env(safe-area-inset-bottom)}
+  .prompt .host{display:none}
+  .cmd .hint,.ret{display:none}
+  .cmd-in,.ghost{font-size:15px;line-height:40px}
+  .cmd-w{height:40px}
+  .out-t{height:38px;padding:0 12px;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line);font-size:13px}
+  .drawer{
+    display:flex;position:fixed;z-index:20;left:0;right:0;bottom:calc(var(--cmd-h) + env(safe-area-inset-bottom));
+    height:min(64dvh,560px);border-radius:18px 18px 0 0;border-top:0;
+    box-shadow:inset 0 1px 0 var(--line), 0 -20px 50px oklch(0 0 0 / .55);
+    transform:translateY(calc(100% + var(--cmd-h) + 40px));visibility:hidden;
+    transition:transform var(--t3) var(--ease),visibility 0s linear var(--t3);
+  }
+  body.drawer-open .drawer{transform:none;visibility:visible;transition:transform var(--t3) var(--ease),visibility 0s}
+  .grab{display:block;width:36px;height:4px;border-radius:2px;background:var(--line-strong);margin:8px auto 0;flex:none}
+  .dr-h{height:40px;border-bottom:1px solid var(--line-soft);padding:0 10px 0 18px}
+  .dr-h button{height:30px;padding:0 10px;font-size:12px}
+  .out{font-size:12.5px}
+  .scrim{display:block;position:fixed;inset:0;z-index:19;background:oklch(0.08 0 0 / .5);opacity:0;pointer-events:none;transition:opacity var(--t3) var(--ease)}
+  body.drawer-open .scrim{opacity:1;pointer-events:auto}
+  .cands{left:8px;right:8px}
+  .keys .cols{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="g-running" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.6" fill="currentColor"/></symbol>
+  <symbol id="g-suspended" viewBox="0 0 16 16"><rect x="4.6" y="4" width="2.3" height="8" rx=".7" fill="currentColor"/><rect x="9.1" y="4" width="2.3" height="8" rx=".7" fill="currentColor"/></symbol>
+  <symbol id="g-succeeded" viewBox="0 0 16 16"><path d="M3.8 8.6l2.7 2.6 5.7-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-failed" viewBox="0 0 16 16"><path d="M4.7 4.7l6.6 6.6M11.3 4.7l-6.6 6.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="g-interrupted" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.6 11.4l6.8-6.8" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="g-deferred" viewBox="0 0 16 16"><path d="M8 2.6L13.4 8 8 13.4 2.6 8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="g-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.3l2.1 1.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="g-child" viewBox="0 0 16 16"><path d="M4.5 3v6.5h7M9.2 7.2l2.3 2.3-2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-parent" viewBox="0 0 16 16"><path d="M11.5 13V6.5h-7M6.8 4.2L4.5 6.5l2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-comp" viewBox="0 0 16 16"><path d="M4.5 6.5h5a3 3 0 010 6H6M6.8 4.2L4.5 6.5l2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-end" viewBox="0 0 16 16"><path d="M4 8h8M12 4.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="g-chev" viewBox="0 0 16 16"><path d="M4.5 10l3.5-3.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-back" viewBox="0 0 16 16"><path d="M10 3.5L5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-ret" viewBox="0 0 16 16"><path d="M12.5 3.5V8a1 1 0 01-1 1H4.2M6.8 6.4L4.2 9l2.6 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-play" viewBox="0 0 16 16"><path d="M5.5 4.2v7.6L11.6 8z" fill="currentColor"/></symbol>
+</svg>
+
+<header class="top" id="top">
+  <a class="brand" href="?" aria-label="kymo home">
+    <svg viewBox="0 0 44 16" aria-hidden="true"><path d="M0 11h9l2-6 3 9 2.5-11 2.5 8h7l1.5-3 1.5 3h6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/><circle class="tip" cx="41" cy="11" r="2" fill="var(--fg)"/></svg>
+    <span class="wordmark">kymo</span>
+  </a>
+  <div class="server wait" id="server" role="status" aria-live="polite"></div>
+  <div class="top-r">
+    <button class="ghost-btn" id="statesBtn" aria-expanded="false" aria-controls="states" type="button">States</button>
+    <button class="ghost-btn" id="keysBtn" type="button" aria-label="Keyboard map">?</button>
+  </div>
+  <nav class="states" id="states" hidden aria-label="Review states"></nav>
+</header>
+
+<main id="main" data-screen="workflows">
+  <section class="pane pane-wf" id="paneWf" aria-labelledby="hWf" data-pane="wf">
+    <div class="pane-head"><h2 class="pane-title" id="hWf">Workflows</h2><span class="pane-count" id="wfCount"></span><span class="sp"></span></div>
+    <div class="pane-body" id="wfBody"></div>
+  </section>
+  <section class="pane pane-list active" id="paneList" aria-labelledby="hList" data-pane="list">
+    <div class="pane-head">
+      <button class="back" data-back="workflows" type="button"><svg class="g"><use href="#g-back"/></svg>Workflows</button>
+      <h2 class="pane-title" id="hList">Executions</h2><span class="pane-count" id="listCount"></span><span class="sp"></span><span class="pane-count" title="Newest first, by each execution's most recent journal entry">by last entry ↓</span>
+    </div>
+    <div class="tools" id="tools"></div>
+    <div class="pane-body" id="listBody" role="listbox" aria-label="Executions" tabindex="-1"></div>
+  </section>
+  <section class="pane pane-detail" id="paneDetail" aria-labelledby="hDetail" data-pane="detail">
+    <div class="pane-head">
+      <button class="back" data-back="list" type="button"><svg class="g"><use href="#g-back"/></svg>Executions</button>
+      <h2 class="pane-title" id="hDetail">Execution</h2><span class="sp"></span><span class="pane-count" id="detailHint"></span>
+    </div>
+    <div class="pane-body" id="detailBody" tabindex="-1"></div>
+  </section>
+  <section class="down" id="down" hidden aria-live="assertive"></section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<section class="drawer" id="drawer" aria-label="Command output">
+  <div class="grab" aria-hidden="true"></div>
+  <div class="dr-h"><span class="t">Output</span><span id="blkCount" class="m"></span><span class="sp"></span><button type="button" id="clearOut">clear</button><button type="button" id="closeOut" aria-label="Collapse output">collapse</button></div>
+  <div class="out" id="out" role="log" aria-live="polite" aria-relevant="additions"></div>
+</section>
+
+<form class="cmd" id="cmd" autocomplete="off" role="search" aria-label="kymo command line">
+  <div class="cands" id="cands" hidden role="listbox" aria-label="Completions"></div>
+  <label class="prompt" for="cmdIn"><span class="host">ledgerly-api</span><span class="ch">›</span></label>
+  <div class="cmd-w">
+    <div class="ghost" id="ghost" aria-hidden="true"></div>
+    <input class="cmd-in" id="cmdIn" spellcheck="false" autocapitalize="off" autocorrect="off" aria-autocomplete="inline" aria-controls="cands" placeholder="kymo executions --status suspended">
+  </div>
+  <span class="ret" aria-hidden="true"><svg class="g"><use href="#g-ret"/></svg></span>
+  <span class="hint"><kbd>⌘K</kbd><kbd>tab</kbd><span>complete</span></span>
+  <button class="out-t" id="outToggle" type="button" aria-controls="drawer" aria-expanded="true"><span>Output</span><span class="badge-n" id="unread"></span><svg class="g"><use href="#g-chev"/></svg></button>
+</form>
+
+<dialog class="keys" id="keys" aria-labelledby="keysH">
+  <h2 id="keysH">Keyboard map</h2>
+  <p class="lead">Everything you can click, you can type. Everything you type, you can click.</p>
+  <button class="ghost-btn x" type="button" data-close-keys aria-label="Close">esc</button>
+  <div class="cols">
+    <div><h3>Move</h3><dl>
+      <dt><kbd>j</kbd><kbd>k</kbd></dt><dd>next / previous row</dd>
+      <dt><kbd>h</kbd><kbd>l</kbd></dt><dd>previous / next pane</dd>
+      <dt><kbd>enter</kbd></dt><dd>open the selected row</dd>
+      <dt><kbd>esc</kbd></dt><dd>back, close, cancel</dd>
+      <dt><kbd>/</kbd></dt><dd>filter executions by id or key</dd>
+    </dl></div>
+    <div><h3>Operate</h3><dl>
+      <dt><kbd>e</kbd></dt><dd>execute the selected Workflow</dd>
+      <dt><kbd>r</kbd></dt><dd>resume (suspended only)</dd>
+      <dt><kbd>i</kbd></dt><dd>interrupt, then <kbd>y</kbd> to confirm</dd>
+      <dt><kbd>⌘</kbd><kbd>↵</kbd></dt><dd>submit the execute form</dd>
+    </dl></div>
+    <div><h3>Command line</h3><dl>
+      <dt><kbd>⌘K</kbd><kbd>:</kbd></dt><dd>focus the command line</dd>
+      <dt><kbd>tab</kbd></dt><dd>complete Workflow names and ids</dd>
+      <dt><kbd>→</kbd></dt><dd>accept the ghost suggestion</dd>
+      <dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>command history</dd>
+      <dt><kbd>`</kbd></dt><dd>show / hide output</dd>
+    </dl></div>
+    <div><h3>Try typing</h3><dl class="m" style="font-size:12px">
+      <dt></dt><dd>kymo executions --status suspended</dd>
+      <dt></dt><dd>kymo resume b6f0</dd>
+      <dt></dt><dd>kymo execute NightlyExport</dd>
+      <dt></dt><dd>kymo execution 7f3a</dd>
+      <dt></dt><dd>kymo resume 91e4 <span style="color:var(--fg-4)"># not_suspended</span></dd>
+    </dl></div>
+  </div>
+</dialog>
+
+<script src="data.js"></script>
+<script>
+/* ═════════ core: clock, data, formatting ═════════ */
+const K = window.KYMO, S = K.state;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const STATUSES = ["running", "suspended", "succeeded", "failed", "interrupted"];
+const LIVE = ["running", "suspended"];
+const params = new URLSearchParams(location.search);
+const REVIEW = ["loading", "down", "empty", "nomatch", "notfound"].includes(params.get("state")) ? params.get("state") : "live";
+const NOTFOUND_ID = "4b1d2c3e5f607182";
+const mqMobile = matchMedia("(max-width: 760px)");
+const mqReduce = matchMedia("(prefers-reduced-motion: reduce)");
+const isMobile = () => mqMobile.matches;
+const reduced = () => mqReduce.matches;
+
+// page clock: KYMO.NOW at load, advanced by real elapsed time
+const T0 = Date.parse(K.NOW), P0 = performance.now();
+const now = () => T0 + (performance.now() - P0);
+const isoNow = () => new Date(now()).toISOString();
+const ts = (x) => (typeof x === "number" ? x : Date.parse(x));
+
+function dur(ms) {
+  ms = Math.max(0, Math.round(ms));
+  if (ms < 1000) return ms + "ms";
+  const s = ms / 1000;
+  if (s < 10) return s.toFixed(2) + "s";
+  if (s < 60) return s.toFixed(1) + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m " + Math.floor(s % 60) + "s";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h " + (m % 60) + "m";
+  const d = Math.floor(h / 24);
+  return d + "d " + (h % 24) + "h";
+}
+function coarse(ms) {
+  ms = Math.max(0, ms);
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h " + (m % 60) + "m";
+  const d = Math.floor(h / 24);
+  return d + "d " + (h % 24) + "h";
+}
+const ago = (t) => coarse(now() - ts(t)) + " ago";
+const until = (t) => (ts(t) <= now() ? "now" : "in " + coarse(ts(t) - now()));
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function stamp(t, ms) {
+  const d = new Date(ts(t)), n = new Date(now());
+  const hm = d.toISOString().slice(11, ms ? 23 : 19);
+  return d.toISOString().slice(0, 10) === n.toISOString().slice(0, 10) ? hm + "Z" : MON[d.getUTCMonth()] + " " + d.getUTCDate() + " " + hm.slice(0, 5) + "Z";
+}
+
+// data helpers
+const byId = (id) => S.executions.find((e) => e.id === id);
+const wfByName = (n) => S.workflows.find((w) => w.name === n);
+const wfNames = () => S.workflows.map((w) => w.name);
+// one ordering everywhere: the most recent journal entry (start, Activity, wait, child, compensation, exit)
+function lastEntry(e) {
+  const cap = now();
+  let t = ts(e.startedAt);
+  const add = (x) => { if (x) { const v = ts(x); if (v <= cap && v > t) t = v; } };
+  add(e.endedAt);
+  e.activities.forEach((a) => { add(a.startedAt); add(a.endedAt); });
+  (e.waits || []).forEach((w) => { add(w.since); add(w.doneAt); if (w.status === "done") add(w.wakeAt); });
+  (e.childCalls || []).forEach((c) => { add(c.startedAt); add(c.endedAt); });
+  (e.compensations || []).forEach((c) => add(c.at));
+  return t;
+}
+const lastIso = (e) => new Date(lastEntry(e)).toISOString();
+const sortedExecs = () => [...S.executions].sort((a, b) => lastEntry(b) - lastEntry(a));
+function countBy(list) {
+  const c = { running: 0, suspended: 0, succeeded: 0, failed: 0, interrupted: 0 };
+  list.forEach((e) => c[e.status]++);
+  return c;
+}
+const REASON = { deferred: "DurableDeferred", clock: "DurableClock", failure: "SuspendOnFailure", child: "child" };
+const keyFields = (w) => w.idempotencyKey.split("+").map((s) => s.trim().replace(/^payload\./, ""));
+function deriveKey(w, p) {
+  const vals = keyFields(w).map((k) => p[k]);
+  if (vals.some((v) => v === undefined || v === null || v === "")) return null;
+  return vals.map(String).join(":");
+}
+function resolveId(arg) {
+  if (!arg) return { missing: true };
+  const p = String(arg).toLowerCase();
+  if (byId(p)) return { id: p };
+  const m = S.executions.filter((e) => e.id.startsWith(p));
+  if (m.length === 1) return { id: m[0].id, expanded: p };
+  if (m.length > 1) return { ambiguous: m, prefix: p };
+  return { id: p };
+}
+const shortId = (id) => id.slice(0, 8);
+
+// API wrapper: server-down simulation + timestamp rewrite onto the page clock
+async function call(name, ...args) {
+  if (S.server.status === "down") {
+    await sleep(K.api.latency);
+    throw { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` };
+  }
+  return K.api[name](...args);
+}
+
+// glyphs + value rendering
+const G = (name, cls = "") => `<svg class="g ${cls}" aria-hidden="true"><use href="#g-${name}"/></svg>`;
+const sg = (status) => `<span class="sg s-${status}" aria-hidden="true">${G(status)}</span>`;
+const actStatus = { success: "succeeded", failure: "failed", running: "running" };
+function compact(v) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(compact).join(", ") + "]";
+  const e = Object.entries(v);
+  return e.length ? "{ " + e.map(([k, x]) => k + ": " + compact(x)).join(", ") + " }" : "{}";
+}
+function val(v) {
+  if (v === null || v === undefined) return '<span class="v-null">null</span>';
+  if (typeof v === "number" || typeof v === "boolean") return `<span class="v-n">${v}</span>`;
+  if (typeof v === "string") return `<span class="v-s">"${esc(v)}"</span>`;
+  return `<span class="v-s">${esc(compact(v))}</span>`;
+}
+// box-drawing tree lines for an object
+function treeLines(obj, prefix) {
+  const ent = Object.entries(obj);
+  return ent.map(([k, x], i) => {
+    const last = i === ent.length - 1;
+    const br = prefix + (last ? "└─ " : "├─ ");
+    if (x && typeof x === "object" && Object.keys(x).length) {
+      return `<div class="tl"><span class="br">${br}</span><span class="v-k">${esc(k)}</span></div>` + treeLines(x, prefix + (last ? "   " : "│  "));
+    }
+    return `<div class="tl"><span class="br">${br}</span><span class="v-k">${esc(k)}</span>  ${val(x)}</div>`;
+  }).join("");
+}
+function causeSummary(c) {
+  if (!c) return "";
+  if (c._tag === "Fail") {
+    const { _tag, ...rest } = c.error || {};
+    return "Fail " + (_tag || "") + (Object.keys(rest).length ? " " + compact(rest) : "");
+  }
+  if (c._tag === "Die") return "Die " + (c.defect?.name || "defect") + ": " + (c.defect?.message || "");
+  if (c._tag === "Interrupt") return "Interrupt " + (c.fiberId || "");
+  return c._tag;
+}
+function exitSummary(x) {
+  if (!x) return "";
+  if (x._tag === "Success") return "Success " + (x.value === null || x.value === undefined ? "null" : compact(x.value));
+  return causeSummary(x.cause);
+}
+</script>
+<script>
+/* ═════════ UI state + views ═════════ */
+const ui = {
+  boot: "loading", downErr: null, retrying: false,
+  wf: null, status: null, q: "", sel: null,
+  pane: "list", screen: "workflows",
+  mode: "detail", execWf: null, form: null, discard: false, pendingExecute: false, execResult: null,
+  confirm: null, pending: {}, opError: {}, notice: null, notFound: null, detailLoading: null,
+  expanded: new Set(), fresh: new Set(), bump: null,
+};
+
+function filtered() {
+  const q = ui.q.trim().toLowerCase();
+  return sortedExecs().filter((e) => (!ui.wf || e.workflow === ui.wf) && (!ui.status || e.status === ui.status) &&
+    (!q || e.id.startsWith(q) || String(e.idempotencyKey).toLowerCase().includes(q)));
+}
+function keepFocus(container, fn) {
+  const a = document.activeElement;
+  const key = a && a !== container && container.contains(a) ? a.dataset.key || null : null;
+  fn();
+  if (key) {
+    const el = container.querySelector(`[data-key="${CSS.escape(key)}"]`);
+    if (el) el.focus({ preventScroll: true });
+  }
+}
+const cliHtml = (c) => `<span class="cli"><span class="p">$</span><code>${esc(c)}</code><button type="button" data-copy="${esc(c)}" aria-label="Copy ${esc(c)}">copy</button></span>`;
+const sec = (h, small, body) => `<section class="sec"><h4 class="sec-h">${h}${small ? `<small>${small}</small>` : ""}</h4><div>${body}</div></section>`;
+
+/* header */
+function renderServer() {
+  const s = S.server, el = $("#server");
+  const down = ui.boot === "down", loading = ui.boot === "loading";
+  el.className = "server" + (down ? " down" : loading ? " wait" : "");
+  const host = s.url.replace(/^https?:\/\//, "");
+  el.innerHTML = `<span class="dot"></span><span class="app">${esc(s.app)}</span><span class="sep opt">·</span><span class="opt">${esc(host)}</span>` +
+    (down ? `<span class="sep st">·</span><span class="st">unreachable</span>`
+      : loading ? `<span class="sep st">·</span><span class="st">connecting…</span>`
+      : `<span class="sep opt">·</span><span class="opt">effect ${esc(s.effect)}</span><span class="sep opt">·</span><span class="opt">${esc(s.runner)}</span><span class="sep opt">·</span><span class="opt">up ${esc(s.uptime)}</span>`);
+}
+
+/* workflows pane */
+function traceHtml(c, total) {
+  if (!total) return `<span class="trace zero" aria-hidden="true"></span>`;
+  return `<span class="trace" aria-hidden="true">${STATUSES.filter((s) => c[s]).map((s) => `<i class="s-${s}" style="flex-grow:${c[s]}"></i>`).join("")}</span>`;
+}
+function countsHtml(c) {
+  return `<span class="wf-counts" aria-hidden="true">${STATUSES.map((s) => c[s]
+    ? `<span title="${s}"><span class="s-${s}">${G(s)}</span>${c[s]}</span>`
+    : `<span class="z" title="${s}">${G(s)}0</span>`).join("")}</span>`;
+}
+function tilesHtml(c) {
+  return `<div class="tiles">
+    <div class="tiles-h"><span>Journal · ${S.executions.length} executions</span><span class="m">${esc(S.server.app)}</span></div>
+    ${["running", "suspended"].map((s) => `<button class="tile" type="button" data-tile="${s}"><span class="n">${c[s]}</span><span class="l"><span class="s-${s}">${G(s)}</span>${s}</span></button>`).join("")}
+    <div class="tile wide">${["succeeded", "failed", "interrupted"].map((s) => `<button type="button" data-tile="${s}"><span class="n">${c[s]}</span><span class="l"><span class="s-${s}">${G(s)}</span>${s}</span></button>`).join("")}</div>
+  </div>`;
+}
+function engineHtml() {
+  const s = S.server;
+  return `<div class="engine" aria-label="Engine">
+    <div><span class="k">app     </span> <b>${esc(s.app)}</b></div>
+    <div><span class="k">engine  </span> ClusterWorkflowEngine</div>
+    <div><span class="k">runner  </span> ${esc(s.runner)} · effect ${esc(s.effect)}</div>
+    <div><span class="k">storage </span> ${esc(s.storage)}</div>
+  </div>`;
+}
+function renderWorkflows() {
+  const body = $("#wfBody");
+  $("#wfCount").textContent = ui.boot === "ready" ? S.workflows.length : "";
+  if (ui.boot !== "ready") {
+    body.innerHTML = `<div class="wf-list" aria-busy="true">${[52, 70, 58, 64, 48, 60].map((w) => `<div class="wf" aria-hidden="true"><span class="sk" style="height:11px;width:${w}%"></span><span></span><span class="sk" style="grid-column:1/-1;height:3px"></span><span class="sk" style="grid-column:1/-1;height:8px;width:70%"></span></div>`).join("")}</div>`;
+    return;
+  }
+  const all = countBy(S.executions);
+  const rows = [{ name: "", c: all, total: S.executions.length }].concat(S.workflows.map((w) => {
+    const l = S.executions.filter((e) => e.workflow === w.name);
+    return { name: w.name, c: countBy(l), total: l.length };
+  }));
+  const selName = ui.wf || "";
+  keepFocus(body, () => {
+    body.innerHTML = tilesHtml(all) + `<div class="wf-list" role="listbox" aria-label="Workflows">` + rows.map((r) => {
+      const sel = selName === r.name;
+      const label = r.name || "All workflows";
+      const desc = STATUSES.filter((s) => r.c[s]).map((s) => `${r.c[s]} ${s}`).join(", ") || "no executions";
+      return `<div class="wf${r.name ? "" : " wf-all"}" role="option" tabindex="${sel ? 0 : -1}" aria-selected="${sel}" data-key="wf:${r.name}" data-wf="${r.name}" aria-label="${esc(label)}: ${desc}">
+        <span class="wf-name">${esc(label)}</span><span class="wf-total m">${r.total}</span>
+        ${r.name ? `<button class="wf-x" type="button" tabindex="-1" data-exec="${r.name}" aria-label="Execute ${r.name}">${G("play")}Execute</button>` : ""}
+        ${traceHtml(r.c, r.total)}${countsHtml(r.c)}
+      </div>`;
+    }).join("") + `</div>` + engineHtml();
+  });
+}
+
+/* executions pane */
+function renderTools() {
+  const t = $("#tools");
+  if (ui.boot !== "ready") {
+    t.innerHTML = `<span class="sk" style="height:30px;border-radius:7px"></span><span class="sk" style="height:22px;width:84%"></span>`;
+    return;
+  }
+  const base = S.executions.filter((e) => !ui.wf || e.workflow === ui.wf);
+  const c = countBy(base);
+  const chips = [["", "all", base.length]].concat(STATUSES.map((s) => [s, s, c[s]]));
+  keepFocus(t, () => {
+    t.innerHTML = `<div class="search"><input id="q" type="search" placeholder="filter by id prefix or idempotencyKey" value="${esc(ui.q)}" aria-label="Filter executions by id prefix or idempotencyKey" data-key="q"><kbd>/</kbd></div>
+    <div class="chips" role="group" aria-label="Filter by status">${chips.map(([s, l, n]) => `<button type="button" class="chip" data-status="${s}" data-key="st:${s}" aria-pressed="${(ui.status || "") === s}">${s ? `<span class="s-${s}">${G(s)}</span>` : ""}${l} <b>${n}</b></button>`).join("")}</div>`;
+  });
+}
+function rowHtml(e, focusable) {
+  const sel = ui.sel === e.id;
+  const reason = e.status === "suspended" && e.suspendedReason ? `<span class="tag">${e.suspendedReason === "failure" ? "SuspendOnFailure" : e.suspendedReason}</span>` : "";
+  const t = `<span class="ex-t" title="last journal entry" data-ago="${lastIso(e)}">${ago(lastEntry(e))}</span>`;
+  const cls = "ex" + (ui.pending[e.id] ? " pending" : "") + (ui.fresh.has(e.id) ? " enter" : "") + (ui.bump === e.id ? " flash" : "");
+  return `<div class="${cls}" role="option" aria-selected="${sel}" tabindex="${focusable ? 0 : -1}" data-key="ex:${e.id}" data-id="${e.id}" aria-label="${esc(e.workflow)} ${e.id}, ${e.status}${e.suspendedReason ? " on " + e.suspendedReason : ""}">
+    ${sg(e.status)}<span class="ex-id"><b>${e.id.slice(0, 8)}</b>${e.id.slice(8)}</span>${t}
+    <span class="ex-sub"><span>${esc(e.workflow)}</span>${reason}<span class="key">${esc(e.idempotencyKey)}</span></span>
+  </div>`;
+}
+function renderList() {
+  const body = $("#listBody");
+  const title = $("#hList");
+  title.textContent = isMobile() ? ui.wf || "All workflows" : "Executions";
+  if (ui.boot !== "ready") {
+    $("#listCount").textContent = "";
+    body.setAttribute("aria-busy", "true");
+    body.innerHTML = Array.from({ length: 8 }, () => `<div class="sk-row" aria-hidden="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>`).join("");
+    return;
+  }
+  body.removeAttribute("aria-busy");
+  const items = filtered();
+  $("#listCount").textContent = items.length === S.executions.length ? String(items.length) : `${items.length} of ${S.executions.length}`;
+  if (!S.executions.length) { body.innerHTML = emptyJournalHtml(); return; }
+  if (!items.length) { body.innerHTML = noMatchHtml(); return; }
+  const anySel = items.some((e) => e.id === ui.sel);
+  keepFocus(body, () => {
+    body.innerHTML = items.map((e, i) => rowHtml(e, anySel ? e.id === ui.sel : i === 0)).join("");
+  });
+  ui.fresh.clear();
+}
+function emptyJournalHtml() {
+  const w = ui.wf || S.workflows[0].name;
+  return `<div class="blank"><span class="big">The journal is empty.</span>
+    <p>No Workflow has been executed against <span class="m">${esc(S.server.storage.split(" ")[1] || "the database")}</span> yet. Executions appear here the moment the engine journals them.</p>
+    <div class="row"><button class="btn btn-primary" type="button" data-exec="${w}">${G("play")}Execute ${w}</button></div>${cliHtml(K.cli.execute(w))}</div>`;
+}
+function noMatchHtml() {
+  const wfTotal = ui.wf ? S.executions.filter((e) => e.workflow === ui.wf).length : S.executions.length;
+  if (ui.wf && !wfTotal) {
+    return `<div class="blank"><span class="big">${esc(ui.wf)} has never been executed.</span>
+      <p>Nothing in the journal for this Workflow yet. Execute it and the first execution lands here.</p>
+      <div class="row"><button class="btn btn-primary" type="button" data-exec="${ui.wf}">${G("play")}Execute ${esc(ui.wf)}</button></div>${cliHtml(K.cli.execute(ui.wf))}</div>`;
+  }
+  const what = [ui.status, ui.wf].filter(Boolean).join(" ");
+  const q = ui.q.trim();
+  return `<div class="blank"><span class="big">No ${esc(what)}${what ? " " : ""}executions${q ? ` match “${esc(q)}”` : ""}.</span>
+    <p>The journal holds ${wfTotal} ${ui.wf ? esc(ui.wf) + " " : ""}execution${wfTotal === 1 ? "" : "s"}; none pass this filter.</p>
+    <div class="row"><button class="btn" type="button" data-act="clear-filters">Clear filters</button>${ui.status ? `<button class="btn" type="button" data-status-only="">Any status</button>` : ""}</div>
+    ${cliHtml(K.cli.list({ workflow: ui.wf, status: ui.status }))}</div>`;
+}
+
+/* detail pane */
+function causeTree(c, e, root) {
+  let h = `<div class="tl root">${root || "Exit.Failure"}</div>`;
+  if (!c) return h;
+  if (c._tag === "Fail") {
+    const { _tag, ...rest } = c.error || {};
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-failed">Cause.Fail</span></div>`;
+    h += `<div class="tl"><span class="br">   └─ </span><span class="tg">${esc(_tag || "error")}</span></div>`;
+    h += treeLines(rest, "      ");
+  } else if (c._tag === "Die") {
+    const d = c.defect || {};
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-failed">Cause.Die</span>  <span class="v-k">defect</span></div>`;
+    h += `<div class="tl"><span class="br">   ├─ </span><span class="v-k">name   </span>  <span class="tg">${esc(d.name || "Error")}</span></div>`;
+    h += `<div class="tl"><span class="br">   ├─ </span><span class="v-k">message</span>  ${val(d.message)}</div>`;
+    h += `<div class="tl"><span class="br">   └─ </span><span class="v-k">stack</span></div><pre>${esc((d.stack || "").split("\n").map((l) => "         " + l).join("\n"))}</pre>`;
+  } else if (c._tag === "Interrupt") {
+    const by = e && e.interruptedBy;
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-interrupted">Cause.Interrupt</span></div>`;
+    h += `<div class="tl"><span class="br">   ${by ? "├─" : "└─"} </span><span class="v-k">fiberId</span>  <span class="v-n">${esc(c.fiberId || "?")}</span></div>`;
+    if (by) h += `<div class="tl"><span class="br">   └─ </span><span class="v-k">interruptedBy</span>  ${val(by)}</div>`;
+  }
+  return h;
+}
+function successTree(v) {
+  return `<div class="tl root">Exit.Success</div>` + (v && typeof v === "object" && Object.keys(v).length
+    ? treeLines(v, "")
+    : `<div class="tl"><span class="br">└─ </span>${val(v)}</div>`);
+}
+function exitInline(x) {
+  if (!x) return "";
+  if (x._tag === "Success") return `<span class="ok">Success</span> ${esc(x.value === null || x.value === undefined ? "null" : compact(x.value))}`;
+  const s = causeSummary(x.cause), i = s.indexOf(" ");
+  const head = i < 0 ? s : s.slice(0, i), tail = i < 0 ? "" : s.slice(i + 1);
+  return `<span class="${x.cause && x.cause._tag === "Interrupt" ? "ir" : "bad"}">${esc(head)}</span> ${esc(tail)}`;
+}
+function activityDetail(a) {
+  const x = a.exit;
+  const tree = !x ? `<div class="tl"><span class="root">in flight</span>  <span class="v-null">no exit journaled yet</span></div>`
+    : x._tag === "Success" ? successTree(x.value) : causeTree(x.cause, null);
+  return `<div class="lbl">${esc(a.name)} · attempt ${a.attempt}</div><div class="tree">${tree}</div>
+    <div class="times">started ${stamp(a.startedAt, true)}${a.endedAt ? ` · ended ${stamp(a.endedAt, true)} · took ${dur(ts(a.endedAt) - ts(a.startedAt))}` : " · still running"}</div>`;
+}
+function waitDetail(w) {
+  const kind = w.kind === "deferred" ? "DurableDeferred" : "DurableClock";
+  const o = { kind, name: w.name, status: w.status, since: w.since };
+  if (w.wakeAt) o.wakeAt = w.wakeAt;
+  if (w.schema) o.schema = w.schema;
+  if (w.doneAt) o.doneAt = w.doneAt;
+  let h = `<div class="lbl">${kind} · ${esc(w.name)}</div><div class="tree"><div class="tl root">${kind}</div>${treeLines(o, "")}`;
+  if (w.exit) h += `<div style="height:8px"></div>` + (w.exit._tag === "Success" ? successTree(w.exit.value) : causeTree(w.exit.cause, null));
+  h += `</div>`;
+  if (w.kind === "deferred" && w.status === "waiting") h += `<div class="times">Completed by your app with DurableDeferred.done. kymo shows it; it does not answer it.</div>`;
+  return h;
+}
+function journalHtml(e) {
+  const S0 = ts(e.startedAt);
+  let S1 = e.endedAt ? ts(e.endedAt) : now();
+  (e.waits || []).forEach((w) => { if (w.status === "waiting" && w.wakeAt && !e.endedAt) S1 = Math.max(S1, ts(w.wakeAt)); });
+  const span = Math.max(1, S1 - S0);
+  const pct = (t) => Math.min(100, Math.max(0, ((ts(t) - S0) / span) * 100));
+  const nowPct = pct(now());
+  const nowMark = !e.endedAt && nowPct < 99.4 ? `<i class="now" style="left:${nowPct.toFixed(2)}%" title="now"></i>` : "";
+  const rows = [];
+  e.activities.forEach((a, i) => rows.push({ k: "act", t: ts(a.startedAt), a, i }));
+  (e.waits || []).forEach((w, i) => rows.push({ k: "wait", t: ts(w.since), w, i }));
+  (e.childCalls || []).forEach((c, i) => rows.push({ k: "child", t: ts(c.startedAt), c, i }));
+  rows.sort((x, y) => x.t - y.t);
+  const maxAtt = {};
+  e.activities.forEach((a) => (maxAtt[a.name] = Math.max(maxAtt[a.name] || 0, a.attempt)));
+  let prev = null;
+  const bar = (l, r, cls = "") => `<i class="bar ${cls}" style="left:${l.toFixed(2)}%;width:${Math.max(0.4, r - l).toFixed(2)}%"></i>`;
+  const html = rows.map((r) => {
+    const off = `<span class="off">+${dur(r.t - S0)}</span>`;
+    if (r.k === "act") {
+      const a = r.a, st = actStatus[a.status] || "running";
+      const end = a.endedAt ? ts(a.endedAt) : now();
+      const key = "a" + r.i, open = ui.expanded.has(e.id + ":" + key);
+      const cont = prev === a.name && a.attempt > 1;
+      prev = a.name;
+      const exitTxt = a.exit ? exitInline(a.exit) : `<span class="wt">in flight</span> attempt ${a.attempt} has not returned`;
+      return `<button type="button" class="jrow act${cont ? " cont" : ""}" data-key="j:${key}" data-j="${key}" aria-expanded="${open}" aria-controls="x-${key}" aria-label="Activity ${esc(a.name)}, attempt ${a.attempt}, ${a.status}">
+        ${off}<span class="gc">${sg(st)}</span>
+        <span class="nm"><span class="n">${esc(a.name)}</span>${maxAtt[a.name] > 1 ? `<span class="att${a.attempt > 1 ? " retry" : ""}">attempt ${a.attempt}</span>` : ""}</span>
+        <span class="track s-${st}">${bar(pct(a.startedAt), pct(end))}${a.status === "running" ? `<i class="tipdot" style="left:${pct(end).toFixed(2)}%"></i>` : ""}${nowMark}</span>
+        <span class="du"${a.endedAt ? "" : ` data-el="${a.startedAt}"`}>${dur(end - ts(a.startedAt))}</span>
+        <span class="ex2">${exitTxt}</span>
+      </button><div class="jx" id="x-${key}"${open ? "" : " hidden"}>${activityDetail(a)}</div>`;
+    }
+    if (r.k === "wait") {
+      prev = null;
+      const w = r.w, abandoned = w.status === "waiting" && !!e.endedAt, waiting = w.status === "waiting" && !abandoned;
+      const kind = w.kind === "deferred" ? "DurableDeferred" : "DurableClock";
+      const endT = abandoned ? e.endedAt : waiting ? (w.kind === "clock" ? w.wakeAt : null) : w.doneAt || w.wakeAt;
+      const key = "w" + r.i, open = ui.expanded.has(e.id + ":" + key);
+      const right = endT ? pct(endT) : nowPct;
+      const du = waiting
+        ? w.kind === "clock" ? `<span class="du" data-until="${w.wakeAt}">${until(w.wakeAt)}</span>` : `<span class="du" data-el="${w.since}">${dur(now() - ts(w.since))}</span>`
+        : `<span class="du">${dur(ts(endT) - ts(w.since))}</span>`;
+      const ex = abandoned ? `<span class="ir">abandoned</span> when the execution ended, never completed`
+        : w.kind === "deferred"
+        ? waiting ? `<span class="wt">waiting</span> for ${esc(w.schema || "a value")}` : `<span class="ok">done</span> ${stamp(w.doneAt)} · ${esc(exitSummary(w.exit))}`
+        : waiting ? `<span class="wt">sleeping</span> · wakes ${stamp(w.wakeAt)}` : `<span class="ok">woke</span> ${stamp(w.wakeAt)}`;
+      return `<button type="button" class="jrow wait${waiting ? " waiting" : ""}" data-key="j:${key}" data-j="${key}" aria-expanded="${open}" aria-controls="x-${key}" aria-label="${kind} ${esc(w.name)}, ${w.status}">
+        ${off}<span class="gc">${G(w.kind === "deferred" ? "deferred" : "clock")}</span>
+        <span class="nm"><span class="n">${esc(w.name)}</span><span class="kind">${kind}</span></span>
+        <span class="track ${waiting ? "s-suspended" : ""}">${bar(pct(w.since), right, "dash")}${nowMark}</span>
+        ${du}<span class="ex2">${ex}</span>
+      </button><div class="jx" id="x-${key}"${open ? "" : " hidden"}>${waitDetail(w)}</div>`;
+    }
+    prev = null;
+    const c = r.c, ch = byId(c.execution), st = ch ? ch.status : "running";
+    const end = c.endedAt ? ts(c.endedAt) : ch && ch.endedAt ? ts(ch.endedAt) : now();
+    return `<button type="button" class="jrow child" data-key="j:c${r.i}" data-go="${c.execution}" aria-label="Child execution ${esc(c.name)} ${c.execution}, ${st}. Open">
+      ${off}<span class="gc">${G("child")}</span>
+      <span class="nm"><span class="n">${esc(c.name)}</span><span class="kind">child</span></span>
+      <span class="track s-${st}">${bar(pct(c.startedAt), pct(end))}${nowMark}</span>
+      <span class="du"${c.endedAt || (ch && ch.endedAt) ? "" : ` data-el="${c.startedAt}"`}>${dur(end - ts(c.startedAt))}</span>
+      <span class="ex2">→ <span style="color:var(--fg)">${shortId(c.execution)}</span> ${esc(ch ? ch.workflow : "")} · <span class="s-${st}">${st}</span></span>
+    </button>`;
+  });
+  let endRow;
+  if (e.endedAt) {
+    const st = e.status;
+    endRow = `<div class="jrow end"><span class="off">+${dur(ts(e.endedAt) - S0)}</span><span class="gc s-${st}">${G("end")}</span>
+      <span class="nm"><span class="n">${st === "succeeded" ? "Exit.Success" : "Exit.Failure"}</span><span class="kind">${stamp(e.endedAt)}</span></span>
+      <span class="track s-${st}">${bar(99.6, 100)}</span><span class="du">${dur(ts(e.endedAt) - S0)}</span></div>`;
+  } else {
+    const st = e.status;
+    const label = st === "running" ? "journal open" : "suspended · " + (e.suspendedReason === "failure" ? "SuspendOnFailure" : REASON[e.suspendedReason] || "");
+    endRow = `<div class="jrow end"><span class="off" data-el="${e.startedAt}" data-prefix="+">+${dur(now() - S0)}</span><span class="gc">${sg(st)}</span>
+      <span class="nm"><span class="n">${label}</span><span class="kind">now</span></span>
+      <span class="track s-${st}"><i class="tipdot" style="left:${nowPct.toFixed(2)}%"></i></span><span class="du" data-el="${e.startedAt}">${dur(now() - S0)}</span></div>`;
+  }
+  const empty = rows.length ? "" : `<p class="muted" style="padding:6px 8px 10px">Nothing journaled yet. The first Activity lands here when it completes.</p>`;
+  return `<div class="ledger">${empty}${html.join("")}${endRow}</div>`;
+}
+function exitHtml(e) {
+  const r = e.result, w = wfByName(e.workflow) || {};
+  if (!r) {
+    const sub = e.status === "running" ? "Still running. The exit is journaled when the Workflow returns." : "Suspended executions have no exit until they resume and finish.";
+    return sec("Exit", "pending", `<p class="verdict" style="color:var(--fg-2)">No exit yet.</p><p>${sub}</p>`);
+  }
+  let verdict, sub, tree;
+  if (r._tag === "Suspended") {
+    const tag = r.cause && r.cause._tag === "Fail" ? r.cause.error._tag : r.cause && r.cause._tag;
+    verdict = `Suspended on <span class="m s-suspended">${esc(tag)}</span>`;
+    sub = "SuspendOnFailure kept this failure out of the exit. The execution is parked, not failed: fix the cause, then resume.";
+    tree = causeTree(r.cause, e, "Suspended");
+  } else if (r.exit._tag === "Success") {
+    verdict = `<span class="s-succeeded">Succeeded.</span>`;
+    sub = `Returned <span class="m">${esc(w.success || "a value")}</span>.`;
+    tree = successTree(r.exit.value);
+  } else {
+    const c = r.exit.cause;
+    if (c._tag === "Fail") {
+      verdict = `Failed with <span class="m s-failed">${esc(c.error._tag)}</span>`;
+      sub = `A typed error from the error channel <span class="m">${esc(w.error || "")}</span>.`;
+    } else if (c._tag === "Die") {
+      verdict = `Died on a defect: <span class="m s-failed">${esc(c.defect.name)}</span>`;
+      sub = "Not a typed error. Something threw inside the Workflow; the stack points at it.";
+    } else {
+      verdict = `<span class="s-interrupted">Interrupted.</span>`;
+      sub = e.interruptedBy ? `By <span class="m">${esc(e.interruptedBy)}</span>.` : "Interrupted by its parent or the runtime.";
+    }
+    tree = causeTree(c, e);
+  }
+  return sec("Exit", r._tag === "Suspended" || (r.exit && r.exit._tag === "Failure") ? "with Cause" : "", `<p class="verdict">${verdict}</p><p>${sub}</p><div class="tree">${tree}</div>`);
+}
+function compsHtml(e) {
+  const cs = e.compensations || [];
+  const live = LIVE.includes(e.status);
+  const body = cs.length ? cs.map((c) => `<div class="comp"><span class="${c.ran ? "s-succeeded" : ""}" style="${c.ran ? "" : "color:var(--fg-3)"}">${G("comp")}</span>
+      <span class="n">${esc(c.name)}<span class="for">for ${esc(c.activity)}</span></span>
+      <span class="st${c.ran ? " ran" : ""}">${c.ran ? "ran " + stamp(c.at, true) : live ? "registered · runs on interrupt" : e.status === "succeeded" ? "registered · not needed" : "registered · did not run"}</span>
+      ${c.ran && c.exit ? `<span class="ex2">${esc(exitSummary(c.exit))}</span>` : ""}</div>`).join("")
+    : `<p class="muted">None registered.${live ? " An interrupt would have nothing to undo." : ""}</p>`;
+  return sec("Compensations", `${cs.filter((c) => c.ran).length} ran / ${cs.length} registered`, body);
+}
+function payloadHtml(e) {
+  const w = wfByName(e.workflow);
+  const kf = w ? keyFields(w) : [];
+  const ent = Object.entries(e.payload || {});
+  return sec("Payload", `${ent.length} fields`, `<dl class="kv">${ent.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${val(v)}${kf.includes(k) ? ` <span class="tag" style="color:var(--fg-3);margin-left:6px">idempotencyKey</span>` : ""}</dd>`).join("")}</dl>`);
+}
+function actionsHtml(e) {
+  const p = ui.pending[e.id];
+  const btns = [];
+  if (e.status === "suspended") btns.push(`<button class="btn btn-primary" type="button" data-act="resume" ${p ? "disabled" : ""}>${p === "resume" ? `<span class="spin"></span>Resuming…` : `${G("play")}Resume`} <kbd>r</kbd></button>`);
+  if (LIVE.includes(e.status)) btns.push(`<button class="btn btn-danger" type="button" data-act="ask-interrupt" ${p ? "disabled" : ""} aria-expanded="${ui.confirm === e.id}">${p === "interrupt" ? `<span class="spin"></span>Interrupting…` : "Interrupt"} <kbd>i</kbd></button>`);
+  if (!btns.length) return `<div class="ops-cli"><span class="muted">Terminal. Nothing to resume or interrupt.</span>${cliHtml(K.cli.show(e.id))}</div>`;
+  const clis = [e.status === "suspended" && K.cli.resume(e.id), K.cli.interrupt(e.id)].filter(Boolean);
+  return `<div class="actions">${btns.join("")}</div><div class="ops-cli">${clis.map(cliHtml).join("")}</div>`;
+}
+function noticeHtml(e) {
+  const n = ui.notice;
+  if (!n || n.id !== e.id) return "";
+  const map = {
+    dedup: ["dedup", "deduplicated", `idempotencyKey <code>${esc(e.idempotencyKey)}</code> already maps to this execution, so Effect returned it instead of running ${esc(e.workflow)} again.`],
+    created: ["info", "executed", `A new ${esc(e.workflow)} execution. Each Activity appears in the journal as the engine records it.`],
+    resumed: ["info", "resumed", `Running again. The engine replays the journal: completed Activities return their recorded exits instead of running twice.`],
+    interrupted: ["info", "interrupted", `${n.comps ? `${n.comps} compensation${n.comps > 1 ? "s" : ""} ran` : "No compensations to run"}${n.kids ? `; ${n.kids} child execution${n.kids > 1 ? "s" : ""} interrupted` : ""}. This is terminal.`],
+  };
+  const [cls, code, msg] = map[n.kind];
+  return `<div class="alert ${cls}" role="status"><span class="code">${code}</span><span class="msg">${msg}</span><span class="acts"><button class="ghost-btn" type="button" data-act="dismiss-notice">dismiss</button></span></div>`;
+}
+function opErrorHtml(e) {
+  const er = ui.opError[e.id];
+  if (!er) return "";
+  const net = er.error === "server_unreachable";
+  return `<div class="alert" role="alert"><span class="code">error: ${esc(er.error)}</span>
+    <span class="msg">${esc(er.message)}${net ? `. Is ${esc(S.server.app)} up at <code>${esc(S.server.url)}</code>?` : ""}</span>
+    <span class="acts">${net ? `<button class="btn" type="button" data-act="retry-op" data-op="${er.op}">Retry ${er.op}</button>` : ""}<button class="ghost-btn" type="button" data-act="dismiss-error">dismiss</button></span></div>`;
+}
+function suspNoteHtml(e) {
+  if (e.status !== "suspended") return "";
+  const w = (e.waits || []).find((x) => x.status === "waiting");
+  if (e.suspendedReason === "deferred" && w) return `<p class="note">Parked on DurableDeferred <b>${esc(w.name)}</b>. Your app completes it with <code>DurableDeferred.done</code>; kymo won't fake the answer. Resume re-enters the Workflow, and it suspends again while the deferred is open.</p>`;
+  if (e.suspendedReason === "clock" && w) return `<p class="note">Sleeping on DurableClock <b>${esc(w.name)}</b> until <b>${stamp(w.wakeAt)}</b>, <span data-until="${w.wakeAt}">${until(w.wakeAt)}</span>. Resume re-enters the Workflow; the clock still decides when it wakes.</p>`;
+  if (e.suspendedReason === "failure") {
+    const a = [...e.activities].reverse().find((x) => x.status === "failure");
+    const tag = a && a.exit && a.exit.cause && a.exit.cause.error ? a.exit.cause.error._tag : "a failure";
+    return `<p class="note">SuspendOnFailure parked this execution after <b>${a ? esc(a.name) : "an Activity"}</b> failed on attempt ${a ? a.attempt : "?"} with <code>${esc(tag)}</code>. Fix the cause, then resume: the journal replays and ${a ? esc(a.name) : "it"} runs again.</p>`;
+  }
+  return `<p class="note">Waiting on a child execution. Resume re-enters once you have reason to.</p>`;
+}
+function confirmHtml(e) {
+  if (ui.confirm !== e.id || !LIVE.includes(e.status)) return "";
+  const comps = e.compensations.filter((c) => c.registered && !c.ran).slice().reverse();
+  const kids = (e.children || []).map(byId).filter((k) => k && LIVE.includes(k.status));
+  const p = ui.pending[e.id] === "interrupt";
+  return `<div class="confirm" role="alertdialog" aria-labelledby="cfH" aria-describedby="cfD" data-confirm="${e.id}">
+    <h3 id="cfH">Interrupt <span class="m">${shortId(e.id)}</span>? There is no undo.</h3>
+    <p id="cfD">The fiber is interrupted, registered compensations run, and the execution can never be resumed.</p>
+    <div class="lst"><div class="lst-h">Compensations that will run, last registered first</div>
+      ${comps.length ? `<ol>${comps.map((c, i) => `<li><span class="i">${i + 1}</span><span style="color:var(--fail)">${G("comp")}</span><span>${esc(c.name)} <span class="r">undoes ${esc(c.activity)}</span></span><span class="r">registered</span></li>`).join("")}</ol>` : `<div class="none">No compensations registered. Nothing gets undone.</div>`}
+    </div>
+    <div class="lst"><div class="lst-h">Child executions interrupted with it</div>
+      ${kids.length ? `<ul>${kids.map((k) => `<li><span class="i">↳</span>${sg(k.status)}<span><span class="m">${shortId(k.id)}</span> ${esc(k.workflow)}</span><span class="r">${k.status}</span></li>`).join("")}</ul>` : `<div class="none">No live child executions.</div>`}
+    </div>
+    <div class="foot">${cliHtml(K.cli.interrupt(e.id))}<div class="actions"><button class="btn" type="button" data-act="cancel-interrupt">Keep ${e.status} <kbd>esc</kbd></button><button class="btn btn-danger solid" type="button" data-act="interrupt" ${p ? "disabled" : ""}>${p ? `<span class="spin"></span>Interrupting…` : "Interrupt execution"} <kbd>y</kbd></button></div></div>
+  </div>`;
+}
+function detailHtml(e) {
+  const parent = e.parent && byId(e.parent);
+  const kids = (e.children || []).map(byId).filter(Boolean);
+  const st = e.status;
+  const why = st === "suspended" && e.suspendedReason ? ` <span class="why">on ${e.suspendedReason === "failure" ? "SuspendOnFailure" : REASON[e.suspendedReason]}</span>` : "";
+  const since = e.endedAt ? `<span class="since">ended <span data-ago="${e.endedAt}">${ago(e.endedAt)}</span></span>` : `<span class="since">open for <span data-el="${e.startedAt}">${dur(now() - ts(e.startedAt))}</span></span>`;
+  const w = wfByName(e.workflow);
+  const kf = w ? w.idempotencyKey : "";
+  const attempts = e.activities.length, names = new Set(e.activities.map((a) => a.name)).size;
+  return `<article class="detail" data-detail="${e.id}">
+    <div class="crumb"><span class="wfname">${esc(e.workflow)}</span>
+      ${parent ? `<button class="lnk" type="button" data-go="${parent.id}">${G("parent")}parent ${shortId(parent.id)} · ${esc(parent.workflow)}</button>` : ""}
+      ${kids.map((k) => `<button class="lnk" type="button" data-go="${k.id}">${G("child")}child ${shortId(k.id)} · ${esc(k.workflow)} <span class="s-${k.status}">${G(k.status)}</span></button>`).join("")}
+    </div>
+    <div class="d-head">
+      <div><h3 class="d-id" aria-label="execution ${e.id}">${e.id.match(/.{4}/g).map((p) => `<span>${p}</span>`).join("")}</h3>
+        <div class="d-status"><span class="badge s-${st}${ui.bump === e.id ? " bump" : ""}">${sg(st)}${st}${why}</span>${since}</div></div>
+      <div>${actionsHtml(e)}</div>
+    </div>
+    ${noticeHtml(e)}${opErrorHtml(e)}${suspNoteHtml(e)}${confirmHtml(e)}
+    <dl class="meta">
+      <div><dt>idempotencyKey</dt><dd>${esc(e.idempotencyKey)}<span class="sub">← ${esc(kf)}</span></dd></div>
+      <div><dt>started</dt><dd>${stamp(e.startedAt, true)}<span class="sub" data-ago="${e.startedAt}">${ago(e.startedAt)}</span></dd></div>
+      <div><dt>${e.endedAt ? "took" : "elapsed"}</dt><dd>${e.endedAt ? dur(ts(e.endedAt) - ts(e.startedAt)) : `<span data-el="${e.startedAt}">${dur(now() - ts(e.startedAt))}</span>`}<span class="sub">${e.endedAt ? "ended " + stamp(e.endedAt, true) : "still journaling"}</span></dd></div>
+      <div><dt>journal</dt><dd>${attempts} attempt${attempts === 1 ? "" : "s"} · ${names} Activit${names === 1 ? "y" : "ies"}<span class="sub">${(e.waits || []).length} wait${(e.waits || []).length === 1 ? "" : "s"} · ${(e.childCalls || []).length} child</span></dd></div>
+    </dl>
+    ${payloadHtml(e)}
+    ${sec("Journal", `${attempts + (e.waits || []).length + (e.childCalls || []).length} entries`, journalHtml(e))}
+    ${exitHtml(e)}
+    ${compsHtml(e)}
+  </article>`;
+}
+function skDetail() {
+  const meta = `<div><span class="sk" style="height:9px;width:60%"></span><span class="sk" style="height:11px;width:80%;margin-top:8px"></span></div>`.repeat(4);
+  const rows = [1, 2, 3, 4, 5].map((i) => `<div style="display:grid;grid-template-columns:62px 16px 150px 1fr 56px;gap:10px;padding:10px 0;align-items:center"><span class="sk" style="height:8px"></span><span class="sk" style="height:12px;border-radius:50%"></span><span class="sk" style="height:10px;width:${48 + i * 9}%"></span><span class="sk" style="height:6px;width:${16 + i * 11}%;margin-left:${i * 10}%"></span><span class="sk" style="height:8px"></span></div>`).join("");
+  return `<div class="detail" aria-busy="true" aria-label="Loading execution"><span class="sk" style="height:10px;width:120px"></span><span class="sk" style="height:28px;width:min(440px,80%);margin-top:16px"></span><span class="sk" style="height:22px;width:150px;margin-top:14px;border-radius:999px"></span><div class="meta">${meta}</div><div style="margin-top:22px">${rows}</div></div>`;
+}
+function noSelHtml() {
+  const wf = ui.wf || (S.workflows[0] && S.workflows[0].name);
+  if (!S.executions.length) {
+    return `<div class="void"><div class="code" style="color:var(--fg-3)">executions[0]</div><h2>Nothing has run yet.</h2>
+      <p>kymo draws what the engine journals. Execute a Workflow and its Activities, waits and exit trace across this pane as they happen.</p>
+      <div class="row"><button class="btn btn-primary" type="button" data-exec="${wf}">${G("play")}Execute ${esc(wf)}</button>${cliHtml(K.cli.execute(wf))}</div></div>`;
+  }
+  return `<div class="void"><div class="code" style="color:var(--fg-3)">no selection</div><h2>Pick an execution.</h2>
+    <p>Move with <kbd>j</kbd> <kbd>k</kbd>, or type <code>kymo execution &lt;id&gt;</code> below. Tab completes any id from its first characters.</p></div>`;
+}
+function notFoundHtml(id) {
+  let near = sortedExecs().filter((e) => e.id[0] === id[0]).slice(0, 3);
+  const same = near.length > 0;
+  if (!same) near = sortedExecs().slice(0, 3);
+  return `<div class="void"><div class="code">error: not_found</div>
+    <h2>No execution <span class="m">${esc(id)}</span> in this journal.</h2>
+    <p>executionIds derive from the Workflow name and its idempotencyKey. An id from another app, or from a database that was reset, won't resolve here.</p>
+    <div class="row"><button class="btn" type="button" data-act="back-to-list">Back to executions</button>${cliHtml(K.cli.show(id))}</div>
+    ${near.length ? `<div class="near"><div class="h">${same ? `Also starting with “${esc(id[0])}”` : "Most recent instead"}</div>${near.map((e) => `<button class="near-i" type="button" data-go="${e.id}">${sg(e.status)}<span>${e.id}</span><span class="w">${esc(e.workflow)}</span></button>`).join("")}</div>` : ""}</div>`;
+}
+function renderDetail() {
+  const body = $("#detailBody");
+  const hint = $("#detailHint");
+  if (ui.mode === "execute" && ui.execWf && ui.boot === "ready") {
+    hint.textContent = "execute";
+    if (body.dataset.form !== ui.execWf) mountForm(ui.execWf);
+    else syncForm();
+    return;
+  }
+  body.dataset.form = "";
+  hint.textContent = ui.sel && !ui.notFound ? shortId(ui.sel) : "";
+  let html;
+  if (ui.boot !== "ready" || ui.detailLoading) html = skDetail();
+  else if (ui.notFound) html = notFoundHtml(ui.notFound);
+  else if (!ui.sel || !byId(ui.sel)) html = noSelHtml();
+  else html = detailHtml(byId(ui.sel));
+  const same = body.dataset.shown === (ui.sel || "") + (ui.notFound || "");
+  body.dataset.shown = (ui.sel || "") + (ui.notFound || "");
+  if (same) keepFocus(body, () => (body.innerHTML = html));
+  else { body.innerHTML = html; body.scrollTop = 0; }
+}
+function renderDown() {
+  const d = $("#down"), down = ui.boot === "down";
+  $("#main").classList.toggle("is-down", down);
+  d.hidden = !down;
+  if (!down) { d.innerHTML = ""; return; }
+  const err = ui.downErr || { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` };
+  d.innerHTML = `<div class="void"><div class="code">error: ${esc(err.error)}</div>
+    <h2>kymo can't reach <span class="m">${esc(S.server.app)}</span>.</h2>
+    <p><code>${esc(err.message)}</code>. The journal is safe in SQLite. When ${esc(S.server.app)} comes back, the engine picks up every running and suspended execution where it left off.</p>
+    <div class="row"><button class="btn btn-primary" type="button" data-act="retry-boot" ${ui.retrying ? "disabled" : ""}>${ui.retrying ? `<span class="spin"></span>Reconnecting…` : "Retry connection"}</button>${cliHtml(K.cli.home())}</div></div>
+    <div class="steps"><div class="c"># what kymo tried</div><div><b>GET</b> ${esc(S.server.url)}/executions</div><div class="e">✕ ECONNREFUSED after ${K.api.latency}ms</div><br>
+    <div class="c"># worth checking</div><div>1  is ${esc(S.server.app)} running?</div><div>2  is <b>Kymo.layer({ port: 4400 })</b> in its layer graph?</div><div>3  is anything else bound to :4400?</div></div>`;
+}
+function renderPanes() {
+  $("#main").dataset.screen = ui.screen;
+  $$(".pane").forEach((p) => p.classList.toggle("active", p.dataset.pane === ui.pane));
+}
+function renderAll() {
+  renderServer(); renderDown(); renderWorkflows(); renderTools(); renderList(); renderDetail(); renderPanes();
+}
+</script>
+<script>
+/* ═════════ execute form (generated from the payload JSON Schema) ═════════ */
+function samplePattern(p) {
+  const src = p.replace(/^\^/, "").replace(/\$$/, "");
+  let out = "", i = 0;
+  while (i < src.length) {
+    let unit;
+    if (src[i] === "[") { const j = src.indexOf("]", i); unit = { cls: src.slice(i + 1, j) }; i = j + 1; }
+    else if (src[i] === "\\") { unit = src[i + 1]; i += 2; }
+    else { unit = src[i]; i++; }
+    let n = 1;
+    const q = src.slice(i).match(/^\{(\d+)\}|^\+|^\*/);
+    if (q) { n = q[1] ? +q[1] : q[0] === "+" ? 3 : 0; i += q[0].length; }
+    for (let k = 0; k < n; k++) out += typeof unit === "object" ? (unit.cls.includes("a-z") ? "9b14c7"[k % 6] : "5532847"[k % 7]) : unit;
+  }
+  return out;
+}
+function validate(w, p) {
+  const issues = [], props = w.payload.properties, req = w.payload.required || [];
+  for (const [k, s] of Object.entries(props)) {
+    const v = p[k];
+    if (v === undefined || v === null || v === "") { if (req.includes(k)) issues.push({ path: k, message: "required" }); continue; }
+    if (s.type === "integer") {
+      if (typeof v !== "number" || !Number.isInteger(v)) { issues.push({ path: k, message: "expected an integer" }); continue; }
+      if (s.minimum !== undefined && v < s.minimum) issues.push({ path: k, message: `must be ≥ ${s.minimum}` });
+      continue;
+    }
+    if (typeof v !== "string") { issues.push({ path: k, message: "expected a string" }); continue; }
+    if (s.enum && !s.enum.includes(v)) issues.push({ path: k, message: "expected " + s.enum.join(" | ") });
+    else if (s.pattern && !new RegExp(s.pattern).test(v)) issues.push({ path: k, message: `doesn't match ${s.pattern}` });
+    else if (s.format === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) issues.push({ path: k, message: "not an email address" });
+    else if (s.format === "date" && !(/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + "T00:00:00Z")))) issues.push({ path: k, message: "expected a date, YYYY-MM-DD" });
+    else if (s.maxLength && v.length > s.maxLength) issues.push({ path: k, message: `at most ${s.maxLength} characters` });
+  }
+  for (const k of Object.keys(p)) if (!props[k]) issues.push({ path: k, message: "not in the payload schema" });
+  return issues;
+}
+function formPayload(w, values) {
+  const p = {};
+  for (const [k, s] of Object.entries(w.payload.properties)) {
+    let v = values[k];
+    if (v === undefined || v === "") continue;
+    if (s.type === "integer") { const t = String(v).trim(); v = /^-?\d+$/.test(t) ? Number(t) : t; }
+    p[k] = v;
+  }
+  return p;
+}
+function exampleJson(w) {
+  const o = {};
+  for (const [k, s] of Object.entries(w.payload.properties)) {
+    if (!(w.payload.required || []).includes(k)) continue;
+    o[k] = s.enum ? s.enum[0] : s.type === "integer" ? 4900 : s.examples ? s.examples[0] : s.pattern ? samplePattern(s.pattern) : s.format === "email" ? "owner@example.com" : s.format === "date" ? isoNow().slice(0, 10) : "…";
+  }
+  return JSON.stringify(o);
+}
+function money(c, cur) {
+  try { return new Intl.NumberFormat("en", { style: "currency", currency: cur || "USD" }).format(c / 100) + (cur ? "" : " (if USD)"); }
+  catch { return (c / 100).toFixed(2); }
+}
+function fieldHtml(k, s, req, v) {
+  const lab = `<div class="f-l" id="l-${k}">${esc(k)}<span class="rq${req ? " req" : ""}">${req ? "required" : "optional"}</span></div>`;
+  let ctl, hint;
+  if (s.enum) {
+    ctl = `<div class="seg" role="radiogroup" aria-labelledby="l-${k}" aria-describedby="m-${k}" data-field="${k}">${s.enum.map((o, i) => `<button type="button" role="radio" aria-checked="${v === o}" tabindex="${v === o || (!s.enum.includes(v) && i === 0) ? 0 : -1}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
+    hint = `${s.enum.length} options`;
+  } else if (s.maxLength && s.maxLength > 120) {
+    ctl = `<textarea class="in" id="f-${k}" data-field="${k}" rows="2" aria-labelledby="l-${k}" aria-describedby="m-${k}" placeholder="optional context for the approver">${esc(v || "")}</textarea>`;
+    hint = `≤ ${s.maxLength} chars`;
+  } else {
+    const ph = s.examples ? s.examples[0] : s.pattern ? samplePattern(s.pattern) : s.format === "email" ? "owner@company.com" : s.format === "date" ? "YYYY-MM-DD" : s.type === "integer" ? "4900" : "";
+    const type = s.format === "email" ? ' type="email" inputmode="email"' : s.type === "integer" ? ' inputmode="numeric"' : "";
+    ctl = `<input class="in" id="f-${k}" data-field="${k}"${type} value="${esc(v === undefined ? "" : v)}" placeholder="${esc(ph)}" aria-labelledby="l-${k}" aria-describedby="m-${k}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+    hint = s.pattern || (s.format === "date" ? "date · YYYY-MM-DD" : s.format) || (s.type === "integer" ? `integer ≥ ${s.minimum === undefined ? "−∞" : s.minimum}` : "string");
+  }
+  return `<div class="f">${lab}<div class="f-c">${ctl}<div class="f-h" id="m-${k}"><span class="msg"></span><span class="hint">${esc(hint)}</span></div></div></div>`;
+}
+function mountForm(name) {
+  const w = wfByName(name), body = $("#detailBody");
+  if (!ui.form || ui.form.wf !== name) {
+    const values = {};
+    if (w.payload.properties.date && w.payload.properties.date.format === "date") values.date = isoNow().slice(0, 10);
+    ui.form = { wf: name, values, touched: {}, submitted: false };
+  }
+  const req = w.payload.required || [];
+  const fields = Object.entries(w.payload.properties).map(([k, s]) => fieldHtml(k, s, req.includes(k), ui.form.values[k])).join("");
+  body.dataset.form = name;
+  body.dataset.shown = "";
+  body.innerHTML = `<article class="detail exec" aria-labelledby="xH">
+    <div class="crumb"><span>Execute</span><span class="wfname">Workflow</span></div>
+    <h3 class="d-wf" id="xH">${esc(name)}</h3>
+    <p class="d-desc">${esc(w.description)}</p>
+    <div class="sig"><span><b>success</b> ${esc(w.success)}</span><span><b>error</b> ${esc(w.error)}</span>${w.annotations.map((a) => `<span class="ann">${esc(a)}</span>`).join("")}</div>
+    <form class="xf" id="xform" novalidate>
+      ${fields}
+      <div class="f"><div class="f-l">idempotencyKey<span class="rq">derived</span></div><div class="f-c"><div class="keycard" id="keycard" aria-live="polite"></div></div></div>
+      <div class="f"><div class="f-l">mode</div><div class="f-c"><div class="sw-row"><button type="button" class="sw" role="switch" id="discard" aria-checked="${ui.discard}" aria-labelledby="swl" aria-describedby="swd"></button><span class="sw-l" id="swl">discard</span><span class="sw-d" id="swd"></span></div></div></div>
+      <div class="f"><div class="f-l">payload.json</div><div class="f-c"><div class="pj"><div class="h"><span>what the CLI sends</span><span id="pjv"></span></div><pre id="pjson"></pre></div><div id="xcli"></div></div></div>
+      <div class="f"><div></div><div class="f-c"><div class="form-acts"><button class="btn btn-primary" type="submit" id="xsubmit">Execute</button><button class="btn" type="button" data-act="cancel-exec">Cancel <kbd>esc</kbd></button></div><div id="xresult"></div></div></div>
+    </form>
+  </article>`;
+  body.scrollTop = 0;
+  syncForm();
+}
+function syncForm() {
+  const f = ui.form;
+  if (!f || !$("#xform")) return;
+  const w = wfByName(f.wf), props = w.payload.properties;
+  const p = formPayload(w, f.values), issues = validate(w, p);
+  const byPath = {};
+  issues.forEach((i) => { if (!byPath[i.path]) byPath[i.path] = i.message; });
+  for (const [k, s] of Object.entries(props)) {
+    const v = f.values[k], filled = v !== undefined && v !== "";
+    const msg = byPath[k];
+    const show = !!msg && (f.submitted || !!f.touched[k] || (filled && msg !== "required"));
+    const el = $(`#xform [data-field="${k}"]`);
+    if (el) {
+      if (el.classList.contains("seg")) el.classList.toggle("invalid", show);
+      else el.setAttribute("aria-invalid", show ? "true" : "false");
+    }
+    const m = $(`#m-${k} .msg`);
+    if (!m) continue;
+    if (show) { m.className = "msg err"; m.textContent = msg; }
+    else if (filled && s.type === "integer") { m.className = "msg okm"; m.textContent = k.toLowerCase().includes("cents") ? "= " + money(p[k], p.currency) : "✓"; }
+    else if (filled && s.maxLength) { m.className = "msg"; m.textContent = `${String(v).length} / ${s.maxLength}`; }
+    else if (filled) { m.className = "msg okm"; m.textContent = "✓"; }
+    else { m.className = "msg"; m.textContent = ""; }
+  }
+  const kf = keyFields(w);
+  const key = deriveKey(w, p);
+  const keyOk = key !== null && kf.every((k) => !byPath[k]);
+  const existing = keyOk ? S.executions.find((e) => e.workflow === w.name && e.idempotencyKey === key) : null;
+  const kc = $("#keycard");
+  kc.className = "keycard" + (existing ? " dedup" : keyOk ? " fresh" : "");
+  kc.innerHTML = `<div class="k1"><span>${esc(w.idempotencyKey)} →</span><span class="val${key ? "" : " pend"}">${key ? esc(key) : "not derived yet"}</span></div>
+    <div class="k2">${existing
+      ? `<span class="lead">returns existing execution</span> <button type="button" class="open" data-go="${existing.id}">${existing.id}</button> (${existing.status}) — Effect does not re-run it.`
+      : keyOk ? `<span class="lead">New execution.</span> No execution holds this key yet; the engine derives a fresh executionId from it.`
+      : key ? `Fix ${kf.filter((k) => byPath[k]).join(", ")} first. The key is only as good as its fields.`
+      : `Fill ${kf.join(" and ")} to derive it. Same key, same execution: that's how Effect deduplicates.`}</div>`;
+  $("#discard").setAttribute("aria-checked", String(ui.discard));
+  $("#swd").textContent = ui.discard
+    ? "Fire and forget. The engine hands back the executionId at once; kymo won't wait for an exit."
+    : "Off. kymo follows the execution into its journal once the engine accepts it.";
+  $("#pjson").textContent = JSON.stringify(p, null, 2);
+  $("#pjv").textContent = issues.length ? `${issues.length} issue${issues.length > 1 ? "s" : ""}` : "valid";
+  $("#xcli").innerHTML = cliHtml(K.cli.execute(w.name, ui.discard));
+  const btn = $("#xsubmit");
+  btn.disabled = ui.pendingExecute;
+  btn.innerHTML = ui.pendingExecute ? `<span class="spin"></span>Executing…` : `${G("play")}${existing ? "Execute · returns existing" : "Execute"} <kbd>⌘↵</kbd>`;
+  const r = ui.execResult, xr = $("#xresult");
+  xr.innerHTML = !r ? ""
+    : r.error ? `<div class="alert" role="alert"><span class="code">error: ${esc(r.error.error)}</span><span class="msg">${esc(r.error.message)}${r.error.error === "server_unreachable" ? `. Nothing was executed; submit again once ${esc(S.server.app)} answers.` : ""}</span></div>`
+    : `<div class="alert info" role="status"><span class="code">dispatched</span><span class="msg"><code>${r.executionId}</code> · discard: true. kymo didn't wait for an exit.</span><span class="acts"><button class="btn" type="button" data-go="${r.executionId}">Open</button></span></div>`;
+}
+function submitForm() {
+  const f = ui.form;
+  if (!f || ui.pendingExecute) return;
+  const w = wfByName(f.wf);
+  f.submitted = true;
+  ui.execResult = null;
+  const issues = validate(w, formPayload(w, f.values));
+  syncForm();
+  if (issues.length) {
+    const el = $(`#xform [data-field="${issues[0].path}"]`);
+    if (el) (el.classList.contains("seg") ? el.querySelector('[tabindex="0"]') : el).focus();
+    return;
+  }
+  ui.pendingExecute = true;
+  syncForm();
+  dispatch(K.cli.execute(w.name, ui.discard));
+}
+function openExecute(name) {
+  if (!wfByName(name) || ui.boot !== "ready") return;
+  ui.mode = "execute"; ui.execWf = name; ui.execResult = null; ui.confirm = null;
+  $("#detailBody").dataset.form = "";
+  renderDetail();
+  if (isMobile()) go("detail");
+  ui.pane = "detail"; renderPanes();
+  const first = $("#xform [data-field]");
+  if (first) (first.classList.contains("seg") ? first.querySelector('[tabindex="0"]') : first).focus({ preventScroll: true });
+}
+function closeExecute() {
+  ui.mode = "detail"; ui.execWf = null; ui.execResult = null; ui.pendingExecute = false;
+  renderDetail();
+  if (isMobile() && !ui.sel) go("list", false);
+}
+function pickSeg(btn) {
+  const seg = btn.closest(".seg"), k = seg.dataset.field;
+  ui.form.values[k] = btn.dataset.v;
+  ui.form.touched[k] = true;
+  $$('[role="radio"]', seg).forEach((b) => { const on = b === btn; b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; });
+  ui.execResult = null;
+  syncForm();
+}
+</script>
+<script>
+/* ═════════ output drawer ═════════ */
+const out = { blocks: [], unread: 0, seq: 0 };
+const drawerOpen = () => document.body.classList.contains("drawer-open");
+function setDrawer(open) {
+  document.body.classList.toggle("drawer-open", open);
+  $("#outToggle").setAttribute("aria-expanded", String(open));
+  $("#drawer").inert = !open && isMobile();
+  if (open) { out.unread = 0; $("#unread").textContent = ""; scrollOut(); }
+}
+function scrollOut() { const o = $("#out"); o.scrollTop = o.scrollHeight; }
+function countOut() { $("#blkCount").textContent = out.blocks.length ? `${out.blocks.length} command${out.blocks.length > 1 ? "s" : ""}` : ""; }
+function clearOut() { $("#out").innerHTML = ""; out.blocks = []; countOut(); }
+function addBlock(cmd, source) {
+  const b = { id: ++out.seq, cmd, source, t: now(), done: false };
+  const el = document.createElement("div");
+  el.className = "blk last";
+  el.innerHTML = `<div class="blk-c"><span class="p">$</span><span class="c">${esc(cmd)}</span><span class="src${source === "typed" ? "" : " ui"}" title="${source === "typed" ? "typed at the command line" : "echoed from a click or key"}">${source === "typed" ? "typed" : "echo"}</span><span class="tm">${stamp(b.t)}</span></div>
+    <div class="ln pend"><span class="dots"><i>·</i><i>·</i><i>·</i></span> ${esc(S.server.url.replace(/^https?:\/\//, ""))}</div>`;
+  b.el = el;
+  $$("#out .blk.last").forEach((x) => x.classList.remove("last"));
+  $("#out").appendChild(el);
+  out.blocks.push(b);
+  while (out.blocks.length > 40) out.blocks.shift().el.remove();
+  countOut();
+  scrollOut();
+  return b;
+}
+function finishBlock(b, lines) {
+  const pend = b.el.querySelector(".ln.pend");
+  if (pend) pend.remove();
+  const isHead = (l) => /^<span class="t-k">(?!help<)[^<]+<\/span><span class="t-n">\[/.test(l.h);
+  const si = [lines.findIndex((l) => l.h.includes('class="t-e"')), lines.findIndex((l) => /class="t-k">status</.test(l.h)), lines.findIndex(isHead), 0].find((i) => i >= 0);
+  b.el.insertAdjacentHTML("beforeend", lines.map((l, i) => `<div class="ln${i === si ? " sum" : ""}" style="--i:${Math.min(i, 18)}">${l.h}</div>`).join(""));
+  b.done = true;
+  if (!drawerOpen() && isMobile()) { out.unread++; $("#unread").textContent = String(out.unread); }
+  const fn = $("#failNext");
+  if (fn) fn.setAttribute("aria-pressed", String(K.api.fail));
+  scrollOut();
+}
+
+/* ═════════ AXI output: TOON-like lines ═════════ */
+const ID_RE = /^[0-9a-f]{16}$/;
+function tv(v) {
+  if (v === null || v === undefined) return `<span class="t-null">null</span>`;
+  if (typeof v === "number") return `<span class="t-n">${v}</span>`;
+  const s = String(v);
+  if (ID_RE.test(s)) return `<button type="button" class="t-id" data-go="${s}">${s}</button>`;
+  if (STATUSES.includes(s)) return `<span class="s-${s}">${s}</span>`;
+  return `<span class="t-v">${esc(/[,\n"]/.test(s) || s === "" ? JSON.stringify(s) : s)}</span>`;
+}
+const L = {
+  head: (name, n, fields) => ({ h: `<span class="t-k">${name}</span><span class="t-n">[${n}]</span>${fields ? `<span class="t-f">{${fields.join(",")}}</span>` : ""}:` }),
+  row: (vals) => ({ h: "  " + vals.map(tv).join(`<span class="t-p">,</span>`) }),
+  kv: (k, v, ind = 0) => ({ h: `${" ".repeat(ind)}<span class="t-k">${esc(k)}</span>: ${tv(v)}` }),
+  kvh: (k, html, ind = 0) => ({ h: `${" ".repeat(ind)}<span class="t-k">${esc(k)}</span>: ${html}` }),
+  obj: (k) => ({ h: `<span class="t-k">${esc(k)}</span>:` }),
+  note: (t) => ({ h: `<span class="t-c"># ${esc(t)}</span>` }),
+  err: (code, msg) => [{ h: `<span class="t-e">error</span>: <span class="t-e">${esc(code)}</span>` }, { h: `<span class="t-k">message</span>: ${esc(msg)}` }],
+  help: (items) => [{ h: `<span class="t-k">help</span><span class="t-n">[${items.length}]</span>:` }].concat(items.map(([c, d]) => ({ h: `  <button type="button" class="t-cmd" data-cmd="${esc(c)}">${esc(c)}</button>${d ? `  <span class="t-c"># ${esc(d)}</span>` : ""}` }))),
+};
+function errLines(err, help) {
+  const lines = L.err(err.error || "error", err.message || String(err));
+  if (err.error === "server_unreachable") help = [["kymo", `retry once ${S.server.app} answers on ${S.server.url.replace(/^https?:\/\//, "")}`]];
+  return help && help.length ? lines.concat(L.help(help)) : lines;
+}
+function lev(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function closest(s, list) {
+  if (!s) return null;
+  const pre = list.find((x) => x.toLowerCase().startsWith(String(s).toLowerCase()));
+  if (pre) return pre;
+  let best = null, bd = 4;
+  list.forEach((x) => { const d = lev(String(s), x); if (d < bd) { bd = d; best = x; } });
+  return best;
+}
+function detailOf(e) {
+  if (e.status === "suspended") return e.suspendedReason === "failure" ? "SuspendOnFailure" : e.suspendedReason;
+  if (e.status === "running") { const a = e.activities[e.activities.length - 1]; return a ? `${a.name}#${a.attempt}` : "starting"; }
+  if (e.status === "succeeded") return "took " + dur(ts(e.endedAt) - ts(e.startedAt));
+  const x = e.result && e.result.exit;
+  return x ? causeSummary(x.cause).split(" ").slice(0, 2).join(" ").replace(/:$/, "") : e.status;
+}
+const exitWord = (x) => (!x ? "—" : x._tag === "Success" ? "Success" : causeSummary(x.cause).split(" ").slice(0, 2).join(" ").replace(/:$/, ""));
+function ambiguousLines(r) {
+  return L.err("ambiguous_id", `${r.prefix} matches ${r.ambiguous.length} executions; type more of it`)
+    .concat([L.head("matches", r.ambiguous.length, ["id", "workflow", "status"])], r.ambiguous.map((e) => L.row([e.id, e.workflow, e.status])));
+}
+
+/* ═════════ commands: one handler per CLI verb; clicks run these too ═════════ */
+async function cmdHome() {
+  const list = await call("listExecutions", {});
+  const s = S.server;
+  const lines = [L.kv("server", `${s.app} @ ${s.url}`), L.kv("engine", `ClusterWorkflowEngine on ${s.runner} · effect ${s.effect}`), L.kv("uptime", s.uptime),
+    L.head("workflows", S.workflows.length, ["name"].concat(STATUSES))]
+    .concat(S.workflows.map((w) => { const c = countBy(list.filter((e) => e.workflow === w.name)); return L.row([w.name].concat(STATUSES.map((x) => c[x]))); }));
+  const sus = list.filter((e) => e.status === "suspended").length;
+  return lines.concat(L.help(list.length
+    ? [["kymo executions --status suspended", `${sus} parked`], ["kymo execute <Workflow>", "start one, or get the existing one back"], ["kymo help", "every command"]]
+    : [[`kymo execute ${S.workflows[0].name}`, "the journal is empty; start something"], ["kymo help", "every command"]]));
+}
+async function cmdList(args, flags, ctx) {
+  for (const f of ["workflow", "status"]) if (f in flags && (flags[f] === undefined || flags[f] === true)) return L.err("missing_value", `--${f} needs a value`).concat(L.help([[`kymo executions --${f} ${f === "status" ? "suspended" : S.workflows[0].name}`, ""]]));
+  const f = { workflow: flags.workflow || null, status: flags.status || null };
+  if (f.status && !STATUSES.includes(f.status)) {
+    const sug = closest(f.status, STATUSES);
+    return L.err("invalid_status", `"${f.status}" is not a status: ${STATUSES.join(" | ")}`).concat(L.help([[`kymo executions --status ${sug || "suspended"}`, sug ? "did you mean" : ""]]));
+  }
+  if (f.workflow && !wfByName(f.workflow)) {
+    const sug = closest(f.workflow, wfNames());
+    return L.err("unknown_workflow", `no Workflow named ${f.workflow}`).concat(L.help([[sug ? `kymo executions --workflow ${sug}` : "kymo", sug ? "did you mean" : "list Workflows"]]));
+  }
+  if (ctx.source === "typed") {
+    ui.q = "";
+    setFilter({ wf: f.workflow, status: f.status });
+    if (isMobile()) go("list");
+  }
+  const list = (await call("listExecutions", { workflow: f.workflow, status: f.status })).slice().sort((a, b) => ts(b.startedAt) - ts(a.startedAt));
+  const flagTxt = [f.workflow && "--workflow " + f.workflow, f.status && "--status " + f.status].filter(Boolean).join(" ");
+  if (!list.length) {
+    return [L.head("executions", 0), L.note(flagTxt ? `nothing matches ${flagTxt}` : "the journal is empty")]
+      .concat(L.help(flagTxt ? [["kymo executions", "drop the filters"]].concat(f.workflow ? [[`kymo execute ${f.workflow}`, "start one"]] : []) : [[`kymo execute ${S.workflows[0].name}`, "start something"]]));
+  }
+  const lines = [L.head("executions", list.length, ["id", "workflow", "status", "detail", "lastEntry"])]
+    .concat(list.map((e) => L.row([e.id, e.workflow, e.status, detailOf(e), ago(lastEntry(e))])));
+  const help = [["kymo execution <id>", "journal, exit, compensations"]];
+  const sus = list.find((e) => e.status === "suspended");
+  if (sus) help.push([K.cli.resume(sus.id), "resume a suspended one"]);
+  return lines.concat(L.help(help));
+}
+function showLines(e, expanded) {
+  const out = [];
+  if (expanded) out.push(L.note(`resolved ${expanded} → ${e.id}`));
+  out.push(L.obj("execution"), L.kv("id", e.id, 2), L.kv("workflow", e.workflow, 2),
+    L.kvh("status", tv(e.status) + (e.suspendedReason ? ` <span class="t-c">(${e.suspendedReason === "failure" ? "SuspendOnFailure" : e.suspendedReason})</span>` : ""), 2),
+    L.kv("idempotencyKey", e.idempotencyKey, 2), L.kv("startedAt", e.startedAt, 2));
+  if (e.endedAt) out.push(L.kv("endedAt", e.endedAt, 2));
+  if (e.parent) out.push(L.kv("parent", e.parent, 2));
+  if (e.children.length) out.push(L.kvh("children", e.children.map(tv).join(" "), 2));
+  out.push(L.kvh("payload", `<span class="t-v">${esc(compact(e.payload))}</span>`, 2));
+  out.push(L.head("activities", e.activities.length, e.activities.length ? ["name", "attempt", "status", "duration", "exit"] : null));
+  e.activities.forEach((a) => out.push(L.row([a.name, a.attempt, a.status, a.endedAt ? dur(ts(a.endedAt) - ts(a.startedAt)) : "running", exitWord(a.exit)])));
+  if (e.waits.length) {
+    out.push(L.head("waits", e.waits.length, ["kind", "name", "status", "at"]));
+    e.waits.forEach((w) => out.push(L.row([w.kind === "deferred" ? "DurableDeferred" : "DurableClock", w.name, w.status, w.wakeAt || w.doneAt || "—"])));
+  }
+  if (e.compensations.length) {
+    out.push(L.head("compensations", e.compensations.length, ["name", "activity", "ran"]));
+    e.compensations.forEach((c) => out.push(L.row([c.name, c.activity, String(c.ran)])));
+  }
+  if (!e.result) out.push(L.kvh("exit", `<span class="t-null">pending</span>`));
+  else if (e.result._tag === "Suspended") out.push(L.kv("suspendedOn", causeSummary(e.result.cause)));
+  else out.push(L.kv("exit", exitSummary(e.result.exit)));
+  const help = e.status === "suspended" ? [[K.cli.resume(e.id), "re-enter the Workflow"], [K.cli.interrupt(e.id), "stop it for good"]]
+    : e.status === "running" ? [[K.cli.interrupt(e.id), "terminal; runs compensations"]]
+    : [[K.cli.list({ workflow: e.workflow }), "its siblings"]];
+  return out.concat(L.help(help));
+}
+async function cmdShow(args, flags, ctx) {
+  const r = resolveId(args[0]);
+  if (r.missing) return L.err("missing_argument", "which execution?").concat(L.help([["kymo execution <id>", "tab completes from any prefix"], ["kymo executions", "list them"]]));
+  if (r.ambiguous) return ambiguousLines(r);
+  const typed = ctx.source === "typed";
+  if (typed) { ui.detailLoading = r.id; ui.notFound = null; if (ui.mode === "execute") ui.mode = "detail"; renderDetail(); if (isMobile()) go("detail"); }
+  try {
+    const e = await call("getExecution", r.id);
+    if (typed) { ui.detailLoading = null; select(e.id); }
+    return showLines(e, r.expanded);
+  } catch (err) {
+    if (err.error === "not_found") {
+      ui.detailLoading = null; ui.notFound = r.id; ui.sel = null; ui.mode = "detail";
+      renderDetail(); renderList();
+      if (isMobile()) go("detail");
+      const near = closest(r.id, S.executions.map((x) => x.id));
+      return errLines(err, [["kymo executions", "list what exists"]].concat(near ? [[K.cli.show(near), "closest id"]] : []));
+    }
+    if (typed) { ui.detailLoading = null; renderDetail(); }
+    return errLines(err);
+  }
+}
+async function cmdExecute(args, flags, ctx) {
+  const name = args[0];
+  if (!name) return L.err("missing_argument", "which Workflow?").concat(L.help(S.workflows.map((w) => [`kymo execute ${w.name}`, ""])));
+  const w = wfByName(name);
+  if (!w) {
+    const sug = closest(name, wfNames());
+    return L.err("unknown_workflow", `no Workflow named ${name}`).concat(L.help([[sug ? `kymo execute ${sug}` : "kymo", sug ? "did you mean" : "list Workflows"]]));
+  }
+  const discard = flags.discard === true || flags.discard === "true";
+  const formOpen = ui.mode === "execute" && ui.form && ui.form.wf === w.name;
+  let payload;
+  if (flags.payload !== undefined && flags.payload !== true) {
+    try { payload = JSON.parse(flags.payload); }
+    catch (er) { return L.err("invalid_json", `--payload is not JSON (${er.message})`).concat(L.help([[`kymo execute ${w.name} --payload '${exampleJson(w)}'`, ""]])); }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return L.err("invalid_payload", "the payload must be a JSON object");
+  } else if (flags["payload-file"] !== undefined) {
+    if (!formOpen) {
+      return L.err("payload_file_unavailable", "this console can't read your disk; payload.json comes from the open form")
+        .concat(L.help([[`kymo execute ${w.name}`, "open the form"], [`kymo execute ${w.name} --payload '${exampleJson(w)}'`, "or pass it inline"]]));
+    }
+    payload = formPayload(w, ui.form.values);
+  } else {
+    openExecute(w.name);
+    return [L.kvh("payload", `<span class="t-e">required</span>`), L.note(`opened the execute form for ${w.name}; payload.json is whatever the form holds`)]
+      .concat(L.help([[`kymo execute ${w.name} --payload '${exampleJson(w)}'`, "or pass it inline"]]));
+  }
+  const issues = validate(w, payload);
+  if (issues.length) {
+    ui.pendingExecute = false;
+    if (formOpen) { ui.form.submitted = true; syncForm(); }
+    return L.err("invalid_payload", `${issues.length} issue${issues.length > 1 ? "s" : ""} against the ${w.name} payload schema`)
+      .concat([L.head("issues", issues.length, ["path", "message"])], issues.map((i) => L.row([i.path, i.message])));
+  }
+  const key = deriveKey(w, payload);
+  const head = [L.kvh("payload.json", `<span class="t-v">${esc(compact(payload))}</span>`), L.kv("idempotencyKey", key)];
+  if (formOpen) { ui.pendingExecute = true; syncForm(); }
+  try {
+    const res = await call("execute", w.name, payload, { discard });
+    ui.pendingExecute = false;
+    const e = byId(res.executionId);
+    if (!res.deduplicated && e) { e.startedAt = isoNow(); ui.fresh.add(e.id); }
+    afterExecute(res, discard);
+    if (res.deduplicated) {
+      return head.concat([L.kv("executionId", res.executionId), L.kv("deduplicated", "true"), L.kv("status", e ? e.status : "unknown"),
+        L.note(`${key} already maps to ${res.executionId}; Effect returned it without running ${w.name} again`)])
+        .concat(L.help([[K.cli.show(res.executionId), "the existing execution"]]));
+    }
+    return head.concat([L.kv("executionId", res.executionId), L.kv("deduplicated", "false"), L.kv("discard", String(discard)), L.kv("status", "running")])
+      .concat(discard ? [L.note("fire and forget: not waiting for an exit")] : [])
+      .concat(L.help([[K.cli.show(res.executionId), "follow its journal"], [K.cli.interrupt(res.executionId), "stop it"]]));
+  } catch (err) {
+    ui.pendingExecute = false;
+    if (formOpen) { ui.execResult = { error: err }; syncForm(); }
+    return head.concat(errLines(err));
+  }
+}
+function afterExecute(res, discard) {
+  if (discard && !res.deduplicated) {
+    if (ui.mode === "execute") ui.execResult = { executionId: res.executionId };
+    renderWorkflows(); renderTools(); renderList(); renderDetail();
+    return;
+  }
+  ui.mode = "detail"; ui.execWf = null; ui.execResult = null; ui.form = null;
+  ui.notice = { id: res.executionId, kind: res.deduplicated ? "dedup" : "created" };
+  const e = byId(res.executionId);
+  if (e && ((ui.status && ui.status !== e.status) || (ui.wf && ui.wf !== e.workflow))) { ui.status = null; ui.wf = e.workflow; }
+  ui.q = "";
+  ui.bump = res.deduplicated ? res.executionId : null;
+  renderWorkflows(); renderTools(); renderList();
+  select(res.executionId);
+  ui.bump = null;
+  if (isMobile()) go("detail");
+}
+async function cmdResume(args, flags, ctx) {
+  const r = resolveId(args[0]);
+  if (r.missing) return L.err("missing_argument", "resume which execution?").concat(L.help(S.executions.filter((e) => e.status === "suspended").slice(0, 4).map((e) => [K.cli.resume(e.id), `${e.workflow} · ${e.suspendedReason}`])));
+  if (r.ambiguous) return ambiguousLines(r);
+  const id = r.id;
+  if (ctx.source === "typed" && byId(id)) { select(id); if (isMobile()) go("detail"); }
+  ui.pending[id] = "resume"; delete ui.opError[id];
+  refreshExec(id);
+  const pre = r.expanded ? [L.note(`resolved ${r.expanded} → ${id}`)] : [];
+  try {
+    const res = await call("resume", id);
+    delete ui.pending[id];
+    ui.notice = { id, kind: "resumed" };
+    ui.bump = id; refreshAll(); ui.bump = null;
+    return pre.concat([L.kv("executionId", res.executionId), L.kv("status", res.status), L.note("the engine replays the journal; completed Activities are not re-run")])
+      .concat(L.help([[K.cli.show(id), "watch it"], [K.cli.interrupt(id), "stop it for good"]]));
+  } catch (err) {
+    delete ui.pending[id];
+    const e = byId(id);
+    if (e) ui.opError[id] = Object.assign({ op: "resume" }, err);
+    refreshAll();
+    const help = err.error === "not_suspended"
+      ? e && e.status === "running" ? [[K.cli.interrupt(id), "it's running; interrupt is the only operation left"]] : [[K.cli.list({ status: "suspended" }), "find one that can resume"]]
+      : null;
+    return pre.concat(errLines(err, help));
+  }
+}
+async function cmdInterrupt(args, flags, ctx) {
+  const r = resolveId(args[0]);
+  if (r.missing) return L.err("missing_argument", "interrupt which execution?").concat(L.help(S.executions.filter((e) => LIVE.includes(e.status)).slice(0, 4).map((e) => [K.cli.interrupt(e.id), `${e.workflow} · ${e.status}`])));
+  if (r.ambiguous) return ambiguousLines(r);
+  const id = r.id, e = byId(id);
+  const plan = e ? e.compensations.filter((c) => c.registered && !c.ran).slice().reverse() : [];
+  const kids = e ? e.children.map(byId).filter((k) => k && LIVE.includes(k.status)) : [];
+  if (ctx.source === "typed" && e) { select(id); if (isMobile()) go("detail"); }
+  ui.pending[id] = "interrupt"; delete ui.opError[id];
+  refreshExec(id);
+  const pre = r.expanded ? [L.note(`resolved ${r.expanded} → ${id}`)] : [];
+  try {
+    await call("interrupt", id);
+    const at = isoNow();
+    e.endedAt = at;
+    e.interruptedBy = `kymo interrupt ${id} (${ctx.source === "typed" ? "cli" : "ui"} · 127.0.0.1)`;
+    plan.forEach((c) => (c.at = at));
+    const stopActs = (x, fiber) => x.activities.forEach((a) => { if (a.status === "running") { a.status = "failure"; a.endedAt = at; a.exit = { _tag: "Failure", cause: { _tag: "Interrupt", fiberId: fiber } }; } });
+    stopActs(e, e.result.exit.cause.fiberId);
+    (e.childCalls || []).forEach((c) => { if (!c.endedAt) c.endedAt = at; });
+    kids.forEach((k) => {
+      const fiber = "#" + Math.floor(Math.random() * 9000 + 1000);
+      k.endedAt = at; delete k.suspendedReason;
+      k.result = { _tag: "Complete", exit: { _tag: "Failure", cause: { _tag: "Interrupt", fiberId: fiber } } };
+      k.interruptedBy = `parent ${id} was interrupted`;
+      stopActs(k, fiber);
+    });
+    delete ui.pending[id];
+    ui.confirm = null;
+    ui.notice = { id, kind: "interrupted", comps: plan.length, kids: kids.length };
+    ui.bump = id; refreshAll(); ui.bump = null;
+    const lines = pre.concat([L.kv("executionId", id), L.kv("status", "interrupted")]);
+    if (plan.length) lines.push(L.head("compensations", plan.length, ["name", "activity", "exit"]), ...plan.map((c) => L.row([c.name, c.activity, exitWord(c.exit)])));
+    else lines.push(L.head("compensations", 0), L.note("none registered; nothing to undo"));
+    if (kids.length) lines.push(L.head("children", kids.length, ["id", "workflow", "status"]), ...kids.map((k) => L.row([k.id, k.workflow, k.status])));
+    return lines;
+  } catch (err) {
+    delete ui.pending[id];
+    if (e) ui.opError[id] = Object.assign({ op: "interrupt" }, err);
+    refreshAll();
+    return pre.concat(errLines(err, err.error === "not_interruptible" ? [[K.cli.show(id), "it's already terminal"]] : null));
+  }
+}
+function cmdHelp() {
+  const rows = [
+    ["kymo", "kymo", "server and Workflows with counts"],
+    ["kymo executions [--workflow W] [--status S]", "kymo executions", "list, newest first"],
+    ["kymo execution <id>", "kymo execution ", "journal, exit, compensations"],
+    ["kymo execute <Workflow> [--payload '<json>'] [--discard]", "kymo execute ", "start one, or get the existing one back"],
+    ["kymo resume <id>", "kymo resume ", "suspended executions only"],
+    ["kymo interrupt <id>", "kymo interrupt ", "terminal; runs registered compensations"],
+    ["clear", "clear", "empty this output"],
+  ];
+  return [{ h: `<span class="t-k">commands</span><span class="t-n">[${rows.length}]</span>:` }]
+    .concat(rows.map(([u, c, d]) => ({ h: `  <button type="button" class="t-cmd" data-cmd="${esc(c)}">${esc(u)}</button>  <span class="t-c"># ${esc(d)}</span>` })))
+    .concat([L.note("ids complete from any prefix with tab; the leading “kymo” is optional")]);
+}
+const CMDS = { "": cmdHome, workflows: cmdHome, executions: cmdList, ls: cmdList, execution: cmdShow, show: cmdShow, execute: cmdExecute, resume: cmdResume, interrupt: cmdInterrupt, help: cmdHelp };
+const COMMANDS = ["executions", "execution", "execute", "resume", "interrupt", "help", "clear"];
+const BOOL_FLAGS = new Set(["discard", "yes", "help"]);
+
+function tokenize(s) {
+  const outT = [];
+  let cur = "", q = null, has = false;
+  for (const ch of s) {
+    if (q) { if (ch === q) q = null; else cur += ch; continue; }
+    if (ch === '"' || ch === "'") { q = ch; has = true; continue; }
+    if (/\s/.test(ch)) { if (cur || has) { outT.push(cur); cur = ""; has = false; } continue; }
+    cur += ch;
+  }
+  if (q) return { error: { error: "unterminated_quote", message: `a ${q}-quoted argument never closes` } };
+  if (cur || has) outT.push(cur);
+  return { tokens: outT };
+}
+function parse(s) {
+  const t = tokenize(s.trim());
+  if (t.error) return { error: t.error };
+  let tk = t.tokens;
+  if (tk[0] === "kymo") tk = tk.slice(1);
+  const name = (tk[0] || "").toLowerCase(), args = [], flags = {};
+  for (let i = 1; i < tk.length; i++) {
+    const x = tk[i];
+    if (x.startsWith("--")) {
+      const eq = x.indexOf("=");
+      if (eq > 0) flags[x.slice(2, eq)] = x.slice(eq + 1);
+      else if (BOOL_FLAGS.has(x.slice(2))) flags[x.slice(2)] = true;
+      else { flags[x.slice(2)] = tk[i + 1]; i++; }
+    } else args.push(x);
+  }
+  return { name, args, flags };
+}
+async function runCommand(cmd, source, opts = {}) {
+  const parsed = parse(cmd);
+  if (!parsed.error && parsed.name === "clear") { clearOut(); return null; }
+  if (opts.coalesce) {
+    const last = out.blocks[out.blocks.length - 1];
+    if (last && last.done && last.coalesce === parsed.name) { last.el.remove(); out.blocks.pop(); }
+  }
+  const b = addBlock(cmd, source);
+  if (opts.coalesce) b.coalesce = parsed.name;
+  let lines, failed = false;
+  try {
+    if (parsed.error) { lines = errLines(parsed.error); failed = true; }
+    else if (CMDS[parsed.name]) lines = await CMDS[parsed.name](parsed.args, parsed.flags, { source, cmd });
+    else {
+      const sug = closest(parsed.name, COMMANDS);
+      lines = L.err("unknown_command", `kymo has no command "${parsed.name}"`).concat(L.help(sug ? [[`kymo ${sug}`, "did you mean"], ["kymo help", "every command"]] : [["kymo help", "every command"]]));
+      failed = true;
+    }
+  } catch (err) {
+    lines = errLines(err && err.error ? err : { error: "internal", message: String((err && err.message) || err) });
+    failed = true;
+  }
+  lines = lines || [];
+  if (lines.length && lines[0].h.includes('class="t-e"')) failed = true;
+  finishBlock(b, lines);
+  if (source === "typed" && isMobile() && !drawerOpen() && (failed || ["", "workflows", "help"].includes(parsed.name))) setDrawer(true);
+  return lines;
+}
+
+/* ═════════ command echo: clicks type their CLI equivalent, then run it ═════════ */
+let echoChain = Promise.resolve();
+function typeOut(cmd) {
+  const inp = $("#cmdIn"), bar = $("#cmd");
+  return new Promise((done) => {
+    const saved = inp.value;
+    bar.classList.add("echoing");
+    inp.readOnly = true;
+    comp = null;
+    renderCands(null);
+    const finish = () => {
+      bar.classList.add("enter");
+      setTimeout(() => {
+        bar.classList.remove("enter", "echoing");
+        inp.readOnly = false;
+        inp.value = saved;
+        updateGhost();
+        done();
+      }, reduced() ? 60 : 150);
+    };
+    if (reduced() || document.hidden) { inp.value = cmd; updateGhost(); setTimeout(finish, 160); return; }
+    const per = Math.max(5, Math.min(13, 320 / cmd.length));
+    const t0 = performance.now();
+    const step = () => {
+      const n = Math.min(cmd.length, Math.ceil((performance.now() - t0) / per));
+      inp.value = cmd.slice(0, n);
+      updateGhost();
+      if (n < cmd.length) requestAnimationFrame(step);
+      else setTimeout(finish, 70);
+    };
+    requestAnimationFrame(step);
+  });
+}
+function dispatch(cmd, opts = {}) {
+  const typed = echoChain.then(() => typeOut(cmd));
+  echoChain = typed.catch(() => {});
+  return typed.then(() => runCommand(cmd, "ui", opts));
+}
+let navTimer = null;
+function echoNav(cmd) {
+  clearTimeout(navTimer);
+  navTimer = setTimeout(() => dispatch(cmd, { coalesce: true }), 280);
+}
+function refreshAll() { renderWorkflows(); renderTools(); renderList(); renderDetail(); }
+function refreshExec(id) { renderList(); if (ui.sel === id && ui.mode === "detail") renderDetail(); }
+</script>
+<script>
+/* ═════════ navigation ═════════ */
+const SCREENS = ["workflows", "list", "detail"];
+const PANE_OF = { workflows: "wf", list: "list", detail: "detail" };
+function go(screen, fwd) {
+  if (ui.screen === screen) return;
+  if (fwd === undefined) fwd = SCREENS.indexOf(screen) > SCREENS.indexOf(ui.screen);
+  ui.screen = screen;
+  ui.pane = PANE_OF[screen];
+  renderPanes();
+  if (isMobile()) {
+    const el = $({ workflows: "#paneWf", list: "#paneList", detail: "#paneDetail" }[screen]);
+    el.classList.remove("in-fwd", "in-back");
+    void el.offsetWidth;
+    el.classList.add(fwd ? "in-fwd" : "in-back");
+    if (title(screen)) document.title = title(screen);
+  }
+}
+const title = (screen) => screen === "detail" && ui.sel ? `${shortId(ui.sel)} · kymo` : screen === "list" ? `${ui.wf || "Executions"} · kymo` : "kymo · console";
+function back() {
+  if (ui.mode === "execute") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); return; }
+  if (ui.screen === "detail") go("list", false);
+  else if (ui.screen === "list") go("workflows", false);
+}
+function select(id, { focus = false } = {}) {
+  const changed = ui.sel !== id;
+  ui.sel = id; ui.notFound = null; ui.detailLoading = null;
+  if (ui.mode === "execute") { ui.mode = "detail"; ui.execWf = null; ui.execResult = null; }
+  if (changed) { ui.confirm = null; if (ui.notice && ui.notice.id !== id) ui.notice = null; }
+  let row = null;
+  $$("#listBody .ex").forEach((r) => {
+    const on = r.dataset.id === id;
+    r.setAttribute("aria-selected", String(on));
+    r.tabIndex = on ? 0 : -1;
+    if (on) row = r;
+  });
+  renderDetail();
+  if (row) {
+    row.scrollIntoView({ block: "nearest" });
+    if (focus) row.focus({ preventScroll: true });
+  }
+  history.replaceState(null, "", location.search + "#" + id);
+}
+function setFilter({ wf, status }) {
+  ui.wf = wf || null;
+  ui.status = status || null;
+  renderWorkflows(); renderTools(); renderList();
+}
+function openRow(id, viaKey) {
+  select(id, { focus: viaKey });
+  if (isMobile()) go("detail");
+  if (viaKey) echoNav(K.cli.show(id));
+  else { clearTimeout(navTimer); dispatch(K.cli.show(id), { coalesce: true }); }
+}
+function goExec(id) {
+  if (byId(id)) { if (!isMobile()) ui.pane = "detail"; openRow(id, false); renderPanes(); return; }
+  dispatch(K.cli.show(id));
+}
+function pickWf(name, viaKey) {
+  setFilter({ wf: name, status: ui.status });
+  if (isMobile() && !viaKey) go("list");
+  const cmd = K.cli.list({ workflow: name || null, status: ui.status });
+  if (viaKey) echoNav(cmd); else dispatch(cmd, { coalesce: true });
+}
+function pickStatus(s, fromTile) {
+  if (fromTile) ui.wf = null;
+  setFilter({ wf: ui.wf, status: s || null });
+  if (isMobile() && fromTile) go("list");
+  dispatch(K.cli.list({ workflow: ui.wf, status: ui.status }), { coalesce: true });
+}
+function opResume(id) {
+  const e = byId(id);
+  if (!e || ui.pending[id]) return;
+  ui.pending[id] = "resume"; delete ui.opError[id];
+  refreshExec(id);
+  dispatch(K.cli.resume(id));
+}
+function askInterrupt(id) {
+  const e = byId(id);
+  if (!e || !LIVE.includes(e.status)) return;
+  ui.confirm = ui.confirm === id ? null : id;
+  renderDetail();
+  const btn = ui.confirm ? $('[data-act="cancel-interrupt"]') : $('[data-act="ask-interrupt"]');
+  if (btn) { btn.focus({ preventScroll: true }); btn.scrollIntoView({ block: "nearest" }); }
+}
+function opInterrupt(id) {
+  const e = byId(id);
+  if (!e || ui.pending[id]) return;
+  ui.pending[id] = "interrupt"; delete ui.opError[id];
+  refreshExec(id);
+  dispatch(K.cli.interrupt(id));
+}
+function currentWf() {
+  if (ui.wf) return ui.wf;
+  const e = ui.sel && byId(ui.sel);
+  return e ? e.workflow : S.workflows[0].name;
+}
+function focusPane(p) {
+  ui.pane = p || ui.pane;
+  renderPanes();
+  let el;
+  if (ui.pane === "wf") el = $('#wfBody .wf[aria-selected="true"]') || $("#wfBody .wf");
+  else if (ui.pane === "list") el = $('#listBody .ex[aria-selected="true"]') || $("#listBody .ex") || $("#q");
+  else el = $("#detailBody button.jrow") || $("#detailBody");
+  if (el) el.focus({ preventScroll: false });
+}
+function move(d) {
+  if (ui.pane === "wf") {
+    const rows = $$("#wfBody .wf");
+    if (!rows.length) return;
+    let i = rows.findIndex((r) => r.getAttribute("aria-selected") === "true");
+    i = Math.max(0, Math.min(rows.length - 1, i + d));
+    pickWf(rows[i].dataset.wf || null, true);
+    const r = $$("#wfBody .wf")[i];
+    if (r) { r.focus({ preventScroll: true }); r.scrollIntoView({ block: "nearest" }); }
+    return;
+  }
+  if (ui.pane === "detail") {
+    const rows = $$("#detailBody button.jrow");
+    if (!rows.length) return;
+    const i = rows.indexOf(document.activeElement);
+    const n = i < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, i + d));
+    rows[n].focus({ preventScroll: true });
+    rows[n].scrollIntoView({ block: "nearest" });
+    return;
+  }
+  const rows = $$("#listBody .ex");
+  if (!rows.length) return;
+  let i = rows.findIndex((r) => r.dataset.id === ui.sel);
+  i = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + d));
+  const id = rows[i].dataset.id;
+  if (id === ui.sel) { rows[i].focus({ preventScroll: true }); return; }
+  select(id, { focus: true });
+  echoNav(K.cli.show(id));
+}
+function toggleJ(btn) {
+  const key = ui.sel + ":" + btn.dataset.j;
+  const open = !ui.expanded.has(key);
+  if (open) ui.expanded.add(key); else ui.expanded.delete(key);
+  btn.setAttribute("aria-expanded", String(open));
+  const x = document.getElementById(btn.getAttribute("aria-controls"));
+  if (x) x.hidden = !open;
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = "copied"; }
+  catch { btn.textContent = "⌘C it"; }
+  setTimeout(() => (btn.textContent = "copy"), 1200);
+}
+
+/* ═════════ command line: ghost completion, tab, history ═════════ */
+let comp = null;
+const hist = [];
+let hi = -1;
+function idCands(fn) { return sortedExecs().filter(fn || (() => true)).map((e) => e.id); }
+function completionsFor(value) {
+  if ((value.match(/'/g) || []).length % 2 || (value.match(/"/g) || []).length % 2) return { cur: "", m: [], kind: "none", base: value };
+  const toks = value.replace(/^\s+/, "").split(/\s+/);
+  const cur = toks[toks.length - 1] || "";
+  const prev = toks.slice(0, -1);
+  const ctx = prev[0] === "kymo" ? prev.slice(1) : prev;
+  let cands = [], kind = "cmd";
+  if (!prev.length) cands = ["kymo"].concat(COMMANDS);
+  else if (!ctx.length) cands = COMMANDS;
+  else {
+    const c = ctx[0], last = ctx[ctx.length - 1];
+    if (last === "--workflow") { cands = wfNames(); kind = "wf"; }
+    else if (last === "--status") { cands = STATUSES; kind = "status"; }
+    else if (last === "--payload-file") cands = ["payload.json"];
+    else if (last === "--payload") cands = [];
+    else if ((c === "execution" || c === "show") && ctx.length === 1) { cands = idCands(); kind = "id"; }
+    else if (c === "resume" && ctx.length === 1) { cands = idCands((e) => e.status === "suspended").concat(idCands((e) => e.status !== "suspended")); kind = "id"; }
+    else if (c === "interrupt" && ctx.length === 1) { cands = idCands((e) => LIVE.includes(e.status)).concat(idCands((e) => !LIVE.includes(e.status))); kind = "id"; }
+    else if (c === "execute") { if (ctx.length === 1) { cands = wfNames(); kind = "wf"; } else cands = ["--payload", "--payload-file", "--discard"].filter((f) => !ctx.includes(f)); }
+    else if (c === "executions" || c === "ls") cands = ["--workflow", "--status"].filter((f) => !ctx.includes(f));
+  }
+  const lc = cur.toLowerCase();
+  const m = cands.filter((x) => x.toLowerCase().startsWith(lc) && x !== cur);
+  return { cur, m, kind, base: value.slice(0, value.length - cur.length) };
+}
+function commonPrefix(list) {
+  let p = list[0] || "";
+  for (const s of list) while (!s.toLowerCase().startsWith(p.toLowerCase())) p = p.slice(0, -1);
+  return p;
+}
+function renderCands(c, selected) {
+  const box = $("#cands");
+  if (!c || c.m.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+  let start = 0;
+  const si = selected ? c.m.indexOf(selected) : -1;
+  if (si > 6) start = si - 6;
+  const list = c.m.slice(start, start + 7);
+  const noun = c.kind === "id" ? "executions" : c.kind === "wf" ? "Workflows" : c.kind === "status" ? "statuses" : "commands";
+  box.hidden = false;
+  box.innerHTML = `<div class="ch"><span>${c.m.length} ${noun}</span><span>tab cycles · → accepts · esc closes</span></div>` + list.map((x) => {
+    const e = c.kind === "id" ? byId(x) : null;
+    return `<button type="button" class="cand" role="option" tabindex="-1" aria-selected="${x === selected}" data-cand="${esc(x)}">${e ? sg(e.status) : c.kind === "status" ? `<span class="s-${x}">${G(x)}</span>` : ""}<span>${esc(x)}</span>${e ? `<span class="w">${esc(e.workflow)} · ${e.status}</span>` : ""}</button>`;
+  }).join("");
+}
+function updateGhost() {
+  const inp = $("#cmdIn"), g = $("#ghost");
+  const v = inp.value;
+  const focused = document.activeElement === inp;
+  let rest = "";
+  if (comp) { /* cycling: the list stays as it was */ }
+  else if (v && !inp.readOnly && focused && inp.selectionEnd === v.length) {
+    const c = completionsFor(v);
+    if (c.m.length && (c.cur || c.kind !== "cmd")) rest = c.m[0].slice(c.cur.length);
+    renderCands(c.cur || c.kind !== "cmd" ? c : null);
+  } else renderCands(null);
+  inp.placeholder = isMobile() ? "kymo …" : "kymo executions --status suspended";
+  if (!v && !focused && !inp.readOnly) g.innerHTML = `<span class="caret"></span><span class="rest">  ${isMobile() ? "kymo …" : "type a command, or click anything"}</span>`;
+  else g.innerHTML = `<span>${esc(v)}</span><span class="caret"></span>${rest ? `<span class="rest">${esc(rest)}</span>` : ""}`;
+}
+function onTab(shift) {
+  const inp = $("#cmdIn");
+  if (comp) {
+    comp.i = (comp.i + (shift ? -1 : 1) + comp.list.length) % comp.list.length;
+    inp.value = comp.base + comp.list[comp.i];
+    $("#ghost").innerHTML = `<span>${esc(inp.value)}</span>`;
+    renderCands({ m: comp.list, kind: comp.kind }, comp.list[comp.i]);
+    return;
+  }
+  const c = completionsFor(inp.value);
+  if (!c.m.length) return;
+  if (c.m.length === 1) { inp.value = c.base + c.m[0] + " "; updateGhost(); return; }
+  const lcp = commonPrefix(c.m);
+  if (lcp.length > c.cur.length) { inp.value = c.base + lcp; updateGhost(); return; }
+  comp = { base: c.base, list: c.m, kind: c.kind, i: 0 };
+  inp.value = comp.base + comp.list[0];
+  $("#ghost").innerHTML = `<span>${esc(inp.value)}</span>`;
+  renderCands({ m: comp.list, kind: comp.kind }, comp.list[0]);
+}
+function acceptCand(x) {
+  const inp = $("#cmdIn");
+  const c = comp || completionsFor(inp.value);
+  inp.value = c.base + x + " ";
+  comp = null;
+  inp.focus();
+  updateGhost();
+}
+function histNav(d) {
+  if (!hist.length) return;
+  const inp = $("#cmdIn");
+  if (d < 0) hi = hi < 0 ? hist.length - 1 : Math.max(0, hi - 1);
+  else if (hi >= 0) hi = hi + 1 >= hist.length ? -1 : hi + 1;
+  inp.value = hi < 0 ? "" : hist[hi];
+  comp = null;
+  updateGhost();
+}
+function focusCmd() {
+  const inp = $("#cmdIn");
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+  updateGhost();
+}
+
+/* ═════════ events ═════════ */
+document.addEventListener("click", (ev) => {
+  const t = ev.target;
+  if (!(t instanceof Element)) return;
+  const at = (s) => t.closest(s);
+  let x;
+  if ((x = at("[data-copy]"))) return copyText(x.dataset.copy, x);
+  if ((x = at("[data-cand]"))) return acceptCand(x.dataset.cand);
+  if ((x = at("[data-cmd]"))) { const inp = $("#cmdIn"); inp.value = x.dataset.cmd; comp = null; focusCmd(); return; }
+  if ((x = at("[data-close-keys]"))) return $("#keys").close();
+  if ((x = at("[data-exec]"))) return openExecute(x.dataset.exec);
+  if ((x = at("[data-go]"))) return goExec(x.dataset.go);
+  if ((x = at("[data-tile]"))) return pickStatus(x.dataset.tile, true);
+  if ((x = at("#wfBody [data-wf]"))) { ui.pane = "wf"; renderPanes(); return pickWf(x.dataset.wf || null, false); }
+  if ((x = at("#tools [data-status]"))) return pickStatus(x.dataset.status);
+  if ((x = at("[data-status-only]"))) return pickStatus("");
+  if ((x = at("[data-back]"))) return back();
+  if ((x = at("[data-j]"))) return toggleJ(x);
+  if ((x = at("#listBody .ex"))) { ui.pane = "list"; renderPanes(); return openRow(x.dataset.id, false); }
+  if ((x = at('.seg [role="radio"]'))) return pickSeg(x);
+  if ((x = at("#discard"))) { ui.discard = !ui.discard; ui.execResult = null; return syncForm(); }
+  if ((x = at("[data-act]"))) {
+    const a = x.dataset.act, id = ui.sel;
+    if (a === "resume") return opResume(id);
+    if (a === "ask-interrupt") return askInterrupt(id);
+    if (a === "cancel-interrupt") { ui.confirm = null; renderDetail(); const b = $('[data-act="ask-interrupt"]'); return b && b.focus(); }
+    if (a === "interrupt") return opInterrupt(id);
+    if (a === "dismiss-notice") { ui.notice = null; return renderDetail(); }
+    if (a === "dismiss-error") { delete ui.opError[id]; return renderDetail(); }
+    if (a === "retry-op") { delete ui.opError[id]; return x.dataset.op === "resume" ? opResume(id) : opInterrupt(id); }
+    if (a === "retry-boot") return retryBoot();
+    if (a === "clear-filters") { ui.q = ""; setFilter({ wf: null, status: null }); return dispatch(K.cli.list({}), { coalesce: true }); }
+    if (a === "back-to-list") { ui.notFound = null; renderDetail(); history.replaceState(null, "", location.search); if (isMobile()) go("list", false); else focusPane("list"); return; }
+    if (a === "cancel-exec") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); return; }
+  }
+});
+$("#cands").addEventListener("mousedown", (ev) => ev.preventDefault());
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.id === "q") { ui.q = t.value; renderList(); return; }
+  if (t.id === "cmdIn") { comp = null; hi = -1; updateGhost(); return; }
+  if (t.dataset && t.dataset.field && ui.form) { ui.form.values[t.dataset.field] = t.value; ui.execResult = null; syncForm(); }
+});
+document.addEventListener("focusout", (ev) => {
+  const t = ev.target;
+  if (t.matches && t.matches("input[data-field], textarea[data-field]") && ui.form && t.value !== "") { ui.form.touched[t.dataset.field] = true; syncForm(); }
+  if (t.id === "cmdIn") setTimeout(() => { if (document.activeElement !== t) { comp = null; renderCands(null); updateGhost(); } }, 0);
+});
+document.addEventListener("focusin", (ev) => {
+  const p = ev.target.closest && ev.target.closest(".pane");
+  if (p && ui.pane !== p.dataset.pane) { ui.pane = p.dataset.pane; renderPanes(); }
+  if (ev.target.id === "cmdIn") updateGhost();
+});
+document.addEventListener("submit", (ev) => {
+  if (ev.target.id === "xform") { ev.preventDefault(); submitForm(); }
+});
+function runTyped() {
+  const inp = $("#cmdIn"), v = inp.value.trim();
+  if (!v || inp.readOnly) return;
+  if (hist[hist.length - 1] !== v) hist.push(v);
+  hi = -1; comp = null;
+  inp.value = "";
+  updateGhost();
+  const bar = $("#cmd");
+  bar.classList.add("enter");
+  setTimeout(() => bar.classList.remove("enter"), 200);
+  if (!isMobile() && !drawerOpen()) setDrawer(true);
+  runCommand(v, "typed");
+}
+$("#cmd").addEventListener("submit", (ev) => { ev.preventDefault(); runTyped(); });
+$("#cmdIn").addEventListener("keydown", (ev) => {
+  const inp = ev.target;
+  if (ev.key === "Tab") {
+    if (!inp.value) return;
+    ev.preventDefault();
+    onTab(ev.shiftKey);
+  } else if (ev.key === "ArrowRight" && inp.selectionStart === inp.value.length && !comp) {
+    const c = completionsFor(inp.value);
+    if (c.m.length && (c.cur || c.kind !== "cmd")) { ev.preventDefault(); inp.value = c.base + c.m[0] + (c.m.length === 1 ? " " : ""); updateGhost(); }
+  } else if (ev.key === "ArrowUp") { ev.preventDefault(); histNav(-1); }
+  else if (ev.key === "ArrowDown") { ev.preventDefault(); histNav(1); }
+  else if (ev.key === "Escape") {
+    ev.preventDefault();
+    if (comp || !$("#cands").hidden) { comp = null; renderCands(null); $("#ghost").innerHTML = `<span>${esc(inp.value)}</span>`; }
+    else if (inp.value) { inp.value = ""; updateGhost(); }
+    else { inp.blur(); focusPane(); }
+  } else if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); comp = null; runTyped(); }
+});
+$("#outToggle").addEventListener("click", () => setDrawer(!drawerOpen()));
+$("#closeOut").addEventListener("click", () => setDrawer(false));
+$("#drawer").addEventListener("click", (ev) => {
+  if (!drawerOpen() && !isMobile() && !(ev.target instanceof Element && ev.target.closest("button"))) setDrawer(true);
+});
+$("#clearOut").addEventListener("click", clearOut);
+$("#scrim").addEventListener("click", () => setDrawer(false));
+$("#keysBtn").addEventListener("click", () => $("#keys").showModal());
+$("#keys").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); });
+$("#statesBtn").addEventListener("click", (ev) => {
+  const nav = $("#states"), open = nav.hidden;
+  nav.hidden = !open;
+  ev.currentTarget.setAttribute("aria-expanded", String(open));
+});
+
+document.addEventListener("keydown", (ev) => {
+  const t = ev.target, k = ev.key;
+  const mod = ev.metaKey || ev.ctrlKey;
+  if (mod && k.toLowerCase() === "k") { ev.preventDefault(); focusCmd(); return; }
+  if (mod && k === "Enter" && ui.mode === "execute") { ev.preventDefault(); submitForm(); return; }
+  if ($("#keys").open || t.id === "cmdIn") return;
+  if (t.closest && t.closest(".seg") && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) {
+    ev.preventDefault();
+    const btns = $$('[role="radio"]', t.closest(".seg"));
+    const i = btns.indexOf(t), n = btns[(i + (k === "ArrowLeft" || k === "ArrowUp" ? -1 : 1) + btns.length) % btns.length];
+    pickSeg(n); n.focus();
+    return;
+  }
+  if (k === "Escape") { onEscape(t, ev); return; }
+  const inField = t.matches && t.matches("input, textarea, select, [contenteditable]");
+  if (inField) {
+    if (t.id === "q" && (k === "ArrowDown" || k === "Enter")) { ev.preventDefault(); focusPane("list"); }
+    return;
+  }
+  if (mod || ev.altKey) return;
+  const onRow = t.matches && t.matches(".ex, .wf");
+  switch (k) {
+    case "j": case "ArrowDown":
+      if (k === "ArrowDown" && !onRow && !(t.matches && t.matches("button.jrow"))) return;
+      ev.preventDefault(); move(1); break;
+    case "k": case "ArrowUp":
+      if (k === "ArrowUp" && !onRow && !(t.matches && t.matches("button.jrow"))) return;
+      ev.preventDefault(); move(-1); break;
+    case "h": ev.preventDefault(); if (isMobile()) back(); else focusPane(PANE_OF[SCREENS[Math.max(0, SCREENS.indexOf(Object.keys(PANE_OF).find((s) => PANE_OF[s] === ui.pane)) - 1)]]); break;
+    case "l": ev.preventDefault(); if (!isMobile()) focusPane(PANE_OF[SCREENS[Math.min(2, SCREENS.indexOf(Object.keys(PANE_OF).find((s) => PANE_OF[s] === ui.pane)) + 1)]]); break;
+    case "Enter": case " ":
+      if (!onRow) return;
+      ev.preventDefault();
+      if (t.matches(".wf")) { if (k === " " || t.getAttribute("aria-selected") !== "true") pickWf(t.dataset.wf || null, false); if (isMobile()) go("list"); else focusPane("list"); }
+      else { if (t.dataset.id !== ui.sel || k === " ") openRow(t.dataset.id, false); else if (isMobile()) go("detail"); else focusPane("detail"); }
+      break;
+    case "/": ev.preventDefault(); if (isMobile()) go("list"); $("#q") && $("#q").focus(); break;
+    case "?": ev.preventDefault(); $("#keys").showModal(); break;
+    case ":": ev.preventDefault(); focusCmd(); break;
+    case "e": ev.preventDefault(); openExecute(currentWf()); break;
+    case "r": { const e = ui.sel && byId(ui.sel); if (e && e.status === "suspended" && ui.mode === "detail") { ev.preventDefault(); opResume(e.id); } break; }
+    case "i": { const e = ui.sel && byId(ui.sel); if (e && LIVE.includes(e.status) && ui.mode === "detail") { ev.preventDefault(); askInterrupt(e.id); } break; }
+    case "y": if (ui.confirm) { ev.preventDefault(); opInterrupt(ui.confirm); } break;
+    case "`": ev.preventDefault(); setDrawer(!drawerOpen()); break;
+  }
+});
+function onEscape(t, ev) {
+  if (t.id === "q") { ev.preventDefault(); if (t.value) { t.value = ""; ui.q = ""; renderList(); } else focusPane("list"); return; }
+  if (isMobile() && drawerOpen()) { setDrawer(false); return; }
+  if (ui.confirm) { ui.confirm = null; renderDetail(); const b = $('[data-act="ask-interrupt"]'); if (b) b.focus(); return; }
+  if (ui.mode === "execute") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); else focusPane("list"); return; }
+  if (isMobile() && ui.screen !== "workflows") { back(); return; }
+  if (ui.notFound) { ui.notFound = null; renderDetail(); focusPane("list"); return; }
+  if (ui.pane === "detail") { focusPane("list"); return; }
+  if (ui.pane === "list" && (ui.status || ui.wf)) return;
+}
+
+/* ═════════ clock tick: running executions keep moving ═════════ */
+setInterval(() => {
+  $$("[data-ago]").forEach((el) => (el.textContent = ago(el.dataset.ago)));
+  $$("[data-el]").forEach((el) => (el.textContent = (el.dataset.prefix || "") + dur(now() - ts(el.dataset.el))));
+  $$("[data-until]").forEach((el) => (el.textContent = until(el.dataset.until)));
+}, 1000);
+setInterval(() => {
+  const e = ui.sel && byId(ui.sel);
+  if (e && LIVE.includes(e.status) && ui.mode === "detail" && !ui.confirm && !ui.pending[e.id] && ui.boot === "ready") renderDetail();
+}, 15000);
+
+/* ═════════ review states + boot ═════════ */
+function renderStates() {
+  const items = ["live", "loading", "down", "empty", "nomatch", "notfound"];
+  $("#states").innerHTML = `<span class="lbl">Review states</span>` +
+    items.map((s) => `<a href="?state=${s}" aria-current="${REVIEW === s}">${s}</a>`).join("") +
+    `<button type="button" id="failNext" aria-pressed="${K.api.fail}" title="Makes the next KYMO.api call reject with server_unreachable">fail next call</button><span class="note">also ?state=… in the URL</span>`;
+  $("#failNext").addEventListener("click", (ev) => {
+    K.api.fail = !K.api.fail;
+    ev.currentTarget.setAttribute("aria-pressed", String(K.api.fail));
+  });
+}
+function applyInitial() {
+  const hashId = location.hash.slice(1).toLowerCase();
+  if (REVIEW === "nomatch") { ui.wf = "NightlyExport"; ui.status = "failed"; ui.sel = null; ui.screen = "list"; return; }
+  if (REVIEW === "notfound") { ui.notFound = NOTFOUND_ID; ui.sel = null; ui.screen = "detail"; ui.pane = "detail"; return; }
+  if (REVIEW === "empty") { ui.sel = null; ui.screen = "workflows"; return; }
+  if (hashId && byId(hashId)) { ui.sel = hashId; ui.screen = "detail"; return; }
+  if (hashId) { ui.notFound = hashId; ui.screen = "detail"; return; }
+  const first = filtered()[0];
+  ui.sel = first ? first.id : null;
+  ui.screen = "workflows";
+}
+async function boot() {
+  if (REVIEW === "down") S.server.status = "down";
+  if (REVIEW === "empty") S.executions.splice(0);
+  ui.boot = "loading";
+  renderAll();
+  renderStates();
+  if (REVIEW !== "live") { $("#states").hidden = false; $("#statesBtn").setAttribute("aria-expanded", "true"); }
+  bootEcho();
+  if (REVIEW === "loading") return; // held on purpose: the first load never resolves
+  try {
+    await call("listExecutions", {});
+    ui.boot = "ready";
+    applyInitial();
+  } catch (err) {
+    ui.boot = "down";
+    ui.downErr = err;
+  }
+  renderAll();
+  if (ui.boot === "ready" && ui.sel) history.replaceState(null, "", location.search + "#" + ui.sel);
+}
+async function bootEcho() {
+  if (REVIEW === "loading") { echoChain = typeOut(K.cli.home()).then(() => { addBlock(K.cli.home(), "ui"); }); return; }
+  await dispatch(K.cli.home());
+  if (REVIEW === "notfound") dispatch(K.cli.show(NOTFOUND_ID));
+  if (REVIEW === "nomatch") dispatch(K.cli.list({ workflow: "NightlyExport", status: "failed" }));
+}
+async function retryBoot() {
+  if (ui.retrying) return;
+  ui.retrying = true;
+  renderDown();
+  S.server.status = "up"; // simulated: the app came back
+  try {
+    await call("listExecutions", {});
+    ui.boot = "ready"; ui.downErr = null;
+    applyInitial();
+  } catch (err) {
+    ui.downErr = err;
+  }
+  ui.retrying = false;
+  renderAll();
+  dispatch(K.cli.home());
+}
+mqMobile.addEventListener("change", () => { setDrawer(false); renderAll(); });
+setDrawer(false);
+updateGhost();
+boot();
+</script>
+</body>
+</html>

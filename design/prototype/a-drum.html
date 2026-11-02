@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>kymo — the drum · ledgerly-api</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+:root{
+  --paper:#F4EFE4; --paper-2:#EDE6D6; --drum:#E8DFCB; --rule:#D8CDB5; --rule-2:#C2B496;
+  --ink:#1F1B15; --ink-2:#463F33; --ink-3:#776E5E; --ink-4:#A69B85;
+  --stylus:#C4401A; --blot:#7A2013; --ok:#3F6B45;
+  --ease:cubic-bezier(.22,.8,.24,1);
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; --sans:"IBM Plex Sans",system-ui,sans-serif; --serif:"Instrument Serif",Georgia,serif;
+  --axis:46px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100vh;overflow:hidden}
+body>*{min-width:0}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .38 0 0 0 0 .26 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--stylus);outline-offset:2px;border-radius:3px}
+.mono{font-family:var(--mono)}
+.cap{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+
+/* header */
+.top{position:relative;z-index:2;display:flex;align-items:center;gap:28px;padding:14px 24px 12px;border-bottom:1px solid var(--rule)}
+.mark{display:flex;align-items:baseline;gap:12px}
+.mark b{font:italic 400 42px/.8 var(--serif);letter-spacing:-.015em}
+.mark span{font:500 10px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);max-width:190px}
+.srv{display:flex;gap:10px;align-items:center;font:11px var(--mono);color:var(--ink-2);padding-left:24px;border-left:1px solid var(--rule);white-space:nowrap;min-width:0;flex:0 1 auto;overflow:hidden}
+.srv i{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(63,107,69,.15)}
+.srv.down i{background:var(--blot);box-shadow:0 0 0 3px rgba(122,32,19,.15)}
+.srv span{flex:none}
+.srv em{font-style:normal;color:var(--ink-3);min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1499px){.srv .up{display:none}}
+.ctl{margin-left:auto;display:flex;gap:14px;align-items:center;flex:none}
+.seg{display:inline-flex;border:1px solid var(--rule-2);border-radius:999px;padding:2px;background:rgba(255,255,255,.25)}
+.seg button{font:500 11px/1 var(--mono);padding:6px 10px;border-radius:999px;color:var(--ink-3);transition:background-color .2s var(--ease),color .2s var(--ease)}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.sel{font:500 11px var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--rule-2);border-radius:999px;padding:5px 26px 5px 11px;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+
+/* deck */
+.deck{position:relative;z-index:1;display:grid;grid-template-columns:240px minmax(0,1fr) 300px;min-height:0;overflow:auto;align-items:start}
+.colhead{height:var(--axis);display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 9px 18px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--paper);z-index:2}
+.gutter{border-right:1px solid var(--rule);min-height:100%}
+.g-row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:0 10px 3px 12px}
+.wf-btn{display:flex;align-items:baseline;gap:7px;font:600 12.5px/1.2 var(--sans);padding:3px 6px;border-radius:4px;letter-spacing:-.005em;text-align:left;white-space:nowrap;min-width:0}
+.wf-btn .plus{font:500 9.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--stylus);opacity:0;transform:translateX(-4px);transition:opacity .2s var(--ease),transform .2s var(--ease)}
+.wf-btn:hover,.wf-btn:focus-visible{background:rgba(31,27,21,.05)}
+.wf-btn:hover .plus,.wf-btn:focus-visible .plus{opacity:1;transform:none}
+.counts{display:flex;gap:2px;flex:none}
+.cnt{display:inline-flex;align-items:center;gap:4px;font:500 10.5px/1 var(--mono);color:var(--ink-2);padding:3px 4px;border-radius:3px}
+.cnt:hover{background:rgba(31,27,21,.06)}
+.cnt[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.pip{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none}
+.pip-running{background:var(--stylus)}
+.pip-suspended{border:1.5px dotted var(--ink-2)}
+.pip-succeeded{background:var(--ink)}
+.pip-failed{background:var(--blot);border-radius:40% 60% 55% 45%}
+.pip-interrupted{width:8px;border-radius:0;height:1.5px;background:var(--ink-2);transform:rotate(-55deg)}
+.l-btn{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:0 14px 0 18px;text-align:left;border-radius:0;transition:background-color .2s var(--ease)}
+.l-btn .lid{font:500 11.5px var(--mono);color:var(--ink)}
+.l-btn .lst{font:10.5px var(--mono);color:var(--ink-3);white-space:nowrap}
+.is-hot.l-btn,.l-btn:hover,.is-hot.ro-row{background:rgba(196,64,26,.07)}
+.is-open.l-btn{box-shadow:inset 2px 0 0 var(--stylus)}
+
+.drumwrap{position:relative;min-width:0;outline:none}
+#drum{display:block;width:100%;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.drumwrap:focus-visible{outline:2px solid var(--stylus);outline-offset:-2px}
+
+/* svg ink */
+.drum-bg{fill:var(--drum)}
+.rail{stroke:rgba(31,27,21,.08);stroke-width:1}
+.grid{stroke:rgba(31,27,21,.09);stroke-width:1}
+.tk{stroke:var(--ink-3);stroke-width:1}
+.tk.major{stroke:var(--ink-2)}
+.tl{font:500 9.5px var(--mono);fill:var(--ink-3);letter-spacing:.06em}
+.tl.major{fill:var(--ink);font-weight:600}
+.needle{stroke:var(--ink);stroke-width:1}
+.needle-l{font:600 9px var(--mono);fill:var(--paper);letter-spacing:.1em}
+.needle-b{fill:var(--ink)}
+.sep{stroke:var(--rule-2);stroke-width:1}
+.hit{fill:transparent}
+.lane.is-hot .hit{fill:rgba(196,64,26,.06)}
+.lane.is-open .hit{fill:rgba(196,64,26,.1)}
+.tr{stroke:var(--ink);stroke-width:1.6;fill:none;stroke-linecap:round}
+.tr-dot{stroke:var(--ink-2);stroke-width:1.7;fill:none;stroke-dasharray:.1 4;stroke-linecap:round}
+.tr-dot.k-child{stroke-dasharray:4 3;stroke-width:1.2;stroke-linecap:butt}
+.pulse{fill:var(--ink)}
+.p-running{fill:var(--stylus)}
+.p-failure{fill:var(--paper);stroke:var(--blot);stroke-width:1.2}
+.p-interrupt{fill:var(--paper);stroke:var(--ink-2);stroke-width:1.2}
+.tick{stroke:var(--ink-2);stroke-width:1.1}
+.blot{fill:var(--blot)}
+.cut{stroke:var(--ink);stroke-width:1.5;stroke-linecap:round}
+.comp{stroke:var(--ink-2);stroke-width:1.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.term{stroke:var(--ink);stroke-width:1.6}
+.live{fill:var(--stylus)}
+.live-ring{fill:none;stroke:var(--stylus);stroke-width:1;transform-box:fill-box;transform-origin:center;animation:ring 1.8s var(--ease) infinite}
+@keyframes ring{from{transform:scale(.5);opacity:.9}to{transform:scale(1.6);opacity:0}}
+.susp{fill:var(--drum);stroke:var(--ink-2);stroke-width:1.3}
+.leader{stroke:var(--ink-4);stroke-width:1;stroke-dasharray:1 5}
+.wake{fill:var(--drum);stroke:var(--ink);stroke-width:1.3}
+.wake-done{stroke:var(--ink-3);stroke-width:1.2}
+.sig{fill:var(--ink-2)}
+.ml{font:500 9px var(--mono);fill:var(--ink-3)}
+.ml.ink{fill:var(--ink-2)}
+.link{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 2}
+.link-end{fill:var(--ink-3)}
+.clipmark{stroke:var(--ink-3);stroke-width:1.2;fill:none}
+.lane{transition:opacity .3s var(--ease)}
+.lane.fresh{animation:fresh 1.6s var(--ease)}
+@keyframes fresh{0%,30%{opacity:.25}100%{opacity:1}}
+.stylus-l{stroke:var(--stylus);stroke-width:1.5}
+.stylus-h{fill:var(--stylus)}
+.stylus-t{font:600 9.5px var(--mono);fill:var(--paper)}
+.skel{fill:rgba(31,27,21,.07)}
+
+.drum-msg{position:absolute;left:50%;top:calc(var(--axis) + 40%);transform:translate(-50%,-50%);max-width:440px;width:calc(100% - 48px);background:var(--paper);border:1px solid var(--rule-2);border-radius:4px;padding:22px 24px;box-shadow:0 24px 50px -30px rgba(40,30,10,.4);z-index:3}
+.drum-msg[hidden]{display:none}
+.drum-msg h2{font:italic 400 30px/1 var(--serif);margin:6px 0 10px;letter-spacing:-.01em}
+.drum-msg p{color:var(--ink-2);margin-bottom:12px}
+.sweep{position:absolute;top:var(--axis);bottom:0;left:0;width:2px;background:var(--stylus);opacity:.7;animation:sweep 2.4s var(--ease) infinite}
+@keyframes sweep{from{transform:translateX(0)}to{transform:translateX(var(--sw,800px))}}
+
+/* readout */
+.readout{border-left:1px solid var(--rule);min-height:100%}
+.ro-head{flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:4px}
+.ro-time{font:600 15px/1 var(--mono);letter-spacing:-.01em;color:var(--stylus)}
+.ro-time small{font:500 10px var(--mono);color:var(--ink-3);margin-left:8px;letter-spacing:0}
+.ro-row{display:flex;flex-direction:column;justify-content:center;padding:0 14px 0 16px;font:11px/1.25 var(--mono);color:var(--ink-2);min-width:0;cursor:pointer;transition:background-color .2s var(--ease)}
+.ro-row .ro-a{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.ro-row .ro-b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-3);font-size:10px}
+.ro-row.idle .ro-a{color:var(--ink-4)}
+.ro-row.k-fail .ro-a{color:var(--blot)}
+.ro-row.k-act .ro-a::before{content:"▮ ";color:var(--stylus)}
+.ro-g{border-bottom:1px solid transparent}
+
+/* footer */
+.foot{position:relative;z-index:2;display:flex;align-items:center;gap:16px;padding:8px 24px;border-top:1px solid var(--rule);font:11px var(--mono);color:var(--ink-3);min-height:38px}
+.foot code{color:var(--ink-2)}
+.foot code::before{content:"$ ";color:var(--ink-4)}
+.states{margin-left:auto;display:flex;gap:2px;align-items:center;flex-wrap:wrap}
+.states a,.states button{font:500 10.5px var(--mono);color:var(--ink-3);text-decoration:none;padding:3px 7px;border-radius:999px}
+.states a:hover,.states button:hover{color:var(--ink);background:rgba(31,27,21,.06)}
+.states a[aria-current=true]{background:var(--ink-2);color:var(--paper)}
+.states button[aria-pressed=true]{color:var(--blot);background:rgba(122,32,19,.1)}
+
+.wfstrip{display:none}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="mark"><b>kymo</b><span>workflow kymograph</span></div>
+  <div class="srv" id="srv"></div>
+  <div class="ctl">
+    <select class="sel" id="fWf" aria-label="Filter by workflow"></select>
+    <div class="seg" id="fSt" role="group" aria-label="Filter by status"></div>
+    <div class="seg" id="fSpan" role="group" aria-label="Time span"></div>
+  </div>
+</header>
+<main class="deck" id="deck">
+  <nav class="wfstrip" id="wfstrip" aria-label="Workflows"></nav>
+  <aside class="gutter" id="gutter" aria-label="Workflows and executions"></aside>
+  <section class="drumwrap" id="drumwrap" tabindex="0" aria-label="Drum: executions over time. Left and right arrows move the stylus, up and down choose an execution, Enter opens it." aria-describedby="roTime">
+    <svg id="drum" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+    <div class="drum-msg" id="drumMsg" hidden></div>
+  </section>
+  <aside class="readout" id="readout" aria-label="Stylus readout"></aside>
+</main>
+<footer class="foot">
+  <code id="cliNow">kymo</code>
+  <nav class="states" id="states" aria-label="Prototype states"></nav>
+</footer>
+<div class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="pTitle" hidden></div>
+<div class="panel sheet" id="sheet" role="dialog" aria-modal="false" aria-labelledby="sTitle" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="data.js"></script>
+<script>
+"use strict";
+const K = window.KYMO;
+const H = 3600e3, D = 24 * H;
+const T0 = Date.parse(K.NOW), REAL0 = Date.now();
+const now = () => T0 + (Date.now() - REAL0);
+const toPage = (iso) => iso ? new Date(T0 + (Date.parse(iso) - REAL0)).toISOString() : iso;
+const ms = (iso) => (iso ? Date.parse(iso) : null);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const params = new URLSearchParams(location.search);
+const STATUSES = ["running", "suspended", "succeeded", "failed", "interrupted"];
+const SPANS = { "24h": { back: 24 * H, ahead: 12 * H, tick: H, label: 3 * H, step: 15 * 60e3 }, "7d": { back: 7 * D, ahead: 3 * D, tick: 6 * H, label: D, step: 2 * H } };
+const S = {
+  mode: params.get("state") || "live", span: params.get("span") === "7d" ? "7d" : "24h",
+  wf: params.get("workflow") || "", status: params.get("status") || "",
+  loaded: false, stylusT: null, hotId: null, openId: null, vertical: false, fresh: null,
+};
+if (S.mode === "nomatch") { S.wf = "DunningSequence"; S.status = "failed"; }
+
+/* ---------- formatting ---------- */
+const pad = (n, w = 2) => String(n).padStart(w, "0");
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"], DOW = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const hhmm = (t) => { const d = new Date(t); return pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()); };
+const hms = (t) => hhmm(t) + ":" + pad(new Date(t).getUTCSeconds());
+const day = (t) => { const d = new Date(t); return MON[d.getUTCMonth()] + " " + pad(d.getUTCDate()); };
+const stamp = (t) => `${day(t)} ${hms(t)}.${pad(new Date(t).getUTCMilliseconds(), 3)}`;
+function dur(v) {
+  v = Math.max(0, v);
+  if (v < 1000) return Math.round(v) + "ms";
+  const s = v / 1000; if (s < 60) return (s < 10 ? s.toFixed(2) : s.toFixed(1)).replace(/\.?0+$/, "") + "s";
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ${pad(Math.floor(s % 60))}s`;
+  const h = Math.floor(m / 60); if (h < 48) return `${h}h ${pad(m % 60)}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+const rel = (t) => { const n = now(); return Math.abs(t - n) < 1000 ? "now" : t < n ? dur(n - t) + " ago" : "in " + dur(t - n); };
+function statusLabel(e) { return e.status === "suspended" ? `suspended · ${e.suspendedReason === "failure" ? "on failure" : e.suspendedReason}` : e.status; }
+
+/* ---------- data ---------- */
+const all = () => (S.loaded && S.mode !== "down" && S.mode !== "loading" ? K.state.executions : []);
+const byId = (id) => K.state.executions.find((e) => e.id === id);
+const visible = () => all().filter((e) => (!S.wf || e.workflow === S.wf) && (!S.status || e.status === S.status));
+function counts(wf) { const c = {}; all().forEach((e) => { if (e.workflow === wf) c[e.status] = (c[e.status] || 0) + 1; }); return c; }
+function layout(list, laneSize, groupSize) {
+  const items = []; let off = 0;
+  for (const w of K.state.workflows) {
+    if (S.wf && w.name !== S.wf) continue;
+    const ex = list.filter((e) => e.workflow === w.name).sort((a, b) => ms(b.startedAt) - ms(a.startedAt));
+    if (S.vertical && !ex.length) continue;
+    items.push({ kind: "group", wf: w.name, off, size: groupSize, n: ex.length }); off += groupSize;
+    ex.forEach((e) => { items.push({ kind: "lane", e, off, size: laneSize }); off += laneSize; });
+  }
+  return { items, total: off, lanes: items.filter((i) => i.kind === "lane") };
+}
+
+/* ---------- geometry: u = time axis, c = cross axis ---------- */
+let G = null;
+function P(u, c) { return S.vertical ? c.toFixed(1) + " " + u.toFixed(1) : u.toFixed(1) + " " + c.toFixed(1); }
+const seg = (u0, c0, u1, c1) => `M${P(u0, c0)}L${P(u1, c1)}`;
+const box = (u0, u1, c0, c1) => `M${P(u0, c0)}L${P(u1, c0)}L${P(u1, c1)}L${P(u0, c1)}Z`;
+function txt(u, c, s, cls, anchor = "middle") {
+  const [x, y] = S.vertical ? [c, u] : [u, c];
+  return `<text class="${cls}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${esc(s)}</text>`;
+}
+function geom(list) {
+  const wrap = $("#drumwrap"), sp = SPANS[S.span], n = now();
+  const sc = { t0: n - sp.back, t1: n + sp.ahead, n, sp };
+  if (!S.vertical) {
+    const lay = layout(list, 38, 30), A = 46, W = Math.max(320, wrap.clientWidth);
+    const u0 = 16, u1 = W - 22;
+    const Hh = Math.max(A + lay.total + 20, ($("#deck").clientHeight || 0) - 2);
+    return { sc, lay, A, W, Hh, end: Hh - 6, u0, u1, U: (t) => u0 + ((t - sc.t0) / (sc.t1 - sc.t0)) * (u1 - u0) };
+  }
+  const W = Math.max(280, Math.min(wrap.clientWidth, document.documentElement.clientWidth)), A = 50;
+  const groups = K.state.workflows.filter((w) => list.some((e) => e.workflow === w.name)).length || 1;
+  const lane = Math.max(18, Math.min(44, (W - A - 8 - groups * 8) / Math.max(1, list.length)));
+  const lay = layout(list, lane, 8), Hh = Math.max(420, wrap.clientHeight || 520), u0 = 52, u1 = Hh - 14;
+  return { sc, lay, A, W, Hh, end: W - 2, u0, u1, U: (t) => u0 + ((t - sc.t0) / (sc.t1 - sc.t0)) * (u1 - u0) };
+}
+const T = (u) => G.sc.t0 + ((u - G.u0) / (G.u1 - G.u0)) * (G.sc.t1 - G.sc.t0);
+const baseOf = (it) => G.A + it.off + (S.vertical ? it.size * 0.32 : it.size * 0.66);
+
+/* ---------- drum ---------- */
+function blot(u, c, seed) {
+  let d = "";
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2, k = seed.charCodeAt(i % seed.length);
+    const r = 4.4 + ((k * 7 + i * 13) % 10) / 10 * 2.8;
+    d += (i ? "L" : "M") + P(u + Math.cos(a) * r, c + Math.sin(a) * r);
+  }
+  const k = seed.charCodeAt(3) % 4;
+  return `<path class="blot" d="${d}Z"/><circle class="blot" ${S.vertical ? `cx="${c - 7 + k}" cy="${u + 8}"` : `cx="${u + 8}" cy="${c - 7 + k}"`} r="1.6"/><circle class="blot" ${S.vertical ? `cx="${c + 6}" cy="${u - 9 + k}"` : `cx="${u - 9 + k}" cy="${c + 6}"`} r="1.1"/>`;
+}
+function laneSVG(e, it) {
+  const { t0, t1, n } = G.sc, U = G.U, dir = S.vertical ? 1 : -1, H8 = S.vertical ? 0.8 : 1;
+  const base = baseOf(it), up = (h) => base + dir * h * H8;
+  const st = ms(e.startedAt), en = e.endedAt ? ms(e.endedAt) : n;
+  const cl = (t) => Math.min(t1, Math.max(t0, t)), vis = (a, b) => b >= t0 && a <= t1;
+  let s = `<g class="lane${S.hotId === e.id ? " is-hot" : ""}${S.openId === e.id ? " is-open" : ""}${S.fresh === e.id ? " fresh" : ""}" data-id="${e.id}">`;
+  s += `<path class="hit" d="${box(G.u0 - 10, G.u1 + 16, G.A + it.off, G.A + it.off + it.size)}"/>`;
+  s += `<path class="rail" d="${seg(G.u0, base, G.u1, base)}"/>`;
+  const dots = [];
+  e.waits.forEach((w) => dots.push([ms(w.since), w.status === "waiting" ? en : ms(w.doneAt || w.wakeAt), w.kind]));
+  e.childCalls.forEach((c) => dots.push([ms(c.startedAt), c.endedAt ? ms(c.endedAt) : en, "child"]));
+  if (e.status === "suspended" && e.suspendedReason === "failure") dots.push([ms(e.activities.at(-1).endedAt), en, "failure"]);
+  const sorted = dots.map((d) => [Math.max(d[0], st), Math.min(d[1], en), d[2]]).filter((d) => d[1] > d[0]).sort((a, b) => a[0] - b[0]);
+  const solid = []; let cur = st;
+  for (const d of sorted) { if (d[0] > cur) solid.push([cur, d[0]]); cur = Math.max(cur, d[1]); }
+  if (en > cur || !solid.length) solid.push([cur, Math.max(cur, en)]);
+  for (const [a, b] of solid) if (vis(a, b)) s += `<path class="tr" d="${seg(U(cl(a)), base, Math.max(U(cl(b)), U(cl(a)) + 0.6), base)}"/>`;
+  for (const [a, b, k] of sorted) if (vis(a, b)) s += `<path class="tr-dot k-${k}" d="${seg(U(cl(a)), base, U(cl(b)), base)}"/>`;
+  if (st < t0 && en >= t0) {
+    s += `<path class="clipmark" d="${seg(G.u0 + 7, up(4), G.u0 + 2, base)}${seg(G.u0 + 2, base, G.u0 + 7, up(-4))}"/>`;
+    if (!S.vertical) s += txt(G.u0 + 12, base + 11, "since " + day(st).toLowerCase() + " " + hhmm(st), "ml", "start");
+  }
+  if (en < t0) s += txt(G.u0 + 4, base + (S.vertical ? 0 : 4), "◂ ended " + day(en).toLowerCase() + " · switch to 7d", "ml", "start");
+  // activity pulses, packed right-to-left so bursts of seconds-long attempts stay legible
+  const acts = e.activities.map((a) => ({ a, s: ms(a.startedAt), e: a.endedAt ? ms(a.endedAt) : en }));
+  const minW = S.vertical ? 3 : 4; let limit = Infinity;
+  for (let i = acts.length - 1; i >= 0; i--) { const x = acts[i]; x.ue = Math.min(U(x.e), limit - 1.4); x.us = Math.min(U(x.s), x.ue - minW); limit = x.us; }
+  const tries = {}; e.activities.forEach((a) => (tries[a.name] = Math.max(tries[a.name] || 0, a.attempt)));
+  for (const x of acts) {
+    if (x.ue < G.u0 - 2 || x.us > G.u1) continue;
+    const intr = x.a.exit && x.a.exit.cause && x.a.exit.cause._tag === "Interrupt";
+    s += `<path class="pulse p-${intr ? "interrupt" : x.a.status}" d="${box(x.us, x.ue, base, up(9))}"/>`;
+    if (tries[x.a.name] > 1) for (let k = 0; k < x.a.attempt; k++) s += `<path class="tick" d="${seg(x.us, up(12 + k * 2.6), x.ue, up(12 + k * 2.6))}"/>`;
+  }
+  // waits: DurableClock wake markers sit ahead of the needle; DurableDeferred completions are dots
+  for (const w of e.waits) {
+    if (w.kind === "clock") {
+      const wk = ms(w.wakeAt);
+      if (w.status === "waiting") {
+        s += `<path class="leader" d="${seg(U(n), base, U(Math.min(wk, t1)), base)}"/>`;
+        if (wk <= t1) { const u = U(wk); s += `<path class="wake" d="M${P(u, up(4.5))}L${P(u + 4.5, base)}L${P(u, up(-4.5))}L${P(u - 4.5, base)}Z"/>`; if (!S.vertical) s += txt(u, up(9), "wake " + hhmm(wk), "ml ink"); }
+        else { const u = G.u1 + 4; s += `<path class="wake" d="M${P(u - 6, up(4))}L${P(u, base)}L${P(u - 6, up(-4))}"/>`; if (!S.vertical) s += txt(u - 8, up(8), "wake in " + dur(wk - n), "ml ink", "end"); }
+      } else if (vis(wk, wk)) s += `<path class="wake-done" d="${seg(U(wk), up(-4), U(wk), up(4))}"/>`;
+    } else if (w.status === "done" && vis(ms(w.doneAt), ms(w.doneAt))) s += `<circle class="sig" ${S.vertical ? `cx="${base}" cy="${U(ms(w.doneAt))}"` : `cx="${U(ms(w.doneAt))}" cy="${base}"`} r="2.4"/>`;
+  }
+  // terminal marks
+  const ue = U(cl(en));
+  if (e.status === "running") s += `<circle class="live-ring" ${S.vertical ? `cx="${base}" cy="${ue}"` : `cx="${ue}" cy="${base}"`} r="6"/><circle class="live" ${S.vertical ? `cx="${base}" cy="${ue}"` : `cx="${ue}" cy="${base}"`} r="3"/>`;
+  if (e.status === "suspended") s += `<circle class="susp" ${S.vertical ? `cx="${base}" cy="${ue}"` : `cx="${ue}" cy="${base}"`} r="3.2"/>`;
+  if (vis(en, en)) {
+    if (e.status === "succeeded") s += `<path class="term" d="${seg(ue, up(-4), ue, up(5))}"/>`;
+    if (e.status === "failed") s += blot(ue, base, e.id);
+    if (e.status === "interrupted") s += `<path class="cut" d="${seg(ue - 1, up(-7), ue + 3, up(7))}${seg(ue + 3, up(-7), ue + 7, up(7))}"/>`;
+  }
+  if (e.status === "suspended" && e.suspendedReason === "failure") { const t = ms(e.activities.at(-1).endedAt); if (vis(t, t)) s += blot(U(t), base, e.id); }
+  for (const c of e.compensations.filter((c) => c.ran && c.at)) {
+    const u = U(cl(ms(c.at))) - 2, cc = up(-5.5);
+    s += `<path class="comp" d="${seg(u, cc, u - 18, cc)}M${P(u - 14, cc - 3)}L${P(u - 18, cc)}L${P(u - 14, cc + 3)}"/>`;
+    if (!S.vertical) s += txt(u - 22, cc + 3.5, "↺ " + c.name, "ml", "end");
+  }
+  return s + "</g>";
+}
+function axisSVG() {
+  const { t0, t1, n, sp } = G.sc, U = G.U, A = G.A, end = G.end;
+  let s = `<path class="drum-bg" d="${box(G.u0 - 10, G.u1 + 16, A, end)}"/>`;
+  s += `<path fill="url(#hatch)" d="${box(U(n), G.u1 + 16, A, end)}"/>`;
+  for (let t = Math.ceil(t0 / sp.tick) * sp.tick; t <= t1; t += sp.tick) {
+    const u = U(t), major = t % sp.label === 0, midnight = t % D === 0;
+    s += `<path class="tk${major ? " major" : ""}" d="${seg(u, A - (major ? 9 : 4), u, A)}"/>`;
+    if (major) {
+      s += `<path class="grid" d="${seg(u, A, u, end)}"/>`;
+      const label = S.span === "7d" ? DOW[new Date(t).getUTCDay()] + " " + pad(new Date(t).getUTCDate()) : midnight ? day(t) : hhmm(t);
+      s += S.vertical ? txt(u + 3, A - 6, label, "tl" + (midnight ? " major" : ""), "end") : txt(u, A - 15, label, "tl" + (midnight ? " major" : ""));
+    }
+  }
+  for (const it of G.lay.items) if (it.kind === "group" && it.off > 0) s += `<path class="sep" d="${seg(G.u0 - 10, A + it.off + (S.vertical ? 0 : it.size * 0.45), G.u1 + 16, A + it.off + (S.vertical ? 0 : it.size * 0.45))}"/>`;
+  const un = U(n);
+  s += `<path class="needle" d="${seg(un, A - 14, un, end)}"/>`;
+  s += S.vertical
+    ? `<rect class="needle-b" x="2" y="${un - 7}" width="${A - 6}" height="14" rx="2"/>` + txt(un + 3, A / 2 - 2, "NOW", "needle-l")
+    : `<rect class="needle-b" x="${un - 17}" y="${A - 27}" width="34" height="13" rx="2"/>` + txt(un, A - 17.5, "NOW", "needle-l");
+  return s;
+}
+function defs() {
+  const v = S.vertical;
+  return `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V6" stroke="rgba(31,27,21,.07)" stroke-width="1.2"/></pattern>
+  <linearGradient id="shade" x1="0" y1="0" x2="${v ? 0 : 1}" y2="${v ? 1 : 0}"><stop offset="0" stop-color="#5a4524" stop-opacity=".16"/><stop offset=".07" stop-color="#5a4524" stop-opacity="0"/><stop offset=".93" stop-color="#5a4524" stop-opacity="0"/><stop offset="1" stop-color="#5a4524" stop-opacity=".16"/></linearGradient></defs>`;
+}
+function renderDrum() {
+  const svg = $("#drum");
+  const list = S.mode === "loading" || !S.loaded || S.mode === "down" ? [] : visible();
+  G = geom(list);
+  svg.setAttribute("viewBox", `0 0 ${S.vertical ? G.W : G.W} ${S.vertical ? G.Hh : G.Hh}`);
+  svg.setAttribute("height", G.Hh);
+  let s = defs() + axisSVG();
+  if (S.mode === "loading" || !S.loaded) {
+    for (let i = 0; i < 9; i++) { const c = G.A + 30 + i * 38 + (S.vertical ? 0 : 24); s += `<path class="skel" d="${box(G.u0 + 40 + ((i * 97) % 300), G.u1 - 120 - ((i * 53) % 200), c, c + 2)}"/>`; }
+  }
+  const bases = {};
+  for (const it of G.lay.lanes) { s += laneSVG(it.e, it); bases[it.e.id] = baseOf(it); }
+  for (const it of G.lay.lanes) for (const c of it.e.childCalls) {
+    if (!(c.execution in bases)) continue;
+    const u = G.U(ms(c.startedAt)), a = bases[it.e.id], b = bases[c.execution];
+    if (u < G.u0 || u > G.u1) continue;
+    s += `<path class="link" d="${seg(u, a, u, b)}"/><circle class="link-end" ${S.vertical ? `cx="${b}" cy="${u}"` : `cx="${u}" cy="${b}"`} r="1.8"/>`;
+  }
+  s += `<path fill="url(#shade)" pointer-events="none" d="${box(G.u0 - 10, G.u1 + 16, G.A, G.end)}"/>`;
+  if (S.vertical) for (const it of G.lay.items) {
+    if (it.kind === "lane") { s += txt(G.u0 - 12, baseOf(it), it.e.id.slice(0, 2), "ml ink"); continue; }
+    const lanes = G.lay.lanes.filter((l) => l.e.workflow === it.wf), c0 = G.A + lanes[0].off + 3, c1 = G.A + lanes.at(-1).off + lanes.at(-1).size - 3;
+    s += `<path class="tk major" d="${seg(22, c0, 22, c1)}"/>` + txt(16, (c0 + c1) / 2, it.wf.replace(/[a-z]/g, ""), "tl major");
+  }
+  s += `<g id="stylus" pointer-events="none"></g>`;
+  svg.innerHTML = s;
+}
+</script>
+<style>
+.panel{position:fixed;top:76px;right:14px;bottom:50px;width:min(620px,calc(100vw - 290px));z-index:30;background:var(--paper);border:1px solid var(--rule-2);border-radius:5px;
+  box-shadow:0 40px 80px -40px rgba(50,35,10,.55),0 1px 0 rgba(255,255,255,.7) inset;overflow:auto;overscroll-behavior:contain;opacity:0;transform:scale(.6,.08);transition:transform .32s var(--ease),opacity .16s var(--ease)}
+.panel.open{opacity:1;transform:none}
+.panel[hidden]{display:none}
+.sheet{right:auto;left:14px;width:min(480px,calc(100vw - 28px))}
+.p-in{padding:20px 26px 28px;transition:opacity .25s var(--ease)}
+.p-in.swap{opacity:0}
+.p-head{position:relative;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.p-head h2{font:400 40px/1 var(--serif);letter-spacing:-.015em;margin:8px 0 6px;padding-right:40px;outline:none}
+.p-head .pid{font:500 12px var(--mono);color:var(--ink-2);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.x{position:absolute;top:-4px;right:-8px;width:36px;height:36px;border-radius:50%;font:300 24px/1 var(--sans);color:var(--ink-3)}
+.x:hover{background:rgba(31,27,21,.06);color:var(--ink)}
+.badge{display:inline-flex;align-items:center;gap:6px;font:600 10.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid var(--rule-2);color:var(--ink-2)}
+.badge.st-running{color:var(--stylus);border-color:rgba(196,64,26,.4)}
+.badge.st-failed{color:var(--blot);border-color:rgba(122,32,19,.4)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;margin:16px 0 4px}
+.facts dt{font:500 9.5px var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.facts dd{font:500 12px var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.facts dd small{display:block;color:var(--ink-3);font-weight:400;font-size:10.5px}
+.cli{display:flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--ink-2);background:var(--paper-2);border:1px solid var(--rule);border-radius:4px;padding:7px 10px;overflow-x:auto;white-space:nowrap}
+.cli::before{content:"$";color:var(--ink-4)}
+.p-sec{margin-top:22px}
+.p-sec>h3{display:flex;justify-content:space-between;font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--rule);margin-bottom:4px}
+.row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 12px;padding:9px 0;border-bottom:1px dashed var(--rule);align-items:baseline}
+.row .n{font:600 10.5px var(--mono);color:var(--ink-3)}
+.row .nm{font:600 13px var(--sans)}
+.row .nm small{font:500 10.5px var(--mono);color:var(--ink-3);margin-left:6px}
+.row .tm{font:11px var(--mono);color:var(--ink-3);text-align:right;white-space:nowrap}
+.row .ex{grid-column:2/4;font:11px/1.45 var(--mono);color:var(--ink-2);overflow-wrap:anywhere}
+.row.failure .nm,.row.failure .ex b{color:var(--blot)}
+.row.running .nm{color:var(--stylus)}
+.row .ex b{font-weight:600}
+.cause{border-left:3px solid var(--ink);padding:10px 14px;background:var(--paper-2);border-radius:0 4px 4px 0}
+.cause.fail{border-color:var(--blot)}
+.cause.ok{border-color:var(--ok)}
+.cause h4{font:400 24px/1.1 var(--serif);margin-bottom:6px}
+.cause p{font:12px/1.5 var(--mono);color:var(--ink-2)}
+pre.code{font:11.5px/1.55 var(--mono);color:var(--ink);background:var(--paper-2);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;overflow:auto;margin-top:8px;white-space:pre}
+pre.code .k{color:var(--ink-3)}pre.code .s{color:#5B4A1E}pre.code .v{color:var(--blot)}
+.lnk{font:500 12px var(--mono);color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule-2);text-underline-offset:3px;padding:2px 0}
+.lnk:hover{text-decoration-color:var(--stylus);color:var(--stylus)}
+.nf{padding:30px 6px}
+.nf h2{font:italic 400 44px/1 var(--serif);margin:10px 0 12px;outline:none}
+.nf p{color:var(--ink-2);margin-bottom:14px;max-width:44ch}
+.skl{height:12px;border-radius:3px;background:rgba(31,27,21,.07);margin:12px 0;animation:pulse 1.4s var(--ease) infinite alternate}
+@keyframes pulse{to{opacity:.4}}
+</style>
+<script>
+"use strict";
+/* ---------- cause / exit ---------- */
+function causeOf(e) { const r = e.result; if (!r) return null; if (r._tag === "Suspended") return r.cause; return r.exit && r.exit._tag === "Failure" ? r.exit.cause : null; }
+function causeShort(c) { if (!c) return ""; if (c._tag === "Fail") return c.error._tag || "Fail"; if (c._tag === "Die") return "Die · " + c.defect.name; return "Interrupt " + c.fiberId; }
+function exitShort(x) {
+  if (!x) return "";
+  if (x._tag === "Success") return x.value === null ? "Success null" : "Success " + JSON.stringify(x.value);
+  const c = x.cause; return c._tag === "Fail" ? "Fail " + JSON.stringify(c.error) : c._tag === "Die" ? "Die " + c.defect.name : "Interrupt " + c.fiberId;
+}
+
+/* ---------- stylus readout: what was each execution doing at instant t ---------- */
+function actDesc(a, t) {
+  const s = ms(a.startedAt), e = a.endedAt ? ms(a.endedAt) : now();
+  const c = a.exit && a.exit.cause;
+  const b = a.status === "running" ? `running · ${dur(Math.min(t, e) - s)} in` : a.status === "success" ? `ok · took ${dur(e - s)}` : `${c._tag === "Interrupt" ? "Interrupt " + c.fiberId : "Fail " + c.error._tag} · after ${dur(e - s)}`;
+  return { a: `${a.name} · attempt ${a.attempt}`, b, k: a.status === "failure" ? "fail act" : "act" };
+}
+function describe(e, t) {
+  const n = now(), st = ms(e.startedAt), en = e.endedAt ? ms(e.endedAt) : n;
+  if (t < st) return { a: "not started", b: `starts ${day(st).toLowerCase()} ${hhmm(st)}`, k: "idle" };
+  if (t > n && !e.endedAt) {
+    const w = e.waits.find((w) => w.status === "waiting");
+    if (w && w.kind === "clock") return { a: ms(w.wakeAt) <= t ? `wakes · ${w.name}` : `sleeping · wakes in ${dur(ms(w.wakeAt) - t)}`, b: `DurableClock set for ${day(ms(w.wakeAt)).toLowerCase()} ${hhmm(ms(w.wakeAt))}`, k: "" };
+    return { a: "ahead of the needle", b: "nothing journaled yet", k: "idle" };
+  }
+  if (e.endedAt && t > en) {
+    if (e.status === "succeeded") return { a: "succeeded", b: `completed ${dur(t - en)} before stylus`, k: "idle" };
+    if (e.status === "interrupted") { const r = e.compensations.filter((x) => x.ran).map((x) => x.name); return { a: "interrupted", b: r.length ? `compensated: ${r.join(", ")}` : "no compensations registered", k: "idle" }; }
+    return { a: `failed · ${causeShort(causeOf(e))}`, b: `${dur(t - en)} before stylus`, k: "fail" };
+  }
+  const act = e.activities.find((a) => ms(a.startedAt) <= t && t <= (a.endedAt ? ms(a.endedAt) : n));
+  if (act) return actDesc(act, t);
+  const tol = G ? Math.abs(T(G.u0 + 8) - T(G.u0)) : 0;
+  let best = null, bd = tol;
+  for (const a of e.activities) { const s = ms(a.startedAt), x = a.endedAt ? ms(a.endedAt) : n, d = t < s ? s - t : t - x; if (d <= bd) { bd = d; best = a; } }
+  if (best) { const d = actDesc(best, t); return { ...d, a: "≈ " + d.a }; }
+  const w = e.waits.find((w) => ms(w.since) <= t && t <= (w.status === "waiting" ? en : ms(w.doneAt || w.wakeAt)));
+  if (w && w.kind === "deferred") return { a: `waiting ${w.name} · ${dur(t - ms(w.since))}`, b: `DurableDeferred · ${w.status === "done" ? "completed " + hhmm(ms(w.doneAt)) : e.status === "suspended" ? "not completed" : "resumed"}`, k: "" };
+  if (w) return { a: `sleeping ${w.name} · ${dur(t - ms(w.since))}`, b: `DurableClock · wakes ${day(ms(w.wakeAt)).toLowerCase()} ${hhmm(ms(w.wakeAt))}${w.status === "waiting" ? " (" + rel(ms(w.wakeAt)) + ")" : ""}`, k: "" };
+  const c = e.childCalls.find((c) => ms(c.startedAt) <= t && t <= (c.endedAt ? ms(c.endedAt) : en));
+  if (c) { const ch = byId(c.execution); return { a: `awaiting child ${c.name} · ${dur(t - ms(c.startedAt))}`, b: `${ch ? ch.workflow : "execution"} ${c.execution.slice(0, 8)}${ch ? " · " + ch.status : ""}`, k: "" }; }
+  if (e.status === "suspended" && e.suspendedReason === "failure") return { a: "suspended · SuspendOnFailure", b: `last Cause: Fail ${causeShort(causeOf(e))} · resume to retry`, k: "fail" };
+  const last = e.activities.filter((a) => a.endedAt && ms(a.endedAt) <= t).at(-1);
+  return { a: e.status === "running" ? "running · between activities" : "between activities", b: last ? `after ${last.name}` : "workflow body started", k: "" };
+}
+
+/* ---------- gutter + readout (desktop) ---------- */
+function countsHTML(wf) {
+  const c = counts(wf);
+  return STATUSES.filter((s) => c[s]).map((s) => `<button class="cnt" data-filter="${wf}|${s}" aria-pressed="${S.wf === wf && S.status === s}" aria-label="${c[s]} ${s}, filter" title="${c[s]} ${s}"><i class="pip pip-${s}"></i>${c[s]}</button>`).join("");
+}
+function renderGutter() {
+  let h = `<div class="colhead"><span class="cap">Workflow</span><span class="cap">by status</span></div>`;
+  for (const it of G.lay.items) {
+    if (it.kind === "group") h += `<div class="g-row" style="height:${it.size}px"><button class="wf-btn" data-exec="${it.wf}" aria-label="Execute ${it.wf}"><span>${it.wf}</span><span class="plus">+ execute</span></button><span class="counts">${countsHTML(it.wf)}</span></div>`;
+    else h += `<button class="l-btn${S.hotId === it.e.id ? " is-hot" : ""}${S.openId === it.e.id ? " is-open" : ""}" style="height:${it.size}px" data-open="${it.e.id}" data-id="${it.e.id}" aria-label="${it.e.workflow} ${it.e.id}, ${statusLabel(it.e)}"><span class="lid">${it.e.id.slice(0, 8)}</span><span class="lst">${statusLabel(it.e)}</span></button>`;
+  }
+  $("#gutter").innerHTML = h;
+}
+function renderReadout() {
+  let h = `<div class="colhead ro-head"><span class="cap">Stylus · UTC</span><div class="ro-time" id="roTime"></div></div>`;
+  for (const it of G.lay.items) h += it.kind === "group" ? `<div class="ro-g" style="height:${it.size}px"></div>` : `<button class="ro-row${S.hotId === it.e.id ? " is-hot" : ""}" style="height:${it.size}px" data-open="${it.e.id}" data-id="${it.e.id}" data-tag="${it.e.id.slice(0, 2)} · ${it.e.workflow} · ${it.e.id.slice(2, 8)}" id="ro-${it.e.id}" aria-label="Open ${it.e.workflow} ${it.e.id}"><span class="ro-a"></span><span class="ro-b"></span></button>`;
+  $("#readout").innerHTML = h;
+}
+function setStylus(t) {
+  if (!G) return;
+  const { t0, t1, n } = G.sc;
+  S.stylusT = Math.min(t1, Math.max(t0, t));
+  const u = G.U(S.stylusT), end = G.end, g = $("#stylus");
+  if (g) g.innerHTML = `<path class="stylus-l" d="${seg(u, 2, u, end)}"/>` + (S.vertical
+    ? `<rect class="stylus-h" x="2" y="${u - 7}" width="${G.A - 6}" height="14" rx="2"/>${txt(u + 3.5, G.A / 2 - 2, hhmm(S.stylusT), "stylus-t")}`
+    : `<rect class="stylus-h" x="${u - 22}" y="2" width="44" height="14" rx="2"/>${txt(u, 12.5, hhmm(S.stylusT), "stylus-t")}`);
+  const rt = $("#roTime");
+  if (rt) rt.innerHTML = `${S.span === "7d" ? day(S.stylusT) + " " : ""}${hms(S.stylusT)}<small>${Math.abs(S.stylusT - n) < 30e3 ? "at the needle" : rel(S.stylusT)}</small>`;
+  for (const it of G.lay.lanes) {
+    const row = document.getElementById("ro-" + it.e.id); if (!row) continue;
+    const d = describe(it.e, S.stylusT);
+    row.className = `ro-row ${d.k.split(" ").filter(Boolean).map((k) => "k-" + k).join(" ")}${d.k === "idle" ? " idle" : ""}${S.hotId === it.e.id ? " is-hot" : ""}`;
+    row.firstChild.textContent = d.a; row.lastChild.textContent = d.b;
+  }
+}
+function setHot(id) {
+  if (S.hotId === id) return;
+  S.hotId = id;
+  $$("[data-id]").forEach((el) => el.classList.toggle("is-hot", el.dataset.id === id));
+  if (S.vertical && id) { const r = document.getElementById("ro-" + id), box = $("#readout"); if (r) box.scrollTop = Math.max(0, r.offsetTop - box.clientHeight / 2); }
+}
+
+/* ---------- drum pointer + keyboard ---------- */
+function drumPoint(ev) {
+  const r = $("#drum").getBoundingClientRect(), k = G.W / r.width;
+  const x = (ev.clientX - r.left) * k, y = (ev.clientY - r.top) * k;
+  return S.vertical ? { u: y, c: x } : { u: x, c: y };
+}
+function laneAt(c) { const it = G.lay.lanes.find((it) => c >= G.A + it.off && c < G.A + it.off + it.size); return it ? it.e.id : null; }
+function laneScreenPoint(id) {
+  const it = G && G.lay.lanes.find((x) => x.e.id === id), r = $("#drum").getBoundingClientRect();
+  if (!it) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  const k = r.width / G.W, u = G.U(S.stylusT ?? G.sc.n), c = baseOf(it);
+  return S.vertical ? { x: r.left + c * k, y: r.top + u * k } : { x: r.left + u * k, y: r.top + c * k };
+}
+(function bindDrum() {
+  const wrap = $("#drumwrap"); let drag = null;
+  wrap.addEventListener("pointermove", (ev) => {
+    if (!G || !S.loaded) return;
+    const p = drumPoint(ev);
+    if (ev.pointerType === "mouse" || drag) { setStylus(T(p.u)); if (drag && Math.abs(p.u - drag.u) > 6) drag.moved = true; }
+    if (ev.pointerType === "mouse") setHot(laneAt(p.c));
+  });
+  wrap.addEventListener("pointerdown", (ev) => {
+    if (!G || !S.loaded) return;
+    const p = drumPoint(ev); drag = { u: p.u, moved: false };
+    if (ev.pointerType !== "mouse") { setStylus(T(p.u)); setHot(laneAt(p.c)); wrap.setPointerCapture(ev.pointerId); }
+  });
+  wrap.addEventListener("pointerup", (ev) => {
+    if (!drag) return; const moved = drag.moved; drag = null;
+    if (moved && ev.pointerType !== "mouse") return;
+    const id = laneAt(drumPoint(ev).c);
+    if (id) { setHot(id); openDetail(id, wrap); }
+  });
+  wrap.addEventListener("pointercancel", () => (drag = null));
+  wrap.addEventListener("pointerleave", (ev) => { if (ev.pointerType === "mouse") setHot(null); });
+  wrap.addEventListener("keydown", (ev) => {
+    if (!G || !S.loaded) return;
+    const sp = G.sc.sp, mul = ev.shiftKey ? 4 : 1, ids = G.lay.lanes.map((l) => l.e.id), i = ids.indexOf(S.hotId);
+    const fwd = S.vertical ? "ArrowDown" : "ArrowRight", back = S.vertical ? "ArrowUp" : "ArrowLeft";
+    const nextL = S.vertical ? "ArrowRight" : "ArrowDown", prevL = S.vertical ? "ArrowLeft" : "ArrowUp";
+    const t = S.stylusT ?? G.sc.n;
+    if (ev.key === fwd) setStylus(t + sp.step * mul);
+    else if (ev.key === back) setStylus(t - sp.step * mul);
+    else if (ev.key === "Home") setStylus(G.sc.t0);
+    else if (ev.key === "End") setStylus(G.sc.n);
+    else if (ev.key === nextL) setHot(ids[Math.min(ids.length - 1, i + 1)] || null);
+    else if (ev.key === prevL) setHot(ids[Math.max(0, i - 1)] || null);
+    else if ((ev.key === "Enter" || ev.key === " ") && S.hotId) openDetail(S.hotId, wrap);
+    else return;
+    ev.preventDefault();
+  });
+})();
+
+/* ---------- detail ---------- */
+function jsonHTML(v) {
+  return esc(JSON.stringify(v, null, 2)).replace(/(&quot;(?:(?!&quot;).)*&quot;)(\s*:)?|\b(true|false|null|-?\d+(?:\.\d+)?)\b/g, (m, s, colon, lit) => s ? (colon ? `<span class="k">${s}</span>${colon}` : `<span class="s">${s}</span>`) : `<span class="v">${lit}</span>`);
+}
+const idLink = (id) => { const e = byId(id); return `<button class="lnk" data-goto="${id}">${id}</button>${e ? ` <small>${e.workflow} · ${statusLabel(e)}</small>` : ""}`; };
+function causeHTML(e) {
+  const r = e.result;
+  if (!r && e.status === "interrupted") return `<div class="cause"><h4>Interrupted with its parent</h4><p>The parent execution ${e.parent ? e.parent.slice(0, 8) + " " : ""}was interrupted; the engine interrupted this child too.</p></div>`;
+  if (!r) return e.status === "running" ? `<div class="cause"><h4>No result yet</h4><p>The workflow body is still running; its Exit is journaled when it completes.</p></div>` : `<div class="cause"><h4>Suspended · ${e.suspendedReason}</h4><p>${e.suspendedReason === "deferred" ? "Waiting for a DurableDeferred to be completed." : e.suspendedReason === "clock" ? "Sleeping on a DurableClock; the engine wakes it at the scheduled time." : "Waiting on a child execution."}</p></div>`;
+  if (r._tag === "Suspended") return `<div class="cause fail"><h4>Suspended on failure</h4><p>SuspendOnFailure caught the Cause below and parked the execution instead of failing it. Resume replays the journal; completed activities are not re-run.</p><pre class="code">${jsonHTML(r.cause)}</pre></div>`;
+  const x = r.exit;
+  if (x._tag === "Success") return `<div class="cause ok"><h4>Success</h4><pre class="code">${jsonHTML(x.value)}</pre></div>`;
+  const c = x.cause;
+  if (c._tag === "Fail") return `<div class="cause fail"><h4>Cause.Fail · ${esc(c.error._tag)}</h4><p>Expected error from the workflow’s error channel.</p><pre class="code">${jsonHTML(c.error)}</pre></div>`;
+  if (c._tag === "Die") return `<div class="cause fail"><h4>Cause.Die · ${esc(c.defect.name)}</h4><p>Defect: ${esc(c.defect.message)}</p><pre class="code">${esc(c.defect.stack)}</pre></div>`;
+  const ran = e.compensations.filter((k) => k.ran);
+  return `<div class="cause"><h4>Cause.Interrupt · fiber ${esc(c.fiberId)}</h4><p>interruptedBy: ${esc(e.interruptedBy || "—")}</p><p>${ran.length ? "Compensation ran: " + ran.map((k) => `${esc(k.name)} (for ${esc(k.activity)}) at ${hms(ms(k.at))} → ${esc(exitShort(k.exit))}`).join("; ") : "No compensations were registered."}</p></div>`;
+}
+function detailHTML(e) {
+  const st = ms(e.startedAt), en = e.endedAt ? ms(e.endedAt) : null;
+  const acts = e.activities.map((a, i) => {
+    const s = ms(a.startedAt), x = a.endedAt ? ms(a.endedAt) : now();
+    return `<div class="row ${a.status}"><span class="n">${pad(i + 1)}</span><span class="nm">${esc(a.name)}<small>attempt ${a.attempt}</small></span><span class="tm">${hms(s)}.${pad(new Date(s).getUTCMilliseconds(), 3)} · ${a.status === "running" ? "running " + dur(x - s) : dur(x - s)}</span><span class="ex">${a.exit ? `<b>${a.exit._tag}</b> ${esc(exitShort(a.exit).replace(/^\w+ ?/, ""))}` : "in flight — no Exit journaled yet"}</span></div>`;
+  }).join("") || `<div class="row"><span></span><span class="ex">No activities journaled.</span></div>`;
+  const waits = e.waits.map((w) => `<div class="row"><span class="n">${w.kind === "clock" ? "◇" : "○"}</span><span class="nm">${esc(w.name)}<small>${w.kind === "clock" ? "DurableClock" : "DurableDeferred"} · ${w.status}</small></span><span class="tm">since ${day(ms(w.since)).toLowerCase()} ${hms(ms(w.since))}</span><span class="ex">${w.kind === "clock" ? `wakeAt <b>${stamp(ms(w.wakeAt))}</b> · ${rel(ms(w.wakeAt))}` : w.status === "done" ? `completed ${stamp(ms(w.doneAt))} · ${esc(exitShort(w.exit))}` : `not completed · waiting ${dur(now() - ms(w.since))} · schema ${esc(w.schema || "")}`}</span></div>`).join("");
+  const comps = e.compensations.map((c) => `<div class="row"><span class="n">↺</span><span class="nm">${esc(c.name)}<small>for ${esc(c.activity)}</small></span><span class="tm">${c.ran ? "ran " + hms(ms(c.at)) : "registered"}</span><span class="ex">${c.ran ? esc(exitShort(c.exit)) : "Runs in reverse order if this execution is interrupted."}</span></div>`).join("");
+  const kids = e.childCalls.map((c) => `<div class="row"><span class="n">↳</span><span class="nm">${esc(c.name)}</span><span class="tm">${hms(ms(c.startedAt))}${c.endedAt ? " · " + dur(ms(c.endedAt) - ms(c.startedAt)) : " · in flight"}</span><span class="ex">${idLink(c.execution)}</span></div>`).join("");
+  return `<div class="p-head"><span class="cap">execution</span><h2 id="pTitle">${esc(e.workflow)}</h2>
+  <div class="pid"><span>${e.id}</span><span class="badge st-${e.status}"><i class="pip pip-${e.status}"></i>${statusLabel(e)}</span></div>
+  <button class="x" data-close aria-label="Close execution detail">×</button></div>
+  <dl class="facts"><div><dt>started</dt><dd>${hms(st)}<small>${day(st).toLowerCase()} · ${rel(st)}</small></dd></div>
+  <div><dt>${en ? "ended" : "elapsed"}</dt><dd>${en ? hms(en) : dur(now() - st)}<small>${en ? "took " + dur(en - st) : "still open"}</small></dd></div>
+  <div><dt>idempotencyKey</dt><dd>${esc(e.idempotencyKey)}<small>${esc((K.state.workflows.find((w) => w.name === e.workflow) || {}).idempotencyKey || "")}</small></dd></div>
+  ${e.parent ? `<div style="grid-column:1/-1"><dt>parent</dt><dd>${idLink(e.parent)}</dd></div>` : ""}</dl>
+  <div class="cli" style="margin-top:12px">${K.cli.show(e.id)}</div>
+  <div id="ops">${opsHTML(e)}</div>
+  <section class="p-sec"><h3><span>${e.status === "running" || e.status === "suspended" ? "Status" : "Result"}</span></h3>${causeHTML(e)}</section>
+  <section class="p-sec"><h3><span>Activity journal</span><span>${e.activities.length} attempts</span></h3>${acts}</section>
+  ${waits ? `<section class="p-sec"><h3><span>DurableDeferred · DurableClock</span></h3>${waits}</section>` : ""}
+  ${kids ? `<section class="p-sec"><h3><span>Child executions</span></h3>${kids}</section>` : ""}
+  ${comps ? `<section class="p-sec"><h3><span>Compensations</span></h3>${comps}</section>` : ""}
+  <section class="p-sec"><h3><span>Payload</span></h3><pre class="code">${jsonHTML(e.payload)}</pre></section>`;
+}
+function notFoundHTML(id, err) {
+  return `<div class="p-head"><span class="cap">execution · ${esc(err.error)}</span><button class="x" data-close aria-label="Close">×</button></div>
+  <div class="nf"><span class="cap">not on the drum</span><h2 id="pTitle">No trace for this id.</h2><p>${esc(err.message)}. The engine has no journal entry under <b class="mono">${esc(id)}</b> — it may belong to another app, or the SQLite store was reset.</p>
+  <div class="cli">${K.cli.show(id)}</div><p style="margin-top:14px"><button class="lnk" data-close>Back to the drum</button></p></div>`;
+}
+function focusTitle(p) { const t = p.querySelector("h2"); if (t) { t.tabIndex = -1; t.focus({ preventScroll: true }); } }
+function showPanel(p, from, html, after) {
+  const inner = `<div class="p-in">${html}</div>`;
+  if (!p.hidden && p.classList.contains("open")) {
+    const pin = p.querySelector(".p-in"); pin.classList.add("swap");
+    setTimeout(() => { p.innerHTML = inner; p.scrollTop = 0; focusTitle(p); after && after(); }, 110); return;
+  }
+  p.innerHTML = inner; p.hidden = false;
+  p.style.transformOrigin = `${from.x - p.offsetLeft}px ${from.y - p.offsetTop}px`;
+  after && after();
+  p.classList.remove("open"); void p.offsetWidth;
+  requestAnimationFrame(() => { p.classList.add("open"); focusTitle(p); });
+}
+let returnFocus = null;
+async function openDetail(id, opener) {
+  if (opener && opener.focus) returnFocus = opener;
+  if ($("#sheet").classList.contains("open")) closePanel($("#sheet"), false);
+  S.openId = id;
+  $$("[data-id]").forEach((el) => el.classList.toggle("is-open", el.dataset.id === id));
+  const p = $("#panel"), from = laneScreenPoint(id), e = byId(id);
+  const q = new URLSearchParams(location.search); q.set("exec", id); history.replaceState(null, "", "?" + q);
+  if (e) return showPanel(p, from, detailHTML(e));
+  showPanel(p, from, `<div class="p-head"><span class="cap">execution</span><h2 id="pTitle">Reading journal…</h2><div class="pid">${esc(id)}</div></div><div class="skl"></div><div class="skl" style="width:70%"></div><div class="skl" style="width:85%"></div>`);
+  try { const x = await K.api.getExecution(id); if (S.openId === id) showPanel(p, from, detailHTML(x)); }
+  catch (err) { if (S.openId === id) showPanel(p, from, err.error === "not_found" ? notFoundHTML(id, err) : unreachableHTML(err, "detail")); }
+}
+function refreshDetail() { const e = S.openId && byId(S.openId), p = $("#panel"); if (e && !p.hidden) { const y = p.scrollTop; p.querySelector(".p-in").innerHTML = detailHTML(e); p.scrollTop = y; } }
+function closePanel(p = $("#panel"), restore = true) {
+  if (p.hidden) return;
+  p.classList.remove("open");
+  if (p.id === "panel") {
+    S.openId = null; $$(".is-open").forEach((el) => el.classList.remove("is-open"));
+    const q = new URLSearchParams(location.search); q.delete("exec"); history.replaceState(null, "", q.toString() ? "?" + q : location.pathname);
+  }
+  setTimeout(() => { if (!p.classList.contains("open")) p.hidden = true; }, 340);
+  if (restore && returnFocus && document.contains(returnFocus)) returnFocus.focus({ preventScroll: true });
+}
+</script>
+<style>
+.ops{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.op-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.op-line .cli{flex:1;min-width:200px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 12px/1 var(--sans);letter-spacing:.01em;padding:10px 16px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);min-height:36px;transition:transform .2s var(--ease),opacity .2s var(--ease)}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.danger{background:transparent;color:var(--blot);border-color:rgba(122,32,19,.5)}
+.btn.danger.solid{background:var(--blot);color:var(--paper);border-color:var(--blot)}
+.btn[aria-busy=true]{opacity:.7;pointer-events:none}
+.btn[aria-busy=true]::after{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse .6s var(--ease) infinite alternate}
+.note{font:12px/1.5 var(--sans);color:var(--ink-3)}
+.confirm{border:1px solid rgba(122,32,19,.35);background:rgba(122,32,19,.04);border-radius:4px;padding:14px 16px}
+.confirm h4{font:400 22px/1.1 var(--serif);color:var(--blot);margin-bottom:6px}
+.confirm ol{margin:8px 0 12px 18px;font:12px/1.6 var(--mono);color:var(--ink-2)}
+.err{border-left:3px solid var(--blot);background:rgba(122,32,19,.05);padding:10px 14px;border-radius:0 4px 4px 0;font:12px/1.5 var(--mono);color:var(--ink-2)}
+.err b{color:var(--blot);display:block;margin-bottom:2px}
+.done{border-left:3px solid var(--ok);background:rgba(63,107,69,.06);padding:10px 14px;border-radius:0 4px 4px 0;font:12px/1.5 var(--mono);color:var(--ink-2)}
+.done b{color:var(--ok)}
+.fld{margin-top:16px}
+.fld label,.fld legend{display:flex;justify-content:space-between;font:600 12px var(--sans);margin-bottom:6px}
+.fld label small,.fld legend small{font:400 10.5px var(--mono);color:var(--ink-3)}
+.fld fieldset{border:0}
+.inp{width:100%;font:13px var(--mono);color:var(--ink);background:rgba(255,255,255,.45);border:1px solid var(--rule-2);border-radius:4px;padding:9px 10px;transition:border-color .2s var(--ease)}
+.inp:focus{outline:none;border-color:var(--ink)}
+.inp[aria-invalid=true]{border-color:var(--blot);background:rgba(122,32,19,.04)}
+textarea.inp{min-height:64px;resize:vertical;font-family:var(--sans)}
+.radios{display:flex;flex-wrap:wrap;gap:6px}
+.radios label{margin:0;font:500 12px var(--mono);border:1px solid var(--rule-2);border-radius:999px;padding:7px 12px;cursor:pointer}
+.radios input{position:absolute;opacity:0;pointer-events:none}
+.radios input:checked+span{color:var(--paper)}
+.radios label:has(input:checked){background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.radios label:has(input:focus-visible){outline:2px solid var(--stylus);outline-offset:2px}
+.ferr{font:11px var(--mono);color:var(--blot);margin-top:5px;min-height:0}
+.tgl{display:flex;gap:12px;align-items:flex-start;margin-top:18px;padding:12px 0;border-top:1px solid var(--rule);cursor:pointer}
+.tgl input{appearance:none;flex:none;width:34px;height:20px;border-radius:999px;background:var(--rule-2);position:relative;cursor:pointer;margin-top:2px;transition:background-color .2s var(--ease)}
+.tgl input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--paper);transition:transform .25s var(--ease)}
+.tgl input:checked{background:var(--ink)}
+.tgl input:checked::after{transform:translateX(14px)}
+.tgl b{display:block;font:600 12px var(--sans)}
+.tgl span{font:12px/1.4 var(--sans);color:var(--ink-3)}
+.key{margin-top:14px;font:12px/1.5 var(--mono);color:var(--ink-2);padding:10px 12px;border:1px dashed var(--rule-2);border-radius:4px}
+.key em{font-style:normal;color:var(--ink-3)}
+.key.dup{border-color:var(--ink-2);background:rgba(31,27,21,.03)}
+.toast{position:fixed;left:16px;bottom:52px;z-index:40;max-width:420px;background:var(--ink);color:var(--paper);font:12px/1.4 var(--mono);padding:10px 14px;border-radius:4px;opacity:0;transform:translateY(8px);transition:opacity .3s var(--ease),transform .3s var(--ease);pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.drum-msg .cli{margin:12px 0}
+.drum-msg .code-l{font:12px var(--mono);color:var(--blot)}
+</style>
+<script>
+"use strict";
+/* ---------- operations on an execution: resume, interrupt ---------- */
+S.op = null;
+function errHTML(err, retry) {
+  return `<div class="err" role="alert"><b>${esc(err.error || "error")}</b>${esc(err.message || String(err))}${retry ? `<div style="margin-top:8px"><button class="btn ghost" ${retry}>Retry</button></div>` : ""}</div>`;
+}
+function opsHTML(e) {
+  const op = S.op && S.op.id === e.id ? S.op : null, busy = (k) => (op && op.phase === "pending" && op.kind === k ? ` aria-busy="true"` : "");
+  if (op && op.phase === "confirm") {
+    const comps = e.compensations.filter((c) => !c.ran).reverse(), kids = e.children.map(byId).filter((c) => c && ["running", "suspended"].includes(c.status));
+    return `<div class="ops"><div class="confirm" role="alertdialog" aria-labelledby="cfH"><h4 id="cfH">Interrupt ${e.id.slice(0, 8)}? This is terminal.</h4>
+    <p class="note">The workflow fiber is interrupted and its result becomes Cause.Interrupt. ${comps.length ? "Registered compensations then run in reverse order:" : "No compensations are registered — nothing is undone."}</p>
+    ${comps.length ? `<ol>${comps.map((c) => `<li>${esc(c.name)} — undoes ${esc(c.activity)}</li>`).join("")}</ol>` : ""}
+    ${kids.length ? `<p class="note" style="margin-bottom:10px">Child executions are interrupted too: ${kids.map((k) => `<b class="mono">${k.workflow} ${k.id.slice(0, 8)}</b>`).join(", ")}</p>` : ""}
+    <div class="op-line"><button class="btn danger solid" data-op="interrupt" data-id-op="${e.id}">Interrupt execution</button><button class="btn ghost" data-op="cancel">Keep it ${e.status}</button></div>
+    <div class="cli" style="margin-top:10px">${K.cli.interrupt(e.id)}</div></div></div>`;
+  }
+  let h = `<div class="ops">`;
+  if (e.status === "suspended") h += `<div class="op-line"><button class="btn" data-op="resume" data-id-op="${e.id}"${busy("resume")}>${busy("resume") ? "Resuming" : "Resume"}</button><div class="cli">${K.cli.resume(e.id)}</div></div>`;
+  if (e.status === "running" || e.status === "suspended") h += `<div class="op-line"><button class="btn danger" data-op="ask" data-id-op="${e.id}"${busy("interrupt")}>${busy("interrupt") ? "Interrupting" : "Interrupt…"}</button><div class="cli">${K.cli.interrupt(e.id)}</div></div>`;
+  else h += `<p class="note">${e.status} is terminal — kymo offers no further operations on this execution.</p>`;
+  if (op && op.phase === "error") h += errHTML(op.err, `data-op="${op.kind}" data-id-op="${e.id}"`);
+  if (op && op.phase === "done") h += `<div class="done" role="status"><b>${op.kind === "resume" ? "Resumed" : "Interrupted"}</b> · ${op.kind === "resume" ? "the engine replays the journal and continues from the last completed activity." : e.compensations.filter((c) => c.ran).length ? "compensations ran: " + e.compensations.filter((c) => c.ran).map((c) => c.name).join(", ") : "no compensations to run."}</div>`;
+  return h + `</div>`;
+}
+function refreshOps() { const o = $("#ops"), e = S.openId && byId(S.openId); if (o && e) o.innerHTML = opsHTML(e); }
+async function runOp(kind, id) {
+  S.op = { id, kind, phase: "pending" }; refreshOps();
+  try {
+    await K.api[kind](id);
+    const e = byId(id);
+    if (kind === "interrupt") {
+      const real = e.endedAt, at = toPage(real);
+      e.endedAt = at; e.interruptedBy = `${K.cli.interrupt(id)} (ui · 127.0.0.1)`;
+      e.compensations.forEach((c) => { if (c.at === real) c.at = at; });
+      e.children.map(byId).forEach((c) => { if (c && c.endedAt === real) c.endedAt = at; });
+    }
+    S.op = { id, kind, phase: "done" }; S.fresh = id;
+    render(); refreshDetail(); toast(kind === "resume" ? `resumed ${id.slice(0, 8)} → running` : `interrupted ${id.slice(0, 8)} → Cause.Interrupt`);
+    const b = $("#panel h2"); if (b) b.focus({ preventScroll: true });
+  } catch (err) { S.op = { id, kind, phase: "error", err }; refreshOps(); renderFooter(); }
+}
+let toastT = 0;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200); }
+
+/* ---------- execute sheet: form from the payload JSON Schema ---------- */
+const wfOf = (name) => K.state.workflows.find((w) => w.name === name);
+function keyFor(wf, p) { if (wf === "NightlyExport") return p.date && p.format ? `${p.date}:${p.format}` : null; const f = wfOf(wf).idempotencyKey.replace("payload.", ""); return p[f] ?? null; }
+function fieldHTML(name, sc, req) {
+  const id = "f_" + name, hint = sc.pattern ? `matches ${sc.pattern}` : sc.format || (sc.type === "integer" ? `integer${sc.minimum != null ? " ≥ " + sc.minimum : ""}` : sc.maxLength ? `≤ ${sc.maxLength} chars` : sc.type);
+  const lab = `${esc(name)}${req ? "" : ` <small>optional</small>`}`;
+  if (sc.enum) return `<div class="fld"><fieldset aria-describedby="${id}_e"><legend><span>${lab}</span><small>${sc.enum.length} options</small></legend><div class="radios">${sc.enum.map((v) => `<label><input type="radio" name="${name}" value="${v}"><span>${v}</span></label>`).join("")}</div></fieldset><div class="ferr" id="${id}_e"></div></div>`;
+  const type = sc.type === "integer" ? `number" inputmode="numeric" step="1"` : sc.format === "email" ? `email"` : sc.format === "date" ? `date"` : `text"`;
+  const ctl = sc.maxLength ? `<textarea class="inp" id="${id}" name="${name}" maxlength="${sc.maxLength}" aria-describedby="${id}_e"></textarea>` : `<input class="inp" id="${id}" name="${name}" type="${type} autocomplete="off" spellcheck="false" placeholder="${esc((sc.examples || [])[0] || "")}" aria-describedby="${id}_e">`;
+  return `<div class="fld"><label for="${id}"><span>${lab}</span><small>${esc(hint)}</small></label>${ctl}<div class="ferr" id="${id}_e"></div></div>`;
+}
+function readForm(f, wf) {
+  const sc = wfOf(wf).payload, p = {}, errs = {};
+  for (const [name, s] of Object.entries(sc.properties)) {
+    const fd = new FormData(f), raw = (fd.get(name) ?? "").toString().trim();
+    if (!raw) { if (sc.required.includes(name)) errs[name] = s.enum ? "Choose one." : "Required."; continue; }
+    if (s.type === "integer") { const n = Number(raw); if (!Number.isInteger(n)) errs[name] = "Must be a whole number."; else if (s.minimum != null && n < s.minimum) errs[name] = `Must be ≥ ${s.minimum}.`; else p[name] = n; continue; }
+    if (s.pattern && !new RegExp(s.pattern).test(raw)) errs[name] = `Doesn’t match ${s.pattern}`;
+    else if (s.format === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) errs[name] = "Not an email address.";
+    else if (s.maxLength && raw.length > s.maxLength) errs[name] = `Over ${s.maxLength} characters.`;
+    else p[name] = raw;
+  }
+  return { p, errs };
+}
+function openSheet(wf, opener) {
+  const w = wfOf(wf), sh = $("#sheet");
+  if (opener) returnFocus = opener;
+  if (!$("#panel").hidden) closePanel($("#panel"), false);
+  S.sheet = { wf, phase: "idle" };
+  const html = `<div class="p-head"><span class="cap">execute · Workflow</span><h2 id="sTitle">${wf}</h2><p class="note" style="max-width:46ch">${esc(w.description)}</p><button class="x" data-close aria-label="Close execute sheet">×</button></div>
+  <form id="exForm" novalidate>${Object.entries(w.payload.properties).map(([n, s]) => fieldHTML(n, s, w.payload.required.includes(n))).join("")}
+  <div class="key" id="exKey"></div>
+  <label class="tgl"><input type="checkbox" name="__discard" id="exDiscard"><div><b>discard</b><span>Return the executionId immediately instead of waiting for the workflow’s result.</span></div></label>
+  <div class="cli" id="exCli">${K.cli.execute(wf, false)}</div><pre class="code" id="exJson" aria-label="payload.json preview">{}</pre>
+  <div class="op-line" style="margin-top:16px"><button class="btn" type="submit" id="exGo">Execute ${wf}</button><span class="note">returns ${esc(w.success)} · errors ${esc(w.error)}</span></div>
+  <div id="exOut" style="margin-top:14px" aria-live="polite"></div></form>`;
+  showPanel(sh, opener ? (() => { const r = opener.getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; })() : { x: 40, y: 120 }, html, syncSheet);
+}
+function syncSheet() {
+  const f = $("#exForm"); if (!f || !S.sheet) return;
+  const wf = S.sheet.wf, { p } = readForm(f, wf), disc = $("#exDiscard").checked, key = keyFor(wf, p), ex = key != null && K.state.executions.find((e) => e.workflow === wf && e.idempotencyKey === key);
+  $("#exCli").textContent = K.cli.execute(wf, disc);
+  $("#exJson").innerHTML = jsonHTML(p);
+  const k = $("#exKey");
+  k.className = "key" + (ex ? " dup" : "");
+  k.innerHTML = key == null ? `idempotencyKey <em>← ${esc(wfOf(wf).idempotencyKey)}</em> · fill it in to see whether this would start a new execution.`
+    : ex ? `idempotencyKey <b>${esc(key)}</b> already maps to <button class="lnk" type="button" data-goto="${ex.id}">${ex.id.slice(0, 8)}</button> (${statusLabel(ex)}). Execute will return that execution — nothing new starts.`
+    : `idempotencyKey <b>${esc(key)}</b> <em>← ${esc(wfOf(wf).idempotencyKey)}</em> · no execution yet — a new trace will start at the needle.`;
+}
+document.addEventListener("input", (ev) => { if (ev.target.closest("#exForm")) { const f = ev.target.name; const el = document.getElementById("f_" + f + "_e"); if (el && el.textContent) { el.textContent = ""; const i = document.getElementById("f_" + f); if (i) i.removeAttribute("aria-invalid"); } syncSheet(); } });
+document.addEventListener("change", (ev) => { if (ev.target.closest("#exForm")) syncSheet(); });
+document.addEventListener("submit", async (ev) => {
+  if (ev.target.id !== "exForm") return; ev.preventDefault();
+  const f = ev.target, wf = S.sheet.wf, { p, errs } = readForm(f, wf);
+  $$(".ferr", f).forEach((el) => (el.textContent = "")); $$("[aria-invalid]", f).forEach((el) => el.removeAttribute("aria-invalid"));
+  const bad = Object.keys(errs);
+  if (bad.length) { bad.forEach((n) => { $("#f_" + n + "_e").textContent = errs[n]; const i = document.getElementById("f_" + n); if (i) i.setAttribute("aria-invalid", "true"); }); const first = document.getElementById("f_" + bad[0]) || f.querySelector(`[name="${bad[0]}"]`); first && first.focus(); $("#exOut").innerHTML = `<p class="ferr">${bad.length} field${bad.length > 1 ? "s" : ""} need attention before the engine will accept this payload.</p>`; return; }
+  const go = $("#exGo"), disc = $("#exDiscard").checked;
+  go.setAttribute("aria-busy", "true"); go.textContent = "Executing"; $("#exOut").innerHTML = "";
+  try {
+    const r = await K.api.execute(wf, p, { discard: disc });
+    const e = byId(r.executionId);
+    if (!r.deduplicated) { e.startedAt = toPage(e.startedAt); S.fresh = e.id; if (S.wf && S.wf !== wf) S.wf = ""; if (S.status && S.status !== "running") S.status = ""; }
+    render();
+    $("#exOut").innerHTML = r.deduplicated
+      ? `<div class="done" style="border-color:var(--ink-2)"><b style="color:var(--ink)">Deduplicated.</b> idempotencyKey ${esc(e.idempotencyKey)} already belongs to <button class="lnk" type="button" data-goto="${e.id}">${e.id}</button> (${statusLabel(e)}). The engine returned it; nothing was re-run.</div>`
+      : `<div class="done"><b>Started.</b> executionId <button class="lnk" type="button" data-goto="${e.id}">${e.id}</button>${disc ? " · discard: not waiting for the result" : ""} — its trace is on the drum at the needle.</div>`;
+    toast(r.deduplicated ? `deduplicated → ${e.id.slice(0, 8)}` : `executed ${wf} → ${e.id.slice(0, 8)}`);
+    syncSheet();
+  } catch (err) { $("#exOut").innerHTML = errHTML(err, `type="submit"`); renderFooter(); }
+  finally { go.removeAttribute("aria-busy"); go.textContent = `Execute ${wf}`; }
+});
+function unreachableHTML(err, where) {
+  return `<div class="p-head"><span class="cap">${esc(err.error)}</span><h2 id="pTitle">Lost contact.</h2><button class="x" data-close aria-label="Close">×</button></div><div style="margin-top:14px">${errHTML(err, where === "detail" && S.openId ? `data-goto="${S.openId}"` : "")}</div>`;
+}
+</script>
+<style>
+.ro-row{width:100%;text-align:left;align-items:stretch}
+.drum-msg .btn{margin:2px 6px 2px 0}
+.states .cap{margin-right:6px}
+@media (max-width:720px){
+  body{height:auto;min-height:100svh;overflow:auto;grid-template-rows:auto auto auto}
+  html,body{overflow-x:hidden;max-width:100vw}
+  .top{flex-wrap:wrap;gap:10px 14px;padding:14px 16px 10px}
+  .mark b{font-size:34px}
+  .mark span{display:none}
+  .srv{padding-left:0;border-left:0;font-size:11px;flex:1;min-width:0}
+  .srv em{display:none}
+  .ctl{margin:0;width:100%;min-width:0;overflow-x:auto;gap:8px;padding-bottom:2px;scrollbar-width:none}
+  .ctl>*{flex:none}
+  .deck{display:block;overflow:visible}
+  .gutter{display:none}
+  .wfstrip{display:flex;gap:8px;overflow-x:auto;padding:10px 16px;border-bottom:1px solid var(--rule);scrollbar-width:none;scroll-snap-type:x proximity}
+  .wfc{flex:none;display:flex;align-items:center;gap:4px;border:1px solid var(--rule-2);border-radius:999px;padding:2px 6px 2px 2px;scroll-snap-align:start}
+  .wfc .wf-btn{font-size:12px;padding:7px 8px;border-radius:999px;min-height:36px;align-items:center}
+  .wfc .plus{opacity:1;transform:none}
+  .drumwrap{height:max(380px,calc(100svh - 420px))}
+  #drum{height:100%}
+  .readout{border-left:0;border-top:1px solid var(--rule);max-height:240px;overflow:auto;position:relative;min-height:0}
+  .ro-head{position:sticky;top:0;flex-direction:row;align-items:center;justify-content:space-between;height:44px;padding:0 16px}
+  .ro-g{display:none}
+  .readout .ro-row{height:auto!important;padding:9px 16px;border-bottom:1px dashed var(--rule);min-height:52px}
+  .readout .ro-row::before{content:attr(data-tag);font:500 9.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+  .foot{flex-wrap:wrap;padding:10px 16px 18px}
+  .states{margin-left:0}
+  .panel,.sheet{top:auto;left:0;right:0;bottom:0;width:100%;height:94svh;border-radius:14px 14px 0 0;border-bottom:0;transform:translateY(100%)!important;opacity:1}
+  .panel.open{transform:none!important}
+  .panel::before{content:"";display:block;width:40px;height:4px;border-radius:2px;background:var(--rule-2);margin:8px auto 0}
+  .p-in{padding:12px 18px 40px}
+  .p-head h2{font-size:34px}
+  .facts{grid-template-columns:1fr 1fr}
+  .row{grid-template-columns:22px minmax(0,1fr)}
+  .row .tm{grid-column:2;text-align:left}
+  .toast{left:12px;right:12px;bottom:16px}
+}
+@media (prefers-reduced-motion:reduce){.panel,.sheet{transform:none!important}.sweep{display:none}}
+</style>
+<script>
+"use strict";
+const mq = matchMedia("(max-width: 720px)");
+function setParams(obj) { const q = new URLSearchParams(location.search); for (const [k, v] of Object.entries(obj)) v ? q.set(k, v) : q.delete(k); history.replaceState(null, "", q.toString() ? "?" + q : location.pathname); }
+function renderHeader() {
+  const sv = K.state.server, down = S.mode === "down", host = sv.url.replace("http://", "");
+  const srv = $("#srv"); srv.className = "srv" + (down ? " down" : ""); srv.title = sv.storage;
+  srv.innerHTML = `<i></i><span>${sv.app}</span><em>${down ? "unreachable · " + host : `${host} · Effect ${sv.effect} · ${sv.runner}<b class="up" style="font-weight:400"> · up ${sv.uptime}</b>`}</em>`;
+  $("#fWf").innerHTML = `<option value="">all workflows</option>` + K.state.workflows.map((w) => `<option value="${w.name}"${S.wf === w.name ? " selected" : ""}>${w.name}</option>`).join("");
+  $("#fSt").innerHTML = ["", ...STATUSES].map((s) => `<button data-st="${s}" aria-pressed="${S.status === s}">${s || "all"}</button>`).join("");
+  $("#fSpan").innerHTML = ["24h", "7d"].map((s) => `<button data-span="${s}" aria-pressed="${S.span === s}" aria-label="Show ${s}">${s}</button>`).join("");
+}
+function renderStrip() {
+  $("#wfstrip").innerHTML = K.state.workflows.map((w) => `<div class="wfc"><button class="wf-btn" data-exec="${w.name}" aria-label="Execute ${w.name}"><span>${w.name}</span><span class="plus">+</span></button><span class="counts">${countsHTML(w.name)}</span></div>`).join("");
+}
+function renderFooter() {
+  $("#cliNow").textContent = S.wf || S.status ? K.cli.list({ workflow: S.wf, status: S.status }) : K.cli.home();
+  const cur = new URLSearchParams(location.search).get("state") || "live";
+  $("#states").innerHTML = `<span class="cap">state</span>` + ["live", "loading", "down", "empty", "nomatch", "notfound"].map((s) => `<a href="${s === "live" ? location.pathname : "?state=" + s}" aria-current="${cur === s}">${s}</a>`).join("") + `<button data-failnext aria-pressed="${K.api.fail}" title="Make the next KYMO.api call reject with server_unreachable">fail next call</button>`;
+}
+function renderMsg() {
+  const m = $("#drumMsg"), wrap = $("#drumwrap"), sv = K.state.server; let h = "";
+  const loading = S.mode === "loading" || (!S.loaded && S.mode !== "down");
+  if (S.mode === "down") h = `<span class="cap code-l">${esc(S.downErr.error)}</span><h2>The drum has stopped.</h2><p>kymo can’t reach <b>${sv.app}</b> at <span class="mono">${sv.url}</span>. Traces stay blank rather than showing a stale journal.</p><p class="code-l">${esc(S.downErr.message)}</p><div class="cli">${K.cli.home()}</div><button class="btn" data-reload>Retry connection</button>`;
+  else if (loading) h = `<span class="cap">GET ${sv.url}/executions</span><h2>Reading the journal…</h2><p>Replaying cluster_messages and cluster_replies from SQLite.</p>`;
+  else if (!all().length) h = `<span class="cap">0 executions</span><h2>Nothing on the drum yet.</h2><p>${sv.app} hasn’t journaled any executions. Execute a workflow to put the first trace on the drum.</p>${K.state.workflows.map((w) => `<button class="btn ghost" data-exec="${w.name}">${w.name}</button>`).join("")}<div class="cli">${esc(K.cli.execute("<Workflow>", false))}</div>`;
+  else if (!visible().length) h = `<span class="cap">0 of ${all().length} match</span><h2>No traces match.</h2><p>No ${S.status ? `<b>${S.status}</b> ` : ""}executions of <b>${S.wf || "any workflow"}</b> in the journal.</p><button class="btn" data-clear>Clear filters</button><div class="cli">${K.cli.list({ workflow: S.wf, status: S.status })}</div>`;
+  m.innerHTML = h; m.hidden = !h;
+  let sw = $(".sweep", wrap);
+  if (loading && !sw) { sw = document.createElement("div"); sw.className = "sweep"; wrap.appendChild(sw); }
+  if (!loading && sw) sw.remove();
+  if (sw) sw.style.setProperty("--sw", (S.vertical ? 0 : wrap.clientWidth - 4) + "px");
+  wrap.setAttribute("aria-busy", String(loading));
+}
+let freshT = 0;
+function render() {
+  S.vertical = mq.matches;
+  renderHeader(); renderDrum(); renderGutter(); renderReadout(); renderStrip(); renderMsg(); renderFooter();
+  setStylus(S.stylusT ?? now());
+  if (S.fresh) { clearTimeout(freshT); freshT = setTimeout(() => (S.fresh = null), 1700); }
+}
+function applyFilter() { setParams({ workflow: S.wf, status: S.status }); render(); }
+$("#fWf").addEventListener("change", (ev) => { S.wf = ev.target.value; applyFilter(); });
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-exec],[data-filter],[data-open],[data-goto],[data-close],[data-op],[data-st],[data-span],[data-reload],[data-clear],[data-failnext]");
+  if (!t) return;
+  const d = t.dataset;
+  if (d.exec) openSheet(d.exec, t);
+  else if (d.filter) { const [w, s] = d.filter.split("|"); const same = S.wf === w && S.status === s; S.wf = same ? "" : w; S.status = same ? "" : s; applyFilter(); }
+  else if (d.open) openDetail(d.open, t);
+  else if (d.goto) { ev.preventDefault(); openDetail(d.goto, t); }
+  else if ("close" in d) closePanel(t.closest(".panel"));
+  else if (d.op) {
+    const id = d.idOp || S.openId;
+    if (d.op === "ask") { S.op = { id, kind: "interrupt", phase: "confirm" }; refreshOps(); const b = $("#ops .btn.solid"); b && b.focus(); }
+    else if (d.op === "cancel") { S.op = null; refreshOps(); const b = $('#ops [data-op="ask"]'); b && b.focus(); }
+    else runOp(d.op, id);
+  }
+  else if ("st" in d) { S.status = d.st; applyFilter(); }
+  else if (d.span) { S.span = d.span; setParams({ span: S.span === "7d" ? "7d" : "" }); render(); }
+  else if ("reload" in d) load(true);
+  else if ("clear" in d) { S.wf = ""; S.status = ""; applyFilter(); }
+  else if ("failnext" in d) { K.api.fail = !K.api.fail; renderFooter(); toast(K.api.fail ? "next KYMO.api call will reject" : "fail-next disarmed"); }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape") return;
+  const sh = $("#sheet"), p = $("#panel");
+  if (!sh.hidden) closePanel(sh); else if (!p.hidden) { if (S.op && S.op.phase === "confirm") { S.op = null; refreshOps(); } else closePanel(p); }
+});
+async function load(retry) {
+  if (S.mode === "down" && !retry) { S.downErr = { error: "server_unreachable", message: `connect ECONNREFUSED ${K.state.server.url}` }; K.state.server.status = "down"; return render(); }
+  if (retry) { S.mode = "live"; setParams({ state: "" }); }
+  S.loaded = false; render();
+  if (S.mode === "loading") return;
+  try { await K.api.listExecutions(); S.loaded = true; K.state.server.status = "up"; }
+  catch (err) { S.mode = "down"; S.downErr = err; K.state.server.status = "down"; }
+  render();
+}
+(async () => {
+  if (S.mode === "empty") K.state.executions.length = 0;
+  await load(false);
+  if (!S.loaded) return;
+  const ex = params.get("exec") || (S.mode === "notfound" ? "0000c0ffee5e7a1d" : null);
+  if (ex) openDetail(ex);
+})();
+let rz = 0;
+window.addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(render); });
+mq.addEventListener("change", render);
+setInterval(() => {
+  if (!S.loaded || !G || S.mode === "down" || S.mode === "loading") return;
+  const follow = S.stylusT == null || Math.abs(S.stylusT - G.sc.n) < 60e3;
+  renderDrum(); setStylus(follow ? now() : S.stylusT);
+  const p = $("#panel"); if (!p.hidden && !p.contains(document.activeElement)) refreshDetail();
+}, 5000);
+</script>
+</body>
+</html>

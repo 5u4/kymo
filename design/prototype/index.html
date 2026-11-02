@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kymo — prototypes</title>
+<style>
+  :root { color-scheme: light dark; --fg: #171512; --muted: #6d675d; --bg: #f4f1ea; --line: #d9d3c6; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #ece8df; --muted: #9a9384; --bg: #141311; --line: #2c2a26; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 860px; margin: 0 auto; padding: 12vh 24px; }
+  h1 { font-size: clamp(56px, 12vw, 128px); letter-spacing: -0.04em; line-height: .9; margin: 0 0 16px; font-weight: 700; }
+  p { color: var(--muted); max-width: 52ch; margin: 0 0 48px; }
+  a { display: grid; grid-template-columns: 3ch 1fr auto; gap: 16px; align-items: baseline; padding: 20px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+  a:last-of-type { border-bottom: 1px solid var(--line); }
+  a span:first-child { font: 13px ui-monospace, monospace; color: var(--muted); }
+  a strong { font-size: 24px; letter-spacing: -0.01em; }
+  a em { font-style: normal; color: var(--muted); font-size: 14px; }
+  a:hover strong, a:focus-visible strong { text-decoration: underline; text-underline-offset: 4px; }
+  a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>kymo</h1>
+  <p>A window onto Effect workflows. G fuses the Console's three panes and execute form with the Trace waterfall. Same fixture behind all.</p>
+  <a href="g-fusion.html"><span>G</span><strong>Fusion</strong><em>console panes · trace waterfall · execute form</em></a>
+  <a href="d-trace.html"><span>D</span><strong>Trace</strong><em>trigger.dev-style · trace tree + inspector</em></a>
+  <a href="e-split.html"><span>E</span><strong>Split</strong><em>three-pane triage · keyboard</em></a>
+  <a href="f-matrix.html"><span>F</span><strong>Matrix</strong><em>executions × activities grid</em></a>
+  <a href="a-drum.html"><span>A</span><strong>The Drum</strong><em>round 1 · instrument · stylus scrub</em></a>
+  <a href="b-console.html"><span>B</span><strong>The Console</strong><em>round 1 · keyboard · CLI echo</em></a>
+  <a href="c-strata.html"><span>C</span><strong>Strata</strong><em>round 1 · Swiss · nested unfold</em></a>
+</main>
+</body>
+</html>

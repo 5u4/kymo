@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kymo · Matrix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b0c0e; --panel: #111215; --panel2: #16171b; --hover: #1b1d22;
+  --line: #212329; --line2: #2c2f36;
+  --tx: #e3e4e8; --tx2: #a0a3ab; --tx3: #6a6e77;
+  --acc: #7c83ff; --acc-bg: rgba(124,131,255,.12);
+  --ok: #3fbf7f; --fail: #f0525c; --run: #5b9cff; --defer: #f0a63a; --clock: #38c7d4; --int: #8d93a0;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rh: 300px; --cw: 132px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--tx); font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--tx2); } .dim { color: var(--tx3); }
+a { color: var(--acc); text-decoration: none; } a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+svg.i { width: 14px; height: 14px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* app shell */
+.app { display: grid; grid-template-columns: 228px minmax(0, 1fr) auto; grid-template-rows: 44px 1fr; height: 100vh; }
+.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.brand { font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+.brand b { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--acc), #4b51c9); display: inline-block; }
+.brand span { color: var(--tx3); font-weight: 400; }
+.server { margin-left: auto; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--line2); border-radius: 999px; color: var(--tx2); font-size: 12px; white-space: nowrap; overflow: hidden; }
+.server .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(63,191,127,.15); }
+.server.down .dot { background: var(--fail); box-shadow: 0 0 0 3px rgba(240,82,92,.18); }
+.server.down { color: #f59ca2; border-color: rgba(240,82,92,.4); }
+.loadbar { position: fixed; top: 43px; left: 0; height: 2px; width: 30%; background: var(--acc); animation: lb 1s ease-in-out infinite; z-index: 50; }
+@keyframes lb { from { left: -30%; } to { left: 100%; } }
+
+/* sidebar */
+.side { border-right: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 10px 8px; }
+.side h6 { margin: 6px 8px 8px; font-size: 11px; font-weight: 500; color: var(--tx3); text-transform: uppercase; letter-spacing: .06em; }
+.wf { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 7px 8px; color: var(--tx2); margin-bottom: 1px; }
+.wf:hover { background: var(--hover); color: var(--tx); }
+.wf[aria-current="true"] { background: var(--acc-bg); color: var(--tx); }
+.wf .n { display: flex; justify-content: space-between; gap: 6px; font-weight: 500; }
+.wf .n em { font-style: normal; color: var(--tx3); font-family: var(--mono); font-size: 11px; }
+.wf .c { display: flex; gap: 8px; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--tx3); }
+.wf .c i { font-style: normal; display: inline-flex; align-items: center; gap: 3px; }
+.wf .c i::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--k); }
+
+/* main */
+.main { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.wfhead { display: flex; gap: 16px; align-items: flex-start; padding: 16px 20px 12px; }
+.wfhead h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.wfhead p { margin: 3px 0 6px; color: var(--tx2); max-width: 72ch; }
+.wfhead .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--tx3); font-size: 12px; }
+.wfhead .meta code { font-family: var(--mono); color: var(--tx2); font-size: 11.5px; }
+.tag { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--line2); color: var(--tx2); }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line2); background: var(--panel2); color: var(--tx); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--hover); border-color: #3a3d45; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--acc); border-color: var(--acc); color: #0b0c10; }
+.btn.primary:hover:not(:disabled) { background: #9097ff; }
+.btn.danger { color: #ff8a91; border-color: rgba(240,82,92,.35); }
+.btn.danger.solid { background: var(--fail); color: #160506; border-color: var(--fail); }
+.btn.ghost { background: none; border-color: transparent; color: var(--tx2); }
+.btn.ghost:hover { color: var(--tx); }
+.spacer { flex: 1; }
+
+.filters { display: flex; align-items: center; gap: 6px; padding: 0 20px 10px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--line2); background: none; color: var(--tx2); font-size: 12px; }
+.chip:hover { color: var(--tx); background: var(--hover); }
+.chip[aria-pressed="true"] { background: var(--acc-bg); border-color: rgba(124,131,255,.5); color: var(--tx); }
+.chip .ct { font-family: var(--mono); font-size: 11px; color: var(--tx3); }
+.chip .sw { width: 7px; height: 7px; border-radius: 2px; background: var(--k); }
+.legend { display: flex; gap: 12px; color: var(--tx3); font-size: 11.5px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend .g { width: 16px; height: 16px; }
+
+.notice { margin: 0 20px 10px; padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; border: 1px solid; font-size: 12.5px; }
+.notice.new { border-color: rgba(63,191,127,.35); background: rgba(63,191,127,.07); }
+.notice.dedup { border-color: rgba(240,166,58,.4); background: rgba(240,166,58,.08); }
+.notice.err { border-color: rgba(240,82,92,.4); background: rgba(240,82,92,.08); }
+.notice .x { margin-left: auto; }
+
+/* matrix */
+.mwrap { flex: 1; overflow: auto; border-top: 1px solid var(--line); position: relative; }
+table.matrix { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+.matrix th, .matrix td { border-bottom: 1px solid var(--line); padding: 0; }
+.matrix thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); text-align: left; font-weight: 500; vertical-align: bottom; border-bottom: 1px solid var(--line2); }
+.matrix th.corner { left: 0; z-index: 4; width: var(--rh); min-width: var(--rh); padding: 8px 12px; color: var(--tx3); font-size: 11.5px; border-right: 1px solid var(--line2); }
+.corner .sort { background: none; border: 0; color: var(--tx2); padding: 0; display: inline-flex; gap: 4px; align-items: center; font-size: 11.5px; }
+.corner .sort:hover { color: var(--tx); }
+.matrix th.col { min-width: var(--cw); width: var(--cw); padding: 8px 10px 0; border-right: 1px solid var(--line); }
+.col .nm { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col .nm svg { color: var(--tx3); }
+.col .kd { font-size: 10.5px; color: var(--tx3); text-transform: uppercase; letter-spacing: .05em; }
+.col .ag { font-family: var(--mono); font-size: 11px; color: var(--tx2); margin: 3px 0 7px; white-space: nowrap; }
+.col .ag .f { color: var(--fail); } .col .ag .w { color: var(--defer); } .col .ag .r { color: var(--run); }
+.col .bar { display: flex; height: 3px; margin: 0 -10px; background: var(--line); }
+.col .bar i { background: var(--k); }
+.matrix tbody th.rh { position: sticky; left: 0; z-index: 1; background: var(--bg); text-align: left; font-weight: 400; border-right: 1px solid var(--line2); }
+.rhb { display: block; width: 100%; background: none; border: 0; text-align: left; padding: 7px 12px; }
+.rhb .l1 { display: flex; align-items: center; gap: 8px; }
+.rhb .l2 { display: flex; gap: 8px; color: var(--tx3); font-size: 11.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; }
+.rhb .id { font-family: var(--mono); font-size: 12px; color: var(--tx); }
+.rhb .key { font-family: var(--mono); font-size: 11px; color: var(--tx2); overflow: hidden; text-overflow: ellipsis; }
+.rhb .par { font-size: 11px; color: var(--tx3); margin-left: auto; white-space: nowrap; }
+.matrix tbody tr:hover th.rh, .matrix tbody tr:hover td { background: #101115; }
+.matrix tbody tr.sel th.rh, .matrix tbody tr.sel td { background: #13152a; }
+.matrix tbody tr.sel th.rh { box-shadow: inset 2px 0 0 var(--acc); }
+tr.flash th.rh, tr.flash td { animation: flash 1.8s ease-out; }
+@keyframes flash { 0%, 30% { background: rgba(124,131,255,.28); } 100% { background: transparent; } }
+.matrix td { border-right: 1px solid var(--line); }
+.cell:hover { background: rgba(255,255,255,.035); }
+.cell.on { background: var(--acc-bg); box-shadow: inset 0 0 0 1px rgba(124,131,255,.6); }
+.cell .mt { font-family: var(--mono); font-size: 11px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell.s-fail .mt { color: #f08a90; } .cell.s-wait-d .mt { color: var(--defer); } .cell.s-wait-c .mt { color: var(--clock); } .cell.s-run .mt { color: var(--run); }
+.cell.head::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: 4px; height: 2px; border-radius: 2px; background: var(--k, var(--tx3)); opacity: .7; }
+.cell.s-skip .mt { color: #3a3d44; }
+.cell { display: flex; align-items: center; gap: 10px; width: 100%; height: 46px; padding: 0 10px; background: none; border: 0; text-align: left; position: relative; }
+
+/* glyphs */
+.g { position: relative; width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center; flex: none; color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); border: 1px solid color-mix(in srgb, var(--k) 40%, transparent); }
+.g svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.g.ok { --k: var(--ok); } .g.fail { --k: var(--fail); } .g.run { --k: var(--run); } .g.int { --k: var(--int); }
+.g.wait-d { --k: var(--defer); border-style: dashed; }
+.g.wait-c { --k: var(--clock); border-style: dashed; }
+.g.done-d, .g.done-c { --k: var(--ok); background: none; }
+.g.fail { background: var(--fail); color: #1a0507; border-color: var(--fail); }
+.g.run::before { content: ""; position: absolute; inset: 3px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--run) 25%, transparent); border-top-color: var(--run); animation: spin 1.1s linear infinite; }
+.g.wait-d svg, .g.wait-c svg { animation: breathe 2.4s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes breathe { 50% { opacity: .45; } }
+.att-n { font: 600 10px/16px var(--mono); padding: 0 5px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--line2); color: var(--tx); margin-left: -4px; flex: none; }
+.g.child-mark::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 7px; height: 7px; border-radius: 2px; background: var(--bg); border: 1px solid var(--k); }
+@media (prefers-reduced-motion: reduce) { .g.run::before, .g svg, tr.flash td, tr.flash th, .loadbar { animation: none !important; } }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11.5px; font-weight: 500; color: var(--k); background: color-mix(in srgb, var(--k) 12%, transparent); white-space: nowrap; }
+.pill svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.pill small { font-weight: 400; opacity: .8; font-size: 11px; }
+.st-running { --k: var(--run); } .st-suspended { --k: var(--defer); } .st-succeeded { --k: var(--ok); } .st-failed { --k: var(--fail); } .st-interrupted { --k: var(--int); }
+.pill.st-running svg { animation: spin 1.6s linear infinite; }
+
+.empty { padding: 48px 20px; text-align: center; color: var(--tx2); }
+.empty h3 { margin: 0 0 4px; color: var(--tx); font-size: 14px; font-weight: 500; }
+.downbox { margin: 40px 20px; max-width: 520px; padding: 22px; border: 1px solid rgba(240,82,92,.35); border-radius: 10px; background: rgba(240,82,92,.05); }
+.downbox h3 { margin: 0 0 6px; font-size: 15px; color: #ffb2b6; font-weight: 500; }
+.downbox pre { margin: 10px 0 14px; }
+
+/* inspector */
+.insp { width: 420px; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; display: none; }
+.app.has-insp .insp { display: block; }
+.ih { position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 14px; z-index: 2; }
+.ih .crumb { display: flex; align-items: center; gap: 6px; color: var(--tx3); font-size: 12px; }
+.ih .crumb .x { margin-left: auto; }
+.ih h2 { margin: 6px 0 2px; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; word-break: break-all; }
+.ih .acts { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.sec { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.sec h4 { margin: 0 0 8px; font-size: 11px; font-weight: 500; color: var(--tx3); text-transform: uppercase; letter-spacing: .06em; display: flex; gap: 8px; }
+.kv { display: grid; grid-template-columns: 112px 1fr; gap: 5px 10px; font-size: 12.5px; }
+.kv dt { color: var(--tx3); } .kv dd { margin: 0; min-width: 0; word-break: break-word; }
+pre.json { margin: 0; padding: 9px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font: 11.5px/1.55 var(--mono); color: var(--tx2); overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.json .k { color: #a9b1ff; } .json .s { color: #9fd8a8; } .json .n { color: #f0c27a; } .json .b { color: #e59ad8; }
+.cause { border: 1px solid rgba(240,82,92,.3); background: rgba(240,82,92,.06); border-radius: 6px; padding: 8px 10px; }
+.cause.int { border-color: var(--line2); background: var(--panel2); }
+.cause .ct { font: 500 11px var(--mono); color: var(--tx3); }
+.cause .et { font: 500 12.5px var(--mono); color: #ff9aa0; margin: 2px 0 4px; }
+.cause.int .et { color: var(--tx); }
+.cause pre { margin: 4px 0 0; font: 11px/1.5 var(--mono); color: var(--tx2); white-space: pre-wrap; }
+.att { border: 1px solid var(--line); border-radius: 7px; margin-bottom: 8px; overflow: hidden; }
+.att .ah { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--panel2); font-size: 12px; }
+.att .ab { padding: 8px 10px; }
+.jl { list-style: none; margin: 0; padding: 0; }
+.jl li button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 6px; border-radius: 5px; background: none; border: 0; text-align: left; }
+.jl li button:hover { background: var(--hover); }
+.jl .g { width: 18px; height: 18px; }
+.jl .mt { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--tx3); }
+.comp { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 12.5px; }
+.comp:first-of-type { border-top: 0; }
+.idcopy { background: none; border: 0; color: var(--tx3); padding: 2px; border-radius: 4px; }
+.idcopy:hover { color: var(--tx); background: var(--hover); }
+.hint { font-size: 11.5px; color: var(--tx3); margin-top: 6px; }
+.sheetbar { display: none; }
+
+/* tooltip */
+.tip { position: fixed; z-index: 80; pointer-events: none; background: #1c1e24; border: 1px solid var(--line2); border-radius: 7px; padding: 8px 10px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.45); max-width: 300px; }
+.tip b { font-weight: 500; } .tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--tx2); font-family: var(--mono); font-size: 11px; margin-top: 2px; }
+.tip .r span:first-child { color: var(--tx3); font-family: var(--sans); }
+
+/* drawer + dialog */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 60; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 100vw; background: var(--panel); border-left: 1px solid var(--line2); z-index: 61; display: flex; flex-direction: column; box-shadow: -20px 0 40px rgba(0,0,0,.4); }
+.drawer header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.drawer header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.drawer .body { flex: 1; overflow: auto; padding: 14px 16px; }
+.drawer footer { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+.fld { margin-bottom: 12px; }
+.fld label { display: flex; gap: 6px; align-items: baseline; font-size: 12px; font-weight: 500; margin-bottom: 4px; }
+.fld label .ty { font: 400 11px var(--mono); color: var(--tx3); }
+.fld label .req { color: var(--fail); }
+.inp { width: 100%; height: 30px; padding: 0 9px; background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; font-size: 12.5px; }
+textarea.inp { height: auto; padding: 7px 9px; resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+.inp:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-bg); }
+.inp.bad { border-color: var(--fail); }
+.fld .err { color: #ff8a91; font-size: 11.5px; margin-top: 3px; }
+.fld .ph { color: var(--tx3); font-size: 11px; margin-top: 3px; font-family: var(--mono); }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 6px; overflow: hidden; }
+.seg button { background: none; border: 0; padding: 4px 10px; font-size: 12px; color: var(--tx2); }
+.seg button[aria-pressed="true"] { background: var(--panel2); color: var(--tx); }
+.row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.keyprev { padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); font-size: 12px; margin: 4px 0 12px; }
+.keyprev.hit { border-color: rgba(240,166,58,.4); }
+.chk { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; }
+.chk small { display: block; color: var(--tx3); }
+dialog { background: var(--panel); color: var(--tx); border: 1px solid var(--line2); border-radius: 10px; padding: 0; width: 440px; max-width: calc(100vw - 24px); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+dialog::backdrop { background: rgba(0,0,0,.55); }
+dialog .db { padding: 16px 18px; }
+dialog h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+dialog p { margin: 0 0 10px; color: var(--tx2); }
+dialog ol { margin: 0 0 10px; padding-left: 20px; font-size: 12.5px; }
+dialog ol li { margin: 3px 0; }
+dialog .df { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.toast { position: fixed; bottom: 16px; right: 16px; z-index: 90; background: #1c1e24; border: 1px solid var(--line2); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+
+/* small screens */
+@media (max-width: 900px) {
+  :root { --rh: 150px; --cw: 104px; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 44px auto minmax(0, 1fr); }
+  .side { border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 4px; overflow-x: auto; padding: 6px 8px; scrollbar-width: none; }
+  .downbox { margin: 16px 12px; }
+  .wfhead .meta > span:not(:first-child):not(.tag) { display: none; }
+  .toast { top: 52px; bottom: auto; left: 12px; right: 12px; }
+  .side h6 { display: none; }
+  .wf { flex: none; width: auto; margin: 0; }
+  .wf .c { gap: 6px; }
+  .server .opt { display: none; }
+  .wfhead { padding: 12px 12px 8px; flex-wrap: wrap; }
+  .wfhead p { display: none; }
+  .filters { padding: 0 12px 8px; flex-wrap: nowrap; overflow-x: auto; }
+  .legend { display: none; }
+  .notice { margin: 0 12px 8px; }
+  .rhb { padding: 6px 8px; } .rhb .key, .rhb .par, .pill .lbl small { display: none; }
+  .pill .lbl { display: none; }
+  .insp { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 68vh; border-left: 0; border-top: 1px solid var(--line2); border-radius: 12px 12px 0 0; z-index: 55; box-shadow: 0 -16px 40px rgba(0,0,0,.5); }
+  .sheetbar { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--line2); margin: 0 auto 8px; }
+  .drawer { width: 100vw; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand"><b></b>kymo <span>/ matrix</span></div>
+    <div class="server" id="server"></div>
+  </header>
+  <nav class="side" id="side" aria-label="Workflows"></nav>
+  <main class="main" id="main"></main>
+  <aside class="insp" id="insp" aria-label="Inspector"></aside>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div id="drawerHost"></div>
+<dialog id="confirm"></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="data.js"></script>
+<script>
+const K = window.KYMO, S = K.state, NOW = Date.parse(K.NOW);
+const $ = (s, r = document) => r.querySelector(s);
+const params = new URLSearchParams(location.search);
+if (params.get("state") === "down") S.server.status = "down";
+const STATUSES = ["running", "suspended", "failed", "succeeded", "interrupted"];
+const LIVE = ["running", "suspended"];
+const SC = { running: "var(--run)", suspended: "var(--defer)", failed: "var(--fail)", succeeded: "var(--ok)", interrupted: "var(--int)" };
+
+const ui = { boot: "loading", err: null, wf: null, status: null, sort: "desc", sel: null, hl: null, flash: null, notice: null, busy: false, exec: null };
+let execs = [];
+const LOADED = Date.now();
+// The fixture stamps mutations with the wall clock; re-stamp them onto the fixture's NOW timeline.
+const clockNow = () => new Date(NOW + (Date.now() - LOADED)).toISOString();
+function restamp() {
+  const fresh = (v) => typeof v === "string" && Math.abs(Date.parse(v) - Date.now()) < 10000;
+  S.executions.forEach((e) => {
+    ["startedAt", "endedAt"].forEach((k) => { if (fresh(e[k])) e[k] = clockNow(); });
+    e.compensations.forEach((c) => { if (fresh(c.at)) c.at = clockNow(); });
+  });
+}
+
+/* ---------- api ---------- */
+async function call(name, ...args) {
+  if (S.server.status === "down") { await new Promise((r) => setTimeout(r, K.api.latency)); throw { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` }; }
+  return K.api[name](...args);
+}
+async function load() {
+  ui.busy = true; render();
+  try { execs = (await call("listExecutions", {})).slice(); ui.boot = "ok"; ui.err = null; }
+  catch (e) { ui.boot = "down"; ui.err = e; }
+  ui.busy = false;
+  if (!ui.wf) ui.wf = defaultWf();
+  render();
+}
+function defaultWf() {
+  const c = {}; execs.forEach((e) => (c[e.workflow] = (c[e.workflow] || 0) + 1));
+  return S.workflows.slice().sort((a, b) => (c[b.name] || 0) - (c[a.name] || 0))[0].name;
+}
+
+/* ---------- helpers ---------- */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const short = (id) => id.slice(0, 8);
+const t = (iso) => (iso ? Date.parse(iso) : null);
+function dur(ms) {
+  if (ms == null || isNaN(ms)) return "—";
+  if (ms < 0) ms = 0;
+  if (ms < 1000) return Math.round(ms) + "ms";
+  const s = ms / 1000; if (s < 60) return (s < 10 ? s.toFixed(1) : Math.round(s)) + "s";
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ${Math.round(s % 60)}s`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+const ago = (iso) => { const d = NOW - t(iso); return d < 5000 ? "just now" : dur(d).split(" ")[0] + " ago"; };
+const until = (iso) => { const d = t(iso) - NOW; return d <= 0 ? "due" : "in " + dur(d).split(" ")[0]; };
+function abs(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso), p = (n, l = 2) => String(n).padStart(l, "0");
+  const time = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)}`;
+  return d.toISOString().slice(0, 10) === K.NOW.slice(0, 10) ? time : `${d.toLocaleString("en", { month: "short", day: "numeric", timeZone: "UTC" })} ${time}`;
+}
+const ICONS = {
+  check: '<path d="M4 12.5l5 5L20 6.5"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  diamond: '<path d="M12 3l9 9-9 9-9-9z"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  child: '<path d="M7 17L17 7M9 7h8v8"/>', ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
+  spin: '<path d="M12 3a9 9 0 1 0 9 9"/>', pause: '<path d="M9 6v12M15 6v12"/>', play: '<path d="M7 5l12 7-12 7z"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>', act: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>',
+  sort: '<path d="M8 4v16M4 16l4 4 4-4M16 20V4M12 8l4-4 4 4"/>', down: '<path d="M6 9l6 6 6-6"/>', up: '<path d="M6 15l6-6 6 6"/>',
+  dot: '<circle cx="12" cy="12" r="2"/>',
+};
+const ico = (n, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+const STATUS_ICON = { running: "spin", suspended: "pause", succeeded: "check", failed: "x", interrupted: "ban" };
+function pill(e, small) {
+  const r = e.status === "suspended" && e.suspendedReason ? ` <small>· ${e.suspendedReason}</small>` : "";
+  return `<span class="pill st-${e.status}" title="${e.status}${e.suspendedReason ? " (" + e.suspendedReason + ")" : ""}">${ico(STATUS_ICON[e.status])}<span class="lbl">${e.status[0].toUpperCase() + e.status.slice(1)}${small ? "" : r}</span></span>`;
+}
+function json(v) {
+  const s = esc(JSON.stringify(v, null, 2));
+  return `<pre class="json">${s.replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(-?\d+(?:\.\d+)?)\b|\b(true|false|null)\b/g,
+    (m, str, colon, num, lit) => str ? `<span class="${colon ? "k" : "s"}">${str}</span>${colon || ""}` : num ? `<span class="n">${num}</span>` : `<span class="b">${lit}</span>`)}</pre>`;
+}
+const isInterrupt = (exit) => exit && exit._tag === "Failure" && exit.cause && exit.cause._tag === "Interrupt";
+function renderCause(c) {
+  if (!c) return "";
+  if (c._tag === "Fail") { const { _tag, ...rest } = c.error || {}; return `<div class="cause"><div class="ct">Cause · Fail</div><div class="et">${esc(_tag || "Error")}</div>${Object.keys(rest).length ? `<pre>${esc(JSON.stringify(rest, null, 2))}</pre>` : ""}</div>`; }
+  if (c._tag === "Die") { const d = c.defect || {}; return `<div class="cause"><div class="ct">Cause · Die (defect)</div><div class="et">${esc(d.name || "Defect")}: ${esc(d.message || "")}</div>${d.stack ? `<pre>${esc(d.stack.split("\n").slice(1).join("\n").trim())}</pre>` : ""}</div>`; }
+  if (c._tag === "Interrupt") return `<div class="cause int"><div class="ct">Cause · Interrupt</div><div class="et">fiber ${esc(c.fiberId)}</div></div>`;
+  return json(c);
+}
+const renderExit = (x) => !x ? `<span class="dim">no exit yet</span>` : x._tag === "Success" ? json(x.value) : renderCause(x.cause);
+function renderResult(r, e) {
+  if (!r && e?.status === "interrupted") return `<div class="cause int"><div class="ct">Cause · Interrupt</div><div class="et">interrupted with parent ${e.parent ? short(e.parent) : ""}</div></div>`;
+  if (!r) return `<span class="dim">No result yet</span>`;
+  if (r._tag === "Suspended") return `<div class="hint" style="margin:0 0 6px">Suspended (SuspendOnFailure) — resume to retry from the journal.</div>${renderCause(r.cause)}`;
+  return renderExit(r.exit);
+}
+
+/* ---------- matrix model ---------- */
+function journal(e) {
+  const m = new Map();
+  e.activities.forEach((a) => { const k = "activity:" + a.name; if (!m.has(k)) m.set(k, { key: k, kind: "activity", name: a.name, t: a.startedAt }); });
+  e.waits.forEach((w) => m.set(w.kind + ":" + w.name, { key: w.kind + ":" + w.name, kind: w.kind, name: w.name, t: w.since }));
+  e.childCalls.forEach((c) => m.set("child:" + c.name, { key: "child:" + c.name, kind: "child", name: c.name, t: c.startedAt }));
+  return [...m.values()].sort((a, b) => t(a.t) - t(b.t));
+}
+function columns(list) {
+  const order = [];
+  [...list].sort((a, b) => journal(b).length - journal(a).length).forEach((e) => {
+    let prev = -1;
+    journal(e).forEach((j) => {
+      const i = order.findIndex((c) => c.key === j.key);
+      if (i >= 0) { prev = i; return; }
+      order.splice(prev + 1, 0, { key: j.key, kind: j.kind, name: j.name }); prev++;
+    });
+  });
+  return order;
+}
+const byId = (id) => execs.find((e) => e.id === id);
+function cell(e, col) {
+  const live = LIVE.includes(e.status);
+  const none = { st: live ? "none" : "skip", g: null, mt: live ? "" : "·" };
+  if (col.kind === "activity") {
+    const at = e.activities.filter((a) => a.name === col.name);
+    if (!at.length) return none;
+    const last = at[at.length - 1];
+    const st = last.status === "success" ? "ok" : last.status === "running" ? (live ? "run" : "int") : isInterrupt(last.exit) ? "int" : "fail";
+    const mt = st === "ok" ? dur(t(last.endedAt) - t(last.startedAt)) : st === "run" ? dur(NOW - t(last.startedAt)) : st === "int" ? "interrupted" : (last.exit?.cause?.error?._tag || "failed");
+    return { st, g: st === "ok" ? "check" : st === "run" ? null : st === "int" ? "ban" : "x", mt, attempts: at, n: at.length };
+  }
+  if (col.kind === "deferred" || col.kind === "clock") {
+    const w = e.waits.find((x) => x.kind === col.kind && x.name === col.name);
+    if (!w) return none;
+    const d = col.kind === "deferred" ? "d" : "c";
+    if (w.status === "waiting") return { st: "wait-" + d, g: d === "d" ? "diamond" : "clock", mt: d === "d" ? "awaiting " + dur(NOW - t(w.since)).split(" ")[0] : "wakes " + until(w.wakeAt), w };
+    const end = w.doneAt || w.wakeAt;
+    return { st: "done-" + d, g: d === "d" ? "diamond" : "clock", mt: dur(t(end) - t(w.since)), w };
+  }
+  const c = e.childCalls.find((x) => x.name === col.name);
+  if (!c) return none;
+  const ch = byId(c.execution);
+  const map = { running: ["run", null], suspended: [ch?.suspendedReason === "clock" ? "wait-c" : "wait-d", "pause"], succeeded: ["ok", "check"], failed: ["fail", "x"], interrupted: ["int", "ban"] };
+  const [st, g] = map[ch?.status] || ["int", "dot"];
+  return { st, g: g || null, mt: "↗ " + short(c.execution), child: c, ch };
+}
+const CELL_COLOR = { ok: "var(--ok)", fail: "var(--fail)", run: "var(--run)", int: "var(--int)", "wait-d": "var(--defer)", "wait-c": "var(--clock)", "done-d": "var(--ok)", "done-c": "var(--ok)" };
+function glyph(c, col) {
+  if (!c.g && c.st !== "run") return "";
+  const badge = c.n > 1 ? `<span class="att-n" title="${c.n} attempts">×${c.n}</span>` : "";
+  return `<span class="g ${c.st}${col.kind === "child" ? " child-mark" : ""}">${c.g ? ico(c.g) : ""}</span>${badge}`;
+}
+const COL_ICON = { activity: "act", deferred: "diamond", clock: "clock", child: "child" };
+const COL_KIND = { activity: "Activity", deferred: "DurableDeferred", clock: "DurableClock", child: "Child workflow" };
+
+/* ---------- render ---------- */
+function render() { renderServer(); renderSide(); renderMain(); renderInsp(); document.querySelector(".loadbar")?.remove(); if (ui.busy) document.body.insertAdjacentHTML("beforeend", '<div class="loadbar"></div>'); }
+function renderServer() {
+  const s = S.server, down = ui.boot === "down";
+  $("#server").className = "server" + (down ? " down" : "");
+  $("#server").innerHTML = `<span class="dot"></span><b style="font-weight:500;color:var(--tx)">${esc(s.app)}</b><span class="opt mono">${esc(s.url.replace(/^https?:\/\//, ""))}</span><span class="opt">· effect ${esc(s.effect)} · ${esc(s.runner)}</span><span>${down ? "unreachable" : "up " + esc(s.uptime)}</span>`;
+}
+function renderSide() {
+  $("#side").innerHTML = `<h6>Workflows</h6>` + S.workflows.map((w) => {
+    const l = execs.filter((e) => e.workflow === w.name);
+    const cnt = STATUSES.map((s) => [s, l.filter((e) => e.status === s).length]).filter(([, n]) => n);
+    const known = ui.boot === "ok";
+    return `<button class="wf" data-act="wf" data-wf="${w.name}" aria-current="${ui.wf === w.name}"><div class="n">${esc(w.name)}<em>${known ? l.length : "—"}</em></div>
+      <div class="c">${!known ? (ui.boot === "down" ? "unknown" : "…") : cnt.map(([s, n]) => `<i style="--k:${SC[s]}" title="${n} ${s}">${n}</i>`).join("") || "no executions"}</div></button>`;
+  }).join("");
+}
+function renderMain() {
+  const m = $("#main");
+  const w = S.workflows.find((x) => x.name === ui.wf) || S.workflows[0];
+  const head = `<div class="wfhead"><div style="min-width:0;flex:1"><h1>${esc(w.name)}</h1><p>${esc(w.description)}</p>
+    <div class="meta"><span>idempotencyKey <code>${esc(w.idempotencyKey)}</code></span><span>success <code>${esc(w.success)}</code></span><span>error <code>${esc(w.error)}</code></span>${w.annotations.map((a) => `<span class="tag">${esc(a)}</span>`).join("")}</div></div>
+    <button class="btn primary" data-act="exec-open" ${ui.boot === "down" ? "disabled" : ""}>${ico("play")}Execute</button></div>`;
+  if (ui.boot === "loading") { m.innerHTML = head + `<div class="empty">Loading executions…</div>`; return; }
+  if (ui.boot === "down") {
+    m.innerHTML = head + `<div class="downbox" role="alert"><h3>Can't reach ${esc(S.server.app)}</h3><div class="muted">kymo talks to your app's workflow engine over HTTP. Start the app or check the URL, then retry.</div>
+      <pre class="json">${esc(ui.err?.error)}: ${esc(ui.err?.message)}</pre><button class="btn" data-act="retry">Retry</button></div>`; return;
+  }
+  const all = execs.filter((e) => e.workflow === w.name);
+  const cols = columns(all);
+  const rows = all.filter((e) => !ui.status || e.status === ui.status).sort((a, b) => (t(b.startedAt) - t(a.startedAt)) * (ui.sort === "desc" ? 1 : -1));
+  const chips = `<div class="filters"><button class="chip" data-act="status" data-s="" aria-pressed="${!ui.status}">All <span class="ct">${all.length}</span></button>` +
+    STATUSES.map((s) => { const n = all.filter((e) => e.status === s).length; return `<button class="chip" data-act="status" data-s="${s}" aria-pressed="${ui.status === s}"><span class="sw" style="--k:${SC[s]}"></span>${s} <span class="ct">${n}</span></button>`; }).join("") +
+    `<span class="spacer"></span><div class="legend">
+      <span><span class="g ok">${ico("check")}</span>ok</span><span><span class="g fail">${ico("x")}</span><span class="att-n">×3</span>failed · attempts</span>
+      <span><span class="g run"></span>running</span><span><span class="g wait-d">${ico("diamond")}</span>deferred</span><span><span class="g wait-c">${ico("clock")}</span>clock</span><span><span class="g int">${ico("ban")}</span>interrupted</span></div></div>`;
+  const n = ui.notice;
+  const notice = n ? `<div class="notice ${n.kind}" role="status">${n.html}<button class="btn ghost x" data-act="notice-x" aria-label="Dismiss">${ico("close")}</button></div>` : "";
+  let table;
+  if (!all.length) table = `<div class="empty"><h3>No executions of ${esc(w.name)} yet</h3><div>Run one with <a href="#" data-act="exec-open">Execute</a>.</div></div>`;
+  else if (!rows.length) table = `<div class="empty"><h3>No ${esc(ui.status)} executions</h3><div>${all.length} ${esc(w.name)} executions are hidden by the status filter. <a href="#" data-act="status" data-s="">Clear filter</a></div></div>`;
+  else {
+    const thead = `<tr><th class="corner"><button class="sort" data-act="sort" title="Sort by started">Execution · started ${ico(ui.sort === "desc" ? "down" : "up")}</button></th>` + cols.map((col) => {
+      const cs = rows.map((e) => cell(e, col).st);
+      const ok = cs.filter((s) => s === "ok" || s.startsWith("done")).length, f = cs.filter((s) => s === "fail").length,
+        wt = cs.filter((s) => s.startsWith("wait")).length, r = cs.filter((s) => s === "run").length, it = cs.filter((s) => s === "int").length;
+      const parts = [`${ok}/${rows.length} ok`, f && `<span class="f">${f} failing</span>`, r && `<span class="r">${r} running</span>`, wt && `<span class="w">${wt} waiting</span>`].filter(Boolean).join(" · ");
+      const seg = (k, v) => (v ? `<i style="--k:${k};flex:${v}"></i>` : "");
+      return `<th class="col" scope="col" title="${esc(COL_KIND[col.kind])} ${esc(col.name)}"><div class="kd">${COL_KIND[col.kind]}</div><div class="nm">${ico(COL_ICON[col.kind])}${esc(col.name)}</div><div class="ag">${parts}</div>
+        <div class="bar">${seg("var(--ok)", ok)}${seg("var(--fail)", f)}${seg("var(--run)", r)}${seg("var(--defer)", wt)}${seg("var(--int)", it)}<i style="flex:${rows.length - ok - f - r - wt - it}"></i></div></th>`;
+    }).join("") + `<th class="col" style="width:auto;min-width:24px;border-right:0"></th></tr>`;
+    const tbody = rows.map((e) => {
+      const j = journal(e), headKey = LIVE.includes(e.status) && j.length ? j[j.length - 1].key : null;
+      const sel = ui.sel && ui.sel.id === e.id;
+      return `<tr class="${sel || ui.hl === e.id ? "sel" : ""} ${ui.flash === e.id ? "flash" : ""}" data-row="${e.id}"><th class="rh" scope="row"><button class="rhb" data-act="exec" data-id="${e.id}">
+        <div class="l1">${pill(e)}<span class="id">${short(e.id)}</span>${e.parent ? `<span class="par" title="child of ${e.parent}">from ${short(e.parent)}</span>` : ""}</div>
+        <div class="l2"><span class="key" title="idempotencyKey">${esc(e.idempotencyKey)}</span><span>${ago(e.startedAt)}</span>${e.endedAt ? `<span>${dur(t(e.endedAt) - t(e.startedAt))}</span>` : ""}</div></button></th>` +
+        cols.map((col) => {
+          const c = cell(e, col), on = ui.sel && ui.sel.id === e.id && ui.sel.col === col.key;
+          return `<td><button class="cell s-${c.st}${on ? " on" : ""}${col.key === headKey ? " head" : ""}" style="--k:${CELL_COLOR[c.st] || "var(--tx3)"}" data-act="${c.st === "none" || c.st === "skip" ? "exec" : "cell"}" data-id="${e.id}" data-col="${esc(col.key)}" aria-label="${esc(col.name)}: ${c.st}">${glyph(c, col)}<span class="mt">${esc(c.mt)}</span></button></td>`;
+        }).join("") + `<td style="border-right:0"></td></tr>`;
+    }).join("");
+    table = `<table class="matrix"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+  }
+  const scroll = $(".mwrap", m); const sx = scroll?.scrollLeft || 0, sy = scroll?.scrollTop || 0;
+  m.innerHTML = head + chips + notice + `<div class="mwrap" id="mwrap">${table}</div>`;
+  const nw = $(".mwrap", m); nw.scrollLeft = sx; nw.scrollTop = sy;
+}
+
+/* ---------- inspector ---------- */
+function renderInsp() {
+  const app = $("#app"), el = $("#insp");
+  const e = ui.sel && byId(ui.sel.id);
+  app.classList.toggle("has-insp", !!e);
+  if (!e) { el.innerHTML = ""; return; }
+  el.innerHTML = ui.sel.col ? cellInsp(e, ui.sel.col) : execInsp(e);
+}
+const crumb = (e, extra) => `<div class="sheetbar"></div><div class="crumb"><span>${esc(e.workflow)}</span>/<a href="#" data-act="exec" data-id="${e.id}" class="mono">${short(e.id)}</a>${extra ? "/ <span>" + esc(extra) + "</span>" : ""}<button class="btn ghost x" data-act="close" aria-label="Close inspector">${ico("close")}</button></div>`;
+function execInsp(e) {
+  const comps = e.compensations;
+  const canResume = e.status === "suspended", canInt = LIVE.includes(e.status);
+  const j = journal(e);
+  return `<div class="ih">${crumb(e)}
+    <h2>${pill(e)}<span class="mono" style="font-size:13px">${e.id}</span><button class="idcopy" data-act="copy" data-v="${e.id}" title="Copy execution id">${ico("copy")}</button></h2>
+    <div class="acts"><button class="btn" data-act="resume" data-id="${e.id}" ${canResume ? "" : "disabled"} title="${canResume ? "Resume this suspended execution" : "Only suspended executions can be resumed"}">${ico("play")}Resume</button>
+      <button class="btn danger" data-act="interrupt" data-id="${e.id}" ${canInt ? "" : "disabled"} title="${canInt ? "Interrupt (terminal)" : "Already " + e.status}">${ico("stop")}Interrupt</button>
+      <button class="btn ghost" data-act="exec-open" data-from="${e.id}">${ico("plus")}Execute with this payload</button></div></div>
+  <div class="sec"><dl class="kv"><dt>Workflow</dt><dd>${esc(e.workflow)}</dd><dt>idempotencyKey</dt><dd class="mono">${esc(e.idempotencyKey)}</dd>
+    <dt>Started</dt><dd>${abs(e.startedAt)} <span class="dim">· ${ago(e.startedAt)}</span></dd><dt>Ended</dt><dd>${e.endedAt ? abs(e.endedAt) : '<span class="dim">—</span>'}</dd>
+    <dt>Duration</dt><dd>${dur((e.endedAt ? t(e.endedAt) : NOW) - t(e.startedAt))}${e.endedAt ? "" : ' <span class="dim">so far</span>'}</dd>
+    ${e.suspendedReason ? `<dt>Suspended on</dt><dd>${esc({ deferred: "DurableDeferred", clock: "DurableClock", failure: "failure (SuspendOnFailure)", child: "child workflow" }[e.suspendedReason])}</dd>` : ""}
+    ${e.parent ? `<dt>Parent</dt><dd><a href="#" data-act="goto" data-id="${e.parent}" class="mono">${short(e.parent)}</a> <span class="dim">${esc(byId(e.parent)?.workflow || "")}</span></dd>` : ""}
+    ${e.children.length ? `<dt>Children</dt><dd>${e.children.map((c) => `<a href="#" data-act="goto" data-id="${c}" class="mono">${short(c)}</a> <span class="dim">${esc(byId(c)?.workflow || "")} · ${esc(byId(c)?.status || "")}</span>`).join("<br>")}</dd>` : ""}
+    ${e.interruptedBy ? `<dt>Interrupted by</dt><dd class="mono">${esc(e.interruptedBy)}</dd>` : ""}</dl></div>
+  <div class="sec"><h4>Result</h4>${renderResult(e.result, e)}</div>
+  <div class="sec"><h4>Journal <span>${j.length}</span></h4>${j.length ? `<ul class="jl">${j.map((x) => { const c = cell(e, x); return `<li><button data-act="cell" data-id="${e.id}" data-col="${esc(x.key)}">${glyph(c, x) || '<span class="g" style="--k:var(--tx3)"></span>'}<span>${esc(x.name)}</span><span class="dim" style="font-size:11px">${COL_KIND[x.kind]}</span><span class="mt">${esc(c.mt)}</span></button></li>`; }).join("")}</ul>` : `<span class="dim">Nothing journaled yet.</span>`}</div>
+  <div class="sec"><h4>Payload</h4>${json(e.payload)}</div>
+  <div class="sec"><h4>Compensations <span>${comps.length}</span></h4>${comps.length ? comps.map((c) => `<div class="comp"><span class="g ${c.ran ? "ok" : "int"}" style="width:18px;height:18px">${ico(c.ran ? "check" : "dot")}</span><span><b style="font-weight:500">${esc(c.name)}</b> <span class="dim">for ${esc(c.activity)}</span></span><span class="spacer"></span><span class="dim" style="font-size:11.5px">${c.ran ? "ran " + abs(c.at) : "registered · runs on interrupt"}</span></div>`).join("") : `<span class="dim">No compensations registered.</span>`}</div>`;
+}
+function cellInsp(e, key) {
+  const col = journal(e).find((x) => x.key === key) || { key, kind: key.split(":")[0], name: key.split(":").slice(1).join(":") };
+  const c = cell(e, col);
+  let body = "";
+  if (col.kind === "activity") {
+    const at = c.attempts || [], first = at[0], last = at[at.length - 1];
+    body = `<div class="sec"><dl class="kv"><dt>Attempts</dt><dd>${at.length}</dd><dt>First started</dt><dd>${abs(first?.startedAt)}</dd><dt>Last ended</dt><dd>${last?.endedAt ? abs(last.endedAt) : '<span class="dim">running</span>'}</dd>
+      <dt>Total span</dt><dd>${dur((last?.endedAt ? t(last.endedAt) : NOW) - t(first?.startedAt))}</dd></dl></div>
+      <div class="sec"><h4>Attempts</h4>${at.slice().reverse().map((a) => { const s = a.status === "success" ? "ok" : a.status === "running" ? "run" : isInterrupt(a.exit) ? "int" : "fail";
+        return `<div class="att"><div class="ah"><span class="g ${s}" style="width:18px;height:18px">${s === "run" ? "" : ico(s === "ok" ? "check" : s === "int" ? "ban" : "x")}</span><b style="font-weight:500">Attempt ${a.attempt}</b><span class="dim">${a.status}</span><span class="spacer"></span><span class="mono dim">${dur((a.endedAt ? t(a.endedAt) : NOW) - t(a.startedAt))}</span></div>
+        <div class="ab"><div class="hint" style="margin:0 0 6px">${abs(a.startedAt)} → ${a.endedAt ? abs(a.endedAt) : "…"}</div>${a.status === "running" ? '<span class="dim">In progress — no exit yet.</span>' : renderExit(a.exit)}</div></div>`; }).join("")}</div>`;
+  } else if (col.kind === "child") {
+    const ch = c.ch;
+    body = `<div class="sec"><dl class="kv"><dt>Child execution</dt><dd class="mono">${esc(c.child.execution)}</dd><dt>Workflow</dt><dd>${esc(ch?.workflow || "?")}</dd><dt>Status</dt><dd>${ch ? pill(ch) : "unknown"}</dd>
+      <dt>Called at</dt><dd>${abs(c.child.startedAt)}</dd><dt>Returned</dt><dd>${c.child.endedAt ? abs(c.child.endedAt) + ` <span class="dim">· ${dur(t(c.child.endedAt) - t(c.child.startedAt))}</span>` : '<span class="dim">not yet</span>'}</dd></dl>
+      <div style="margin-top:12px"><button class="btn" data-act="goto" data-id="${c.child.execution}">${ico("child")}Open in ${esc(ch?.workflow || "child")} matrix</button></div></div>
+      ${ch ? `<div class="sec"><h4>Child result</h4>${renderResult(ch.result, ch)}</div>` : ""}`;
+  } else {
+    const w = c.w;
+    body = `<div class="sec"><dl class="kv"><dt>Kind</dt><dd>${COL_KIND[col.kind]}</dd><dt>Status</dt><dd>${w.status === "waiting" ? `<span class="pill" style="--k:${col.kind === "clock" ? "var(--clock)" : "var(--defer)"}">${ico(col.kind === "clock" ? "clock" : "diamond")}waiting</span>` : `<span class="pill st-succeeded">${ico("check")}done</span>`}</dd>
+      <dt>Since</dt><dd>${abs(w.since)} <span class="dim">· ${ago(w.since)}</span></dd>
+      ${w.wakeAt ? `<dt>Wakes at</dt><dd>${abs(w.wakeAt)} <span class="dim">· ${until(w.wakeAt)}</span></dd>` : ""}
+      ${w.doneAt ? `<dt>Completed</dt><dd>${abs(w.doneAt)}</dd>` : ""}
+      <dt>Waited</dt><dd>${dur((w.doneAt ? t(w.doneAt) : w.status === "done" ? t(w.wakeAt) : NOW) - t(w.since))}${w.status === "waiting" ? ' <span class="dim">so far</span>' : ""}</dd>
+      ${w.schema ? `<dt>Schema</dt><dd class="mono">${esc(w.schema)}</dd>` : ""}</dl>
+      ${w.status === "waiting" ? `<div class="hint">${col.kind === "clock" ? "The engine wakes this execution automatically at wakeAt." : "Completed when your app resolves this DurableDeferred token."}</div>` : ""}</div>
+      ${w.exit ? `<div class="sec"><h4>Value</h4>${renderExit(w.exit)}</div>` : ""}`;
+  }
+  return `<div class="ih">${crumb(e, col.name)}<h2>${glyph(c, col)}${esc(col.name)}</h2><div class="dim" style="font-size:12px">${COL_KIND[col.kind]} in ${pill(e, true)} <span class="mono">${short(e.id)}</span></div></div>${body}`;
+}
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+document.addEventListener("mouseover", (ev) => {
+  const b = ev.target.closest(".cell");
+  if (!b || matchMedia("(hover: none)").matches) { tip.hidden = true; return; }
+  const e = byId(b.dataset.id), col = journal(e).find((x) => x.key === b.dataset.col);
+  if (!col) { tip.hidden = true; return; }
+  const c = cell(e, col), r = (k, v) => `<div class="r"><span>${k}</span><span>${esc(v)}</span></div>`;
+  let h = `<b>${esc(col.name)}</b> <span class="dim">· ${short(e.id)}</span>`;
+  if (c.attempts) { const l = c.attempts[c.attempts.length - 1]; h += r("attempt", `${l.attempt} of ${c.attempts.length}`) + r("status", l.status) + r("duration", dur((l.endedAt ? t(l.endedAt) : NOW) - t(l.startedAt))) + r("started", abs(l.startedAt)); if (c.st === "fail") h += r("error", c.mt); }
+  else if (c.w) { h += r("status", c.w.status) + r("since", abs(c.w.since)) + (c.w.wakeAt ? r("wakeAt", abs(c.w.wakeAt) + " (" + until(c.w.wakeAt) + ")") : ""); }
+  else if (c.child) { h += r("child", c.child.execution) + r("status", c.ch?.status || "?") + r("called", abs(c.child.startedAt)); }
+  tip.innerHTML = h + `<div class="hint">${c.child ? "Click to open child" : "Click to inspect"}</div>`; tip.hidden = false;
+  const bb = b.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = Math.min(innerWidth - tw - 8, Math.max(8, bb.left)) + "px";
+  tip.style.top = (bb.bottom + th + 8 > innerHeight ? bb.top - th - 6 : bb.bottom + 6) + "px";
+});
+document.addEventListener("scroll", () => (tip.hidden = true), true);
+
+/* ---------- actions ---------- */
+function toast(msg) { const el = $("#toast"); el.innerHTML = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 3200); }
+function goto(id, opts = {}) {
+  const e = byId(id); if (!e) return;
+  ui.wf = e.workflow; ui.hl = id; ui.flash = id; ui.sel = { id };
+  if (ui.status && ui.status !== e.status) ui.status = null;
+  render();
+  requestAnimationFrame(() => $(`tr[data-row="${id}"]`)?.scrollIntoView({ block: "nearest" }));
+  setTimeout(() => { if (ui.flash === id) ui.flash = null; }, 1900);
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act; if (b.tagName === "A") ev.preventDefault();
+  if (a === "wf") { if (ui.wf !== b.dataset.wf) { ui.wf = b.dataset.wf; ui.status = null; ui.sel = null; ui.hl = null; ui.notice = null; } render(); }
+  else if (a === "status") { ui.status = b.dataset.s || null; render(); }
+  else if (a === "sort") { ui.sort = ui.sort === "desc" ? "asc" : "desc"; render(); }
+  else if (a === "exec") { ui.sel = { id: b.dataset.id }; ui.hl = null; render(); }
+  else if (a === "cell") {
+    const e = byId(b.dataset.id), key = b.dataset.col;
+    if (key.startsWith("child:") && b.classList.contains("cell")) { const c = e.childCalls.find((x) => "child:" + x.name === key); if (c) return goto(c.execution); }
+    ui.sel = { id: b.dataset.id, col: key }; ui.hl = null; render();
+  }
+  else if (a === "goto") goto(b.dataset.id);
+  else if (a === "close") { ui.sel = null; render(); }
+  else if (a === "notice-x") { ui.notice = null; render(); }
+  else if (a === "retry") load();
+  else if (a === "copy") { navigator.clipboard?.writeText(b.dataset.v); toast(`Copied <span class="mono">${esc(b.dataset.v)}</span>`); }
+  else if (a === "resume" || a === "interrupt") confirmOp(a, byId(b.dataset.id));
+  else if (a === "exec-open") openDrawer(b.dataset.from ? byId(b.dataset.from) : null);
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || $("#confirm").open) return;
+  if (ui.exec) closeDrawer(); else if (ui.sel) { ui.sel = null; render(); }
+});
+
+function confirmOp(op, e) {
+  const d = $("#confirm");
+  const pending = e.compensations.filter((c) => c.registered && !c.ran).slice().reverse();
+  const kids = e.children.map(byId).filter((c) => c && LIVE.includes(c.status));
+  const body = op === "resume"
+    ? `<h3>Resume ${esc(e.workflow)} <span class="mono">${short(e.id)}</span>?</h3><p>Suspended on <b>${esc(e.suspendedReason || "?")}</b>. The engine replays the journal: completed activities return their recorded exits and are not re-run.</p>`
+    : `<h3>Interrupt ${esc(e.workflow)} <span class="mono">${short(e.id)}</span>?</h3><p>Interrupt is <b>terminal</b> — the execution cannot be resumed afterwards.</p>
+       ${pending.length ? `<p style="margin-bottom:4px">These compensations will run, in reverse order:</p><ol>${pending.map((c) => `<li><b style="font-weight:500">${esc(c.name)}</b> <span class="dim">— undoes ${esc(c.activity)}</span></li>`).join("")}</ol>` : `<p class="dim">No compensations are registered; nothing will be undone.</p>`}
+       ${kids.length ? `<p>Also interrupts child ${kids.map((k) => `<span class="mono">${short(k.id)}</span> (${esc(k.workflow)})`).join(", ")}.</p>` : ""}`;
+  d.innerHTML = `<div class="db">${body}<div class="err" id="cerr" style="color:#ff8a91;font-size:12px"></div></div><div class="df"><button class="btn" id="cno">Cancel</button><button class="btn ${op === "interrupt" ? "danger solid" : "primary"}" id="cyes">${op === "resume" ? "Resume" : "Interrupt"}</button></div>`;
+  d.showModal(); $("#cno").focus();
+  $("#cno").onclick = () => d.close();
+  $("#cyes").onclick = async () => {
+    const y = $("#cyes"); y.disabled = true; y.textContent = op === "resume" ? "Resuming…" : "Interrupting…";
+    try {
+      const r = await call(op, e.id); restamp();
+      d.close();
+      await load();
+      ui.sel = { id: e.id }; ui.flash = e.id; render(); setTimeout(() => (ui.flash = null), 1900);
+      toast(`${op === "resume" ? "Resumed" : "Interrupted"} <span class="mono">${short(e.id)}</span> → ${esc(r.status)}${op === "interrupt" && pending.length ? ` · ran ${pending.length} compensation${pending.length > 1 ? "s" : ""}` : ""}`);
+    } catch (err) { $("#cerr").textContent = `${err.error}: ${err.message}`; y.disabled = false; y.textContent = "Try again"; }
+  };
+}
+
+/* ---------- execute drawer ---------- */
+function keyOf(wf, p) { if (wf === "NightlyExport") return p.date && p.format ? `${p.date}:${p.format}` : null; const f = S.workflows.find((x) => x.name === wf).idempotencyKey.replace("payload.", ""); return p[f] ?? null; }
+function openDrawer(from) {
+  ui.exec = { wf: from ? from.workflow : ui.wf, payload: from ? structuredClone(from.payload) : {}, raw: false, discard: false, errs: {}, err: null, busy: false, rawText: "" };
+  if (!from) { const ex = S.workflows.find((w) => w.name === ui.exec.wf).payload.properties; Object.entries(ex).forEach(([k, s]) => { if (s.enum) ui.exec.payload[k] = s.enum[0]; }); }
+  renderDrawer();
+  setTimeout(() => $("#drawerHost input, #drawerHost textarea")?.focus(), 0);
+}
+function closeDrawer() { ui.exec = null; $("#drawerHost").innerHTML = ""; }
+function field(name, s, req, val, err) {
+  const id = "f_" + name, ty = s.enum ? "enum" : s.format || s.type;
+  let input;
+  if (s.enum) input = `<select class="inp" id="${id}" data-f="${name}">${req ? "" : '<option value="">—</option>'}${s.enum.map((o) => `<option ${o === val ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  else if (s.maxLength && s.maxLength > 80) input = `<textarea class="inp${err ? " bad" : ""}" id="${id}" data-f="${name}" rows="3" maxlength="${s.maxLength}" style="font-family:var(--sans)">${esc(val ?? "")}</textarea>`;
+  else input = `<input class="inp${err ? " bad" : ""}" id="${id}" data-f="${name}" type="${s.type === "integer" ? "number" : s.format === "email" ? "email" : s.format === "date" ? "date" : "text"}" ${s.type === "integer" ? `step="1" ${s.minimum != null ? `min="${s.minimum}"` : ""}` : ""} value="${esc(val ?? "")}" placeholder="${esc(s.examples?.[0] || "")}" autocomplete="off" spellcheck="false">`;
+  const hint = [s.pattern && `pattern ${s.pattern}`, s.minimum != null && `≥ ${s.minimum}`, s.maxLength && `max ${s.maxLength} chars`].filter(Boolean).join(" · ");
+  return `<div class="fld"><label for="${id}">${esc(name)}${req ? '<span class="req">*</span>' : ""}<span class="ty">${esc(ty)}</span></label>${input}${err ? `<div class="err">${esc(err)}</div>` : hint ? `<div class="ph">${esc(hint)}</div>` : ""}</div>`;
+}
+function validate(wf, p) {
+  const sc = S.workflows.find((w) => w.name === wf).payload, errs = {};
+  (sc.required || []).forEach((k) => { if (p[k] === undefined || p[k] === "") errs[k] = "Required"; });
+  Object.entries(sc.properties).forEach(([k, s]) => {
+    const v = p[k]; if (v === undefined || v === "" || errs[k]) return;
+    if (s.type === "integer" && !Number.isInteger(v)) errs[k] = "Must be an integer";
+    else if (s.type === "string" && typeof v !== "string") errs[k] = "Must be a string";
+    else if (s.minimum != null && v < s.minimum) errs[k] = `Must be ≥ ${s.minimum}`;
+    else if (s.pattern && !new RegExp(s.pattern).test(v)) errs[k] = `Doesn't match ${s.pattern}`;
+    else if (s.enum && !s.enum.includes(v)) errs[k] = `One of ${s.enum.join(", ")}`;
+    else if (s.format === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) errs[k] = "Must be an email";
+  });
+  return errs;
+}
+function readForm() {
+  const x = ui.exec, sc = S.workflows.find((w) => w.name === x.wf).payload, p = {};
+  if (x.raw) { try { return JSON.parse($("#rawjson").value); } catch (e) { throw { field: "_raw", message: "Invalid JSON: " + e.message }; } }
+  document.querySelectorAll("#drawerHost [data-f]").forEach((el) => { const k = el.dataset.f, s = sc.properties[k]; let v = el.value; if (v === "") return; if (s.type === "integer") v = Number(v); p[k] = v; });
+  return p;
+}
+function renderDrawer() {
+  const x = ui.exec; if (!x) return;
+  const w = S.workflows.find((y) => y.name === x.wf), sc = w.payload;
+  const rows = execs.filter((e) => e.workflow === x.wf);
+  const key = keyOf(x.wf, x.payload), hit = key != null && rows.find((e) => e.idempotencyKey === String(key));
+  const form = x.raw ? `<div class="fld"><label for="rawjson">payload <span class="ty">JSON</span></label><textarea class="inp${x.errs._raw ? " bad" : ""}" id="rawjson" rows="12">${esc(x.rawText)}</textarea>${x.errs._raw ? `<div class="err">${esc(x.errs._raw)}</div>` : ""}</div>`
+    : Object.entries(sc.properties).map(([k, s]) => field(k, s, (sc.required || []).includes(k), x.payload[k], x.errs[k])).join("");
+  $("#drawerHost").innerHTML = `<div class="scrim" data-dr="close"></div><section class="drawer" role="dialog" aria-modal="true" aria-label="Execute workflow">
+    <header><h2>Execute workflow</h2><span class="spacer"></span><button class="btn ghost" data-dr="close" aria-label="Close">${ico("close")}</button></header>
+    <div class="body">
+      <div class="fld"><label for="dwf">Workflow</label><select class="inp" id="dwf">${S.workflows.map((y) => `<option ${y.name === x.wf ? "selected" : ""}>${esc(y.name)}</option>`).join("")}</select><div class="hint">${esc(w.description)}</div></div>
+      <div class="row"><select class="inp" id="dpre" style="flex:1;min-width:0" ${rows.length ? "" : "disabled"}><option value="">${rows.length ? "Prefill payload from an execution…" : "No executions to prefill from"}</option>${rows.map((e) => `<option value="${e.id}">${short(e.id)} · ${esc(e.idempotencyKey)} · ${e.status}</option>`).join("")}</select>
+        <div class="seg" role="group" aria-label="Editor"><button data-dr="form" aria-pressed="${!x.raw}">Form</button><button data-dr="raw" aria-pressed="${x.raw}">JSON</button></div></div>
+      ${form}
+      <div class="keyprev${hit ? " hit" : ""}"><span class="dim">idempotencyKey</span> <span class="mono">${esc(w.idempotencyKey)}</span> → <span class="mono">${key != null && key !== "" ? esc(key) : "—"}</span>
+        ${hit ? `<div style="margin-top:4px;color:var(--defer)">Matches existing ${pill(hit, true)} <span class="mono">${short(hit.id)}</span> — Effect will return that execution instead of starting a new one.</div>` : ""}</div>
+      <label class="chk"><input type="checkbox" id="ddis" ${x.discard ? "checked" : ""}><span>Discard<small>Fire and forget: return the executionId immediately without awaiting the result.</small></span></label>
+      ${x.err ? `<div class="notice err" style="margin:12px 0 0">${esc(x.err)}</div>` : ""}
+    </div>
+    <footer><span class="dim" style="font-size:11.5px">Esc to close</span><span class="spacer"></span><button class="btn" data-dr="close">Cancel</button><button class="btn primary" data-dr="go" ${x.busy ? "disabled" : ""}>${ico("play")}${x.busy ? "Executing…" : "Execute"}</button></footer></section>`;
+}
+function syncDrawer() { const x = ui.exec; try { const p = readForm(); x.payload = p; if (x.raw) x.rawText = $("#rawjson").value; delete x.errs._raw; } catch (e) { x.errs._raw = e.message; } }
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-dr]"); if (!b || !ui.exec) return;
+  const x = ui.exec, a = b.dataset.dr;
+  if (a === "close") return closeDrawer();
+  if (a === "raw" && !x.raw) { syncDrawer(); x.raw = true; x.rawText = JSON.stringify(x.payload, null, 2); x.errs = {}; return renderDrawer(); }
+  if (a === "form" && x.raw) { syncDrawer(); if (x.errs._raw) return renderDrawer(); x.raw = false; return renderDrawer(); }
+  if (a === "go") {
+    let p; try { p = readForm(); } catch (e) { x.errs = { _raw: e.message }; return renderDrawer(); }
+    x.payload = p; if (x.raw) x.rawText = $("#rawjson").value;
+    x.errs = validate(x.wf, p);
+    if (Object.keys(x.errs).length) { if (x.raw) x.errs = { _raw: Object.entries(x.errs).map(([k, v]) => `${k}: ${v}`).join("; ") }; return renderDrawer(); }
+    x.busy = true; x.err = null; renderDrawer();
+    try {
+      const r = await call("execute", x.wf, p, { discard: x.discard }); restamp();
+      const wf = x.wf; closeDrawer();
+      await load();
+      const e = byId(r.executionId);
+      ui.notice = r.deduplicated
+        ? { kind: "dedup", html: `${ico("copy")}<span><b style="font-weight:500">Existing execution returned (same idempotencyKey)</b> — <a href="#" data-act="exec" data-id="${r.executionId}" class="mono">${short(r.executionId)}</a> · key <span class="mono">${esc(e?.idempotencyKey)}</span> · ${esc(e?.status)}. Nothing was re-run.</span>` }
+        : { kind: "new", html: `${ico("check")}<span>Started ${esc(wf)} <a href="#" data-act="exec" data-id="${r.executionId}" class="mono">${short(r.executionId)}</a>${r.discard ? " · discarded (not awaiting result)" : ""}</span>` };
+      goto(r.executionId);
+    } catch (err) { if (ui.exec) { x.busy = false; x.err = `${err.error}: ${err.message}`; renderDrawer(); } }
+  }
+});
+document.addEventListener("change", (ev) => {
+  if (!ui.exec) return;
+  const x = ui.exec;
+  if (ev.target.id === "dwf") { x.wf = ev.target.value; x.payload = {}; x.errs = {}; x.rawText = "{}"; Object.entries(S.workflows.find((w) => w.name === x.wf).payload.properties).forEach(([k, s]) => { if (s.enum) x.payload[k] = s.enum[0]; }); if (x.raw) x.rawText = JSON.stringify(x.payload, null, 2); renderDrawer(); }
+  else if (ev.target.id === "dpre" && ev.target.value) { x.payload = structuredClone(byId(ev.target.value).payload); x.rawText = JSON.stringify(x.payload, null, 2); x.errs = {}; renderDrawer(); }
+  else if (ev.target.id === "ddis") x.discard = ev.target.checked;
+  else if (ev.target.dataset.f) { syncDrawer(); delete x.errs[ev.target.dataset.f]; const f = document.activeElement?.id; renderDrawer(); f && document.getElementById(f)?.focus(); }
+});
+document.addEventListener("input", (ev) => { if (ui.exec && ev.target.id === "rawjson") { syncDrawer(); const kp = $("#drawerHost .keyprev"); if (kp && !ui.exec.errs._raw) { const pos = ev.target.selectionStart; renderDrawer(); const ta = $("#rawjson"); ta.focus(); ta.setSelectionRange(pos, pos); } } });
+
+render();
+load();
+</script>
+</body>
+</html>

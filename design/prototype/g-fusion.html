@@ -1,0 +1,2271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>kymo · fusion</title>
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-sunk: oklch(0.135 0.004 75);
+  --bg: oklch(0.158 0.005 75);
+  --panel: oklch(0.172 0.005 75);
+  --raised: oklch(0.205 0.006 75);
+  --hover: oklch(0.212 0.006 75);
+  --sel: oklch(0.238 0.007 75);
+  --line-soft: oklch(0.225 0.006 75);
+  --line: oklch(0.285 0.007 75);
+  --line-strong: oklch(0.36 0.008 75);
+  --fg: oklch(0.945 0.012 85);
+  --fg-2: oklch(0.80 0.010 80);
+  --fg-3: oklch(0.645 0.010 80);
+  --fg-4: oklch(0.47 0.008 80);
+  --run: oklch(0.80 0.115 215);
+  --sus: oklch(0.84 0.135 82);
+  --ok: oklch(0.80 0.13 152);
+  --fail: oklch(0.71 0.17 28);
+  --intr: oklch(0.76 0.075 305);
+  --num: oklch(0.83 0.065 245);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t1: 140ms; --t2: 220ms; --t3: 340ms;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --clock: oklch(0.80 0.10 185);
+  --comp: oklch(0.78 0.11 330);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark;-webkit-text-size-adjust:100%;background:var(--bg-sunk)}
+body{
+  height:100vh;height:100dvh;overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(0,1fr);
+  background:var(--bg);color:var(--fg);
+  font:400 13px/1.45 var(--sans);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums;
+}
+button,input,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;text-align:inherit}
+a{color:inherit}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.005em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px;border-radius:6px}
+::selection{background:oklch(0.94 0.012 85 / .22)}
+kbd{
+  font:500 10.5px/1 var(--mono);color:var(--fg-3);
+  display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;
+  border-radius:5px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line), 0 1px 0 var(--line-soft);
+}
+.g{width:14px;height:14px;flex:none;display:block}
+.s-running{color:var(--run)} .s-suspended{color:var(--sus)} .s-succeeded{color:var(--ok)} .s-failed{color:var(--fail)} .s-interrupted{color:var(--intr)}
+.sg{position:relative;display:inline-grid;place-items:center;width:16px;height:16px;flex:none}
+.sg.s-running::after{
+  content:"";position:absolute;inset:1px;border-radius:50%;border:1px solid currentColor;
+  animation:ping 1.8s var(--ease) infinite;
+}
+@keyframes ping{0%{transform:scale(.45);opacity:.9}70%,100%{transform:scale(1.15);opacity:0}}
+
+/* ───────── header ───────── */
+.top{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:18px;
+  min-height:44px;padding:0 10px 0 16px;background:var(--bg-sunk);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand svg{width:44px;height:16px;color:var(--fg-3)}
+.brand .tip{transform-box:fill-box;transform-origin:center;animation:stylus 2.4s var(--ease) infinite}
+@keyframes stylus{0%,100%{opacity:1}50%{opacity:.25}}
+.wordmark{font:600 15px/1 var(--mono);letter-spacing:-0.04em}
+.server{display:flex;align-items:center;gap:10px;min-width:0;font:400 11.5px/1 var(--mono);color:var(--fg-3);white-space:nowrap;overflow:hidden}
+.server .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in oklch, var(--ok) 18%, transparent);flex:none}
+.server.down .dot{background:var(--fail);box-shadow:0 0 0 3px color-mix(in oklch, var(--fail) 22%, transparent)}
+.server.down .app{color:var(--fail)}
+.server.wait .dot{background:var(--fg-4);box-shadow:none}
+.server .app{color:var(--fg-2);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server .sep{color:var(--fg-4)}
+.top-r{display:flex;align-items:center;gap:4px}
+.ghost-btn{
+  height:28px;padding:0 9px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;
+  color:var(--fg-3);font:500 12px/1 var(--sans);
+  transition-property:background-color,color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.ghost-btn:hover{background:var(--hover);color:var(--fg)}
+.ghost-btn:active{transform:scale(.96)}
+.ghost-btn[aria-expanded="true"]{background:var(--sel);color:var(--fg)}
+.states{
+  grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 0 10px;
+  font:400 11.5px/1 var(--mono);
+}
+.states[hidden]{display:none}
+.states .lbl{color:var(--fg-3);margin-right:4px;font-family:var(--sans);font-size:12px}
+.states a,.states button{
+  height:24px;padding:0 9px;border-radius:6px;display:inline-flex;align-items:center;
+  color:var(--fg-2);text-decoration:none;box-shadow:inset 0 0 0 1px var(--line-soft);
+  transition-property:background-color,color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.states a:hover,.states button:hover{background:var(--hover);color:var(--fg)}
+.states a[aria-current="true"]{background:var(--fg);color:var(--bg);box-shadow:none}
+.states button[aria-pressed="true"]{color:var(--fail);box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 50%, transparent)}
+.states .note{color:var(--fg-4);margin-left:auto}
+
+/* ───────── panes ───────── */
+main{display:grid;grid-template-columns:272px minmax(360px,416px) minmax(0,1fr);min-height:0;position:relative}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line-soft)}
+.pane:last-child{border-right:0}
+.pane-wf{background:var(--bg-sunk)}
+.pane-list{background:var(--bg)}
+.pane-detail{background:var(--panel)}
+.pane-head{
+  flex:none;height:40px;display:flex;align-items:center;gap:8px;padding:0 14px 0 16px;
+  border-bottom:1px solid var(--line-soft);
+}
+.pane-title{font:500 12px/1 var(--sans);color:var(--fg-3);letter-spacing:.01em;transition:color var(--t1) var(--ease)}
+.pane.active .pane-title{color:var(--fg)}
+.pane-count{font:400 11.5px/1 var(--mono);color:var(--fg-4)}
+.pane-head .sp{flex:1}
+.pane-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.back{display:none}
+
+/* workflows */
+.wf-list{padding:6px 0}
+.wf{
+  position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;align-items:center;
+  width:calc(100% - 12px);margin:1px 6px;padding:10px 10px 10px 12px;border-radius:9px;
+  transition-property:background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.wf:hover{background:var(--hover)}
+.wf[aria-selected="true"]{background:var(--sel)}
+.wf:focus-visible{outline-offset:-2px}
+.wf-name{font:500 13px/1.2 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wf-all .wf-name{color:var(--fg-2)}
+.wf-total{font:400 11.5px/1 var(--mono);color:var(--fg-3)}
+.trace{grid-column:1/-1;display:flex;gap:2px;height:3px}
+.trace i{display:block;height:100%;border-radius:2px;background:currentColor;min-width:3px}
+.trace.zero{background:repeating-linear-gradient(90deg,var(--line) 0 4px,transparent 4px 8px);border-radius:2px}
+.wf-counts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 11px;font:400 11px/1 var(--mono);color:var(--fg-3)}
+.wf-counts span{display:inline-flex;align-items:center;gap:4px}
+.wf-counts .g{width:11px;height:11px}
+.wf-counts .z{color:var(--fg-4)}
+.wf-x{
+  position:absolute;right:8px;top:7px;height:24px;padding:0 8px;border-radius:6px;
+  display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1 var(--sans);color:var(--fg-2);
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line);opacity:0;
+  transition-property:opacity,background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.wf:hover .wf-x,.wf[aria-selected="true"] .wf-x,.wf-x:focus-visible,.wf:focus-visible .wf-x{opacity:1}
+.wf-x:hover{background:var(--hover);color:var(--fg)}
+.wf-x:active{transform:scale(.96)}
+.wf:hover .wf-total,.wf[aria-selected="true"] .wf-total{opacity:0}
+.wf-all .wf-x{display:none}
+.wf-all.wf:hover .wf-total,.wf-all[aria-selected="true"] .wf-total{opacity:1}
+.tiles{display:none}
+.engine{margin:14px 16px 18px;padding-top:14px;border-top:1px solid var(--line-soft);font:400 11px/1.65 var(--mono);color:var(--fg-3)}
+.engine b{font-weight:500;color:var(--fg-2)}
+.engine .k{color:var(--fg-4)}
+
+/* executions list */
+.tools{flex:none;padding:10px 12px 10px 14px;border-bottom:1px solid var(--line-soft);display:grid;gap:9px}
+.search{position:relative;display:flex;align-items:center}
+.search input{
+  width:100%;height:30px;border-radius:7px;padding:0 34px 0 11px;border:0;
+  background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);
+  font:400 12.5px/1 var(--mono);
+  transition-property:box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.search input::placeholder{color:var(--fg-4)}
+.search input:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--fg-3), 0 0 0 3px oklch(0.94 0.012 85 / .08)}
+.search .lead{position:absolute;left:10px;color:var(--fg-4);font:400 12px/1 var(--mono);pointer-events:none}
+.search kbd{position:absolute;right:7px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{
+  flex:none;height:24px;padding:0 7px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;
+  font:400 11.5px/1 var(--mono);color:var(--fg-3);
+  transition-property:background-color,color,box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.chip .g{width:11px;height:11px}
+.chip b{font-weight:400;color:var(--fg-4)}
+.chip:hover{background:var(--hover);color:var(--fg)}
+.chip:active{transform:scale(.96)}
+.chip[aria-pressed="true"]{background:var(--sel);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.chip[aria-pressed="true"] b{color:var(--fg-3)}
+.ex{
+  position:relative;display:grid;grid-template-columns:16px minmax(0,1fr) auto;column-gap:10px;row-gap:3px;align-items:center;
+  width:100%;padding:10px 14px 11px 14px;border-bottom:1px solid var(--line-soft);
+  transition-property:background-color;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.ex:hover{background:var(--hover)}
+.ex[aria-selected="true"]{background:var(--sel)}
+.ex[aria-selected="true"]::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:0 2px 2px 0;background:var(--fg)}
+.ex:focus-visible{outline-offset:-2px;border-radius:0}
+.ex .sg{grid-row:1/3}
+.ex-t{font:400 11px/1 var(--mono);color:var(--fg-3);white-space:nowrap}
+.ex-sub{grid-column:2/4;display:flex;align-items:center;gap:8px;min-width:0;font:400 12px/1.2 var(--sans);color:var(--fg-2)}
+.tag{
+  flex:none;display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;
+  font:500 10.5px/1 var(--mono);color:currentColor;background:color-mix(in oklch, currentColor 12%, transparent);
+}
+.ex-sub .tag{color:var(--sus)}
+.ex.pending .sg{animation:breathe 1s var(--ease) infinite alternate}
+@keyframes breathe{from{opacity:1}to{opacity:.3}}
+.ex.enter{animation:rowIn var(--t3) var(--ease) both}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.ex.flash::after{content:"";position:absolute;inset:0;background:var(--fg);opacity:0;pointer-events:none;animation:flash 700ms var(--ease)}
+@keyframes flash{0%{opacity:.09}100%{opacity:0}}
+.ex{--px:14px}
+.ex-l{grid-column:2;min-width:0;font:500 13px/1.3 var(--sans);color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-l.nolabel{font:400 12.5px/1.3 var(--mono);color:var(--fg-2)}
+.ex-sub .wfn,.ex-sub .sid{flex:none}
+.ex-sub .sid{font:400 11px/1.2 var(--mono);color:var(--fg-4)}
+.ex-sub .par{display:inline-flex;align-items:center;gap:4px;min-width:0;font:400 11px/1.2 var(--mono);color:var(--fg-3);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ex-sub .par .g{width:12px;height:12px;flex:none}
+.ex.kid{padding-left:calc(var(--px) + var(--d) * 26px)}
+.ex .cn{position:absolute;left:calc(var(--px) + 7.5px + var(--l) * 26px);width:0;border-left:1px solid var(--line-strong);pointer-events:none}
+.ex .cn.vt{top:-1px;bottom:-1px}
+.ex .cn.el{top:-1px;height:calc(50% + 1px);width:15px;border-bottom:1px solid var(--line-strong);border-bottom-left-radius:6px}
+.ex .cn.dn{top:calc(50% + 11px);bottom:-1px}
+
+/* empty / blank states */
+.blank{padding:44px 24px;display:grid;gap:12px;justify-items:start;max-width:420px}
+.blank .big{font:500 15px/1.35 var(--sans);color:var(--fg);text-wrap:balance}
+.blank p{color:var(--fg-3);font-size:12.5px;line-height:1.55;text-wrap:pretty}
+.blank .cli{margin-top:2px}
+.blank .row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* skeleton */
+.sk{position:relative;overflow:hidden;background:var(--raised);border-radius:4px;display:block}
+.sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,oklch(1 0 0 / .045),transparent);animation:shim 1.3s var(--ease) infinite}
+@keyframes shim{to{transform:translateX(100%)}}
+.sk-row{display:grid;grid-template-columns:16px 1fr 44px;gap:8px 10px;padding:13px 14px;border-bottom:1px solid var(--line-soft)}
+.sk-row .sk:nth-child(1){width:12px;height:12px;border-radius:50%;grid-row:1/3;align-self:center}
+.sk-row .sk:nth-child(2){height:10px;width:62%}
+.sk-row .sk:nth-child(3){height:10px}
+.sk-row .sk:nth-child(4){grid-column:2/4;height:8px;width:44%}
+
+/* ───────── detail ───────── */
+.detail{padding:26px 36px 56px;max-width:940px}
+.crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:400 12.5px/1.3 var(--sans);color:var(--fg-3)}
+.crumb .wfname{color:var(--fg-2);font-weight:500}
+.crumb .anc{display:inline-flex;align-items:baseline;gap:6px;padding:2px 5px;margin:-2px -5px;border-radius:5px;color:var(--fg-3);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.crumb .anc:hover{background:var(--hover);color:var(--fg)}
+.crumb .anc .m{font-size:11.5px;color:var(--fg-4)}
+.crumb .chev{color:var(--fg-4)}
+.d-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px 24px;flex-wrap:wrap;margin-top:12px}
+.d-label{font:500 21px/1.25 var(--sans);letter-spacing:-0.018em;text-wrap:balance;overflow-wrap:anywhere}
+.d-label.nolabel{font-family:var(--mono);letter-spacing:-0.03em;color:var(--fg-2)}
+.d-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;
+  font:500 12px/1 var(--mono);color:currentColor;
+  background:color-mix(in oklch, currentColor 11%, transparent);box-shadow:inset 0 0 0 1px color-mix(in oklch, currentColor 30%, transparent);
+}
+.badge .why{color:var(--fg-2);font-weight:400}
+.badge.bump{animation:bump var(--t3) var(--ease)}
+@keyframes bump{0%{transform:scale(.96);opacity:.4}100%{transform:none;opacity:1}}
+.since{font:400 12px/1 var(--mono);color:var(--fg-3)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{
+  height:32px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font:500 12.5px/1 var(--sans);color:var(--fg);white-space:nowrap;
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line), 0 1px 0 oklch(0 0 0 / .25);
+  transition-property:background-color,box-shadow,color,opacity;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.btn:hover{background:var(--hover);box-shadow:inset 0 0 0 1px var(--line-strong), 0 1px 0 oklch(0 0 0 / .25)}
+.btn:active{transform:scale(.96)}
+.btn[disabled]{opacity:.55;cursor:default;transform:none}
+.btn kbd{background:transparent;box-shadow:inset 0 0 0 1px currentColor;color:inherit;opacity:.45}
+.btn-primary{background:var(--fg);color:var(--bg);box-shadow:0 1px 0 oklch(0 0 0 / .3)}
+.btn-primary:hover{background:oklch(1 0 0);box-shadow:0 1px 0 oklch(0 0 0 / .3)}
+.btn-danger{color:var(--fail);box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 40%, transparent)}
+.btn-danger:hover{background:color-mix(in oklch, var(--fail) 10%, var(--raised));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 60%, transparent)}
+.btn-danger.solid{background:var(--fail);color:oklch(0.16 0.02 28);box-shadow:none}
+.btn-danger.solid:hover{background:oklch(0.76 0.17 28)}
+.spin{width:12px;height:12px;border-radius:50%;border:1.5px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(1turn)}}
+.note{margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--fg-2);font-size:12.5px;line-height:1.55;text-wrap:pretty}
+.note b{color:var(--fg);font-weight:500}
+.note code{font:400 11.5px/1 var(--mono);color:var(--fg)}
+.meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 20px;margin-top:22px;padding:14px 0 2px;border-top:1px solid var(--line-soft)}
+.meta dt{font:400 11.5px/1.2 var(--sans);color:var(--fg-3);margin-bottom:5px}
+.meta dd{font:400 12.5px/1.35 var(--mono);color:var(--fg);overflow-wrap:anywhere}
+.meta dd .sub{display:block;color:var(--fg-3);font-size:11.5px}
+.sec{display:grid;grid-template-columns:116px minmax(0,1fr);gap:8px 24px;padding:22px 0;border-top:1px solid var(--line-soft)}
+.sec:first-of-type{margin-top:20px}
+.sec-h{font:500 12.5px/1.3 var(--sans);color:var(--fg-2)}
+.sec-h small{display:block;margin-top:3px;font:400 11.5px/1.3 var(--mono);color:var(--fg-4)}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 18px;font:400 12.5px/1.45 var(--mono)}
+.kv dt{color:var(--fg-3)}
+.kv dd{color:var(--fg);overflow-wrap:anywhere}
+.v-s{color:var(--fg)} .v-n{color:var(--num)} .v-b{color:var(--num)} .v-null{color:var(--fg-4)}
+.v-k{color:var(--fg-3)}
+
+/* execution: header, trace (tree + waterfall), span inspector */
+#detailBody:has(> .xd){overflow:hidden}
+.xd{display:flex;flex-direction:column;height:100%;min-height:0}
+.xd-h{flex:none;padding:18px 24px 16px;border-bottom:1px solid var(--line-soft)}
+.xd .d-head{margin-top:10px;align-items:center}
+.xd .d-label{font-size:19px}
+.xd .d-status{margin-top:8px}
+.xd-h .note,.xd-h .alert,.xd-h .confirm{margin-top:12px}
+.xd-trace{flex:0 1 auto;max-height:56%;min-height:96px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent;background:var(--bg);container-type:inline-size}
+.xd-trace.sized{flex:none;max-height:none}
+.xd-split{flex:none;height:9px;margin:-4px 0;position:relative;z-index:4;cursor:row-resize;touch-action:none}
+.xd-split::after{content:"";position:absolute;left:0;right:0;top:4px;height:1px;background:var(--line);transition:background-color var(--t1) var(--ease),transform var(--t1) var(--ease)}
+.xd-split:hover::after,.xd-split.drag::after{background:var(--fg-3);transform:scaleY(2)}
+.tv{--treew:clamp(200px,40cqw,300px);position:relative;width:calc(var(--treew) + (100cqw - var(--treew)) * var(--z,1));min-width:460px;outline:none}
+.trh{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:var(--treew) minmax(0,1fr);height:28px;background:var(--bg-sunk);border-bottom:1px solid var(--line-soft);font:400 10.5px/1 var(--mono);color:var(--fg-4)}
+.trh-l{position:sticky;left:0;z-index:1;display:flex;align-items:center;gap:8px;padding:0 8px 0 14px;border-right:1px solid var(--line-soft);background:var(--bg-sunk);font:500 11.5px/1 var(--sans);color:var(--fg-3)}
+.trh-l .m{font-size:10.5px;font-weight:400;color:var(--fg-4)}
+.ruler{position:relative;overflow:hidden}
+.tick{position:absolute;top:0;bottom:0;padding:9px 0 0 4px;border-left:1px solid var(--line-soft);white-space:nowrap}
+.tick.now{border-left:1px dashed var(--fg-3);color:var(--fg-2)}
+.tick.now.flip{transform:translateX(-100%);border-left:0;border-right:1px dashed var(--fg-3);padding:9px 4px 0 0}
+.trb{position:relative;padding:4px 0 8px}
+.trb .grid{position:absolute;top:0;bottom:0;left:var(--treew);right:0;pointer-events:none}
+.trb .grid i{position:absolute;top:0;bottom:0;border-left:1px solid oklch(1 0 0 / .035)}
+.trb .grid i.now{border-left:1px dashed color-mix(in oklch, var(--fg-3) 55%, transparent)}
+.tr{display:grid;grid-template-columns:var(--treew) minmax(0,1fr);height:28px;position:relative;cursor:pointer;transition:background-color var(--t1) var(--ease)}
+.tr:hover{--rt:oklch(1 0 0 / .028);background:var(--rt)}
+.tr[aria-selected="true"]{--rt:var(--sel);background:var(--rt)}
+.tr[aria-selected="true"] .tlab{box-shadow:inset 2px 0 0 var(--fg)}
+.tv:focus-visible{outline:0}
+.tv:focus-visible .tr[aria-selected="true"]{box-shadow:inset 0 0 0 1px var(--line-strong)}
+.tlab{position:sticky;left:0;z-index:1;display:flex;align-items:center;gap:6px;min-width:0;padding:0 10px 0 calc(8px + var(--d, 0) * 16px);border-right:1px solid var(--line-soft);background:linear-gradient(var(--rt,transparent),var(--rt,transparent)),var(--bg)}
+.tlab .nm{font:500 12.5px/1 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:24px}
+.tr[data-t="att"] .nm{font:400 12px/1 var(--mono);color:var(--fg-2)}
+.tr[data-t="exec"] .nm{font-weight:600}
+.tlab .ty{font:400 10.5px/1 var(--mono);color:var(--fg-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 100 auto;min-width:0}
+.tlab .du{margin-left:auto;padding-left:6px;font:400 11px/1 var(--mono);color:var(--fg-3);white-space:nowrap}
+.ic{display:grid;place-items:center;width:16px;height:16px;flex:none}
+.ic.c-def,.ic.c-clock,.ic.c-comp{color:var(--c)}
+.tog{display:grid;place-items:center;width:16px;height:16px;flex:none;border-radius:4px;color:var(--fg-4);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.tog:hover{background:var(--line);color:var(--fg)}
+.tog .g{width:12px;height:12px;transform:rotate(90deg);transition:transform var(--t2) var(--ease)}
+.tog[aria-expanded="true"] .g{transform:rotate(180deg)}
+.tog.none{visibility:hidden}
+.wfc{position:relative;overflow:hidden}
+.tv .bar{position:absolute;top:9px;height:10px;min-width:2px;border-radius:2px;background:var(--c)}
+.tv .bar.thin{top:12px;height:4px;opacity:.7}
+.tv .bar.wait{background:repeating-linear-gradient(135deg,color-mix(in oklch, var(--c) 75%, transparent) 0 4px,color-mix(in oklch, var(--c) 26%, transparent) 4px 8px)}
+.tv .bar.future{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 70%, transparent)}
+.tv .bar.pt{width:9px;height:9px;min-width:0;border-radius:1px;transform:translateX(-4px) rotate(45deg)}
+.tv .bar.live::after{content:"";position:absolute;right:-3px;top:-1px;width:6px;height:12px;border-radius:3px;background:var(--c);animation:breathe .9s var(--ease) infinite alternate}
+.blab{position:absolute;top:7px;font:400 10.5px/14px var(--mono);color:var(--fg-3);white-space:nowrap}
+.c-running{--c:var(--run)} .c-suspended,.c-waiting,.c-def{--c:var(--sus)} .c-succeeded,.c-done{--c:var(--ok)} .c-failed{--c:var(--fail)} .c-interrupted,.c-abandoned{--c:var(--intr)} .c-clock{--c:var(--clock)} .c-comp{--c:var(--comp)}
+.tv .lgm{position:absolute;top:2px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--sus);box-shadow:0 0 0 1.5px var(--bg);pointer-events:none}
+.tv .lgm.lv-Error,.tv .lgm.lv-Fatal{background:var(--fail)}
+.zm{margin-left:auto;display:inline-flex;align-items:center;gap:1px;padding:1px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--line-soft)}
+.zm button{min-width:20px;height:18px;padding:0 5px;border-radius:5px;font:400 10.5px/1 var(--mono);color:var(--fg-3);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.zm button:hover:not([disabled]){background:var(--line);color:var(--fg)}
+.zm button[disabled]{opacity:.4;cursor:default}
+.insp{flex:1 1 0;min-height:140px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent;background:var(--panel)}
+.ih{position:sticky;top:0;z-index:2;background:var(--panel);padding:14px 24px 0;border-bottom:1px solid var(--line-soft)}
+.ih-t{display:flex;align-items:center;gap:8px;min-width:0}
+.ih-t .n{font:500 14px/1.3 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ih-t .k{font:400 11px/1 var(--mono);color:var(--fg-3);white-space:nowrap}
+.tabs{display:flex;gap:18px;margin-top:8px}
+.tabs button{padding:6px 0 9px;margin-bottom:-1px;font:500 12.5px/1 var(--sans);color:var(--fg-3);border-bottom:2px solid transparent;transition:color var(--t1) var(--ease),border-color var(--t1) var(--ease)}
+.tabs button:hover{color:var(--fg-2)}
+.tabs button[aria-selected="true"]{color:var(--fg);border-color:var(--fg)}
+.tabs .c{font:400 11px/1 var(--mono);color:var(--fg-4);margin-left:5px}
+.tabs .c.err{color:var(--fail)}
+.ib{padding:16px 24px 28px;max-width:780px;animation:fadeIn var(--t2) var(--ease) both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.ib .kv{gap:7px 22px}
+.ib .note{margin-top:14px}
+.lnk-id{font:400 12.5px/1.3 var(--mono);color:var(--fg);text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px;transition:text-decoration-color var(--t1) var(--ease)}
+.lnk-id:hover{text-decoration-color:var(--fg)}
+.lnk-id span{color:var(--fg-3);font-family:var(--sans)}
+.atts{margin-top:18px;display:grid;gap:2px}
+.atts-h{font:400 11.5px/1 var(--sans);color:var(--fg-3);margin-bottom:6px}
+.atts button{display:grid;grid-template-columns:16px 76px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 8px;border-radius:7px;font:400 12px/1.2 var(--mono);color:var(--fg-2);transition:background-color var(--t1) var(--ease)}
+.atts button:hover{background:var(--hover);color:var(--fg)}
+.atts button[aria-current="true"]{background:var(--sel);color:var(--fg)}
+.atts .x{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atts .d{color:var(--fg-3)}
+.lgf{display:flex;gap:4px;margin-bottom:12px}
+.lgf button{height:24px;padding:0 9px;border-radius:6px;font:400 11.5px/1 var(--mono);color:var(--fg-3);box-shadow:inset 0 0 0 1px var(--line-soft);transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease)}
+.lgf button:hover{color:var(--fg)}
+.lgf button b{font-weight:400;color:var(--fg-4);margin-left:3px}
+.lgf button[aria-pressed="true"]{background:var(--sel);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.logs{font:400 12px/1.5 var(--mono)}
+.lg{display:grid;grid-template-columns:90px 42px minmax(0,1fr);column-gap:12px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line-soft);align-items:baseline}
+.logs.src .lg{grid-template-columns:90px 42px minmax(0,140px) minmax(0,1fr)}
+.lg time{color:var(--fg-4)}
+.lg .lvl{font-size:10.5px;color:var(--fg-4);letter-spacing:.02em}
+.lg.lv-Info .lvl{color:var(--fg-3)}
+.lg.lv-Warning .lvl{color:var(--sus)}
+.lg.lv-Error .lvl,.lg.lv-Fatal .lvl{color:var(--fail)}
+.lg.lv-Error,.lg.lv-Fatal{background:color-mix(in oklch, var(--fail) 6%, transparent)}
+.lg .msg{min-width:0;color:var(--fg-2);overflow-wrap:anywhere}
+.lg.lv-Debug .msg{color:var(--fg-3)}
+.lg.lv-Warning .msg,.lg.lv-Error .msg,.lg.lv-Fatal .msg{color:var(--fg)}
+.lg-ann{display:flex;flex-wrap:wrap;gap:1px 12px;margin-top:2px;font-size:11px;color:var(--fg-3)}
+.lg-ann i{font-style:normal;color:var(--fg-4)}
+.lg-src{justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;color:var(--fg-2);text-align:left;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
+.lg-src:hover{text-decoration-color:var(--fg)}
+.lg-src span{color:var(--fg-4);margin-left:4px}
+.lg-att{display:flex;align-items:center;gap:6px;margin:14px 0 4px;font:400 11.5px/1 var(--sans);color:var(--fg-3)}
+.lg-att:first-child{margin-top:0}
+.lg-empty{color:var(--fg-3);font-size:12.5px;line-height:1.55}
+.open-child{margin-top:16px}
+.tree{font:400 12.5px/1.75 var(--mono);color:var(--fg);overflow-x:auto}
+.tree .tl{white-space:pre}
+.tree .br{color:var(--fg-4)}
+.tree .tg{font-weight:500}
+.tree .root{color:var(--fg-2)}
+.tree pre{font:400 11.5px/1.6 var(--mono);color:var(--fg-3);white-space:pre;margin:2px 0 0}
+.verdict{font:500 17px/1.3 var(--sans);letter-spacing:-0.01em;margin-bottom:10px;text-wrap:balance}
+.verdict .m{font-weight:500}
+.verdict + p{color:var(--fg-3);font-size:12.5px;line-height:1.55;margin:-4px 0 12px;max-width:60ch;text-wrap:pretty}
+.comp{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-soft)}
+.comp:last-child{border-bottom:0}
+.comp .n{font:500 12.5px/1.3 var(--sans)}
+.comp .n .for{font:400 11.5px/1 var(--mono);color:var(--fg-3);margin-left:6px}
+.comp .st{font:400 11.5px/1 var(--mono);color:var(--fg-3);text-align:right}
+.comp .st.ran{color:var(--ok)}
+.comp .ex2{grid-column:2/-1;font:400 11.5px/1.3 var(--mono);color:var(--fg-4)}
+.muted{color:var(--fg-3);font-size:12.5px}
+
+/* alerts & notices */
+.alert{
+  margin-top:16px;padding:12px 14px;border-radius:10px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:start;
+  background:color-mix(in oklch, var(--fail) 7%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 35%, transparent);
+  animation:rowIn var(--t2) var(--ease) both;
+}
+.alert .code{font:500 12.5px/1.3 var(--mono);color:var(--fail)}
+.alert .msg{grid-column:1;font:400 12.5px/1.5 var(--sans);color:var(--fg-2);text-wrap:pretty}
+.alert .msg code{font:400 11.5px/1 var(--mono);color:var(--fg)}
+.alert .acts{grid-row:1/3;grid-column:2;display:flex;gap:6px}
+.alert.info{background:color-mix(in oklch, var(--ok) 6%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--ok) 30%, transparent)}
+.alert.info .code{color:var(--ok)}
+.alert.dedup{background:color-mix(in oklch, var(--sus) 6%, var(--panel));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--sus) 35%, transparent)}
+.alert.dedup .code{color:var(--sus)}
+.confirm{
+  margin-top:18px;border-radius:12px;padding:16px 18px;background:var(--bg);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 40%, transparent), 0 12px 32px oklch(0 0 0 / .35);
+  animation:rowIn var(--t2) var(--ease) both;
+}
+.confirm h3{font:500 15px/1.35 var(--sans);text-wrap:balance}
+.confirm h3 .m{font-weight:500}
+.confirm > p{color:var(--fg-3);font-size:12.5px;margin-top:4px}
+.confirm .lst{margin-top:14px;display:grid;gap:6px}
+.confirm .lst-h{font:400 11.5px/1.3 var(--sans);color:var(--fg-3)}
+.confirm ol,.confirm ul{list-style:none;display:grid;gap:2px}
+.confirm li{display:grid;grid-template-columns:22px 16px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;background:var(--panel);font:400 12.5px/1.3 var(--sans)}
+.confirm li .i{font:400 11px/1 var(--mono);color:var(--fg-4);text-align:right}
+.confirm li .r{font:400 11.5px/1 var(--mono);color:var(--fg-3)}
+.confirm li .m{font-size:12px}
+.confirm .none{font-size:12.5px;color:var(--fg-3);padding:6px 0}
+.confirm .foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
+
+/* not found / down */
+.void{padding:56px 36px;max-width:620px}
+.void .code{font:500 12px/1 var(--mono);color:var(--fail);letter-spacing:.02em}
+.void h2{font:500 30px/1.12 var(--sans);letter-spacing:-0.03em;margin-top:14px;text-wrap:balance}
+.void h2 .m{font-weight:500;letter-spacing:-0.04em}
+.void p{color:var(--fg-3);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:56ch;text-wrap:pretty}
+.void p code{font:400 12.5px/1 var(--mono);color:var(--fg)}
+.void .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:22px}
+.void .near{margin-top:26px;display:grid;gap:4px}
+.void .near .h{font:400 11.5px/1 var(--sans);color:var(--fg-3);margin-bottom:6px}
+.near-i{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font:400 12.5px/1 var(--mono);color:var(--fg-2);transition:background-color var(--t1) var(--ease)}
+.near-i:hover{background:var(--hover);color:var(--fg)}
+.near-i .w{font-family:var(--sans);color:var(--fg-3)}
+.down{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:48px;align-content:center;padding:40px clamp(28px,6vw,96px);background:var(--bg)}
+.down[hidden]{display:none}
+.down .void{padding:0}
+.down h2{font-size:44px}
+.down .steps{align-self:center;padding:20px 22px;border-radius:14px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);font:400 12px/1.75 var(--mono);color:var(--fg-3)}
+.down .steps b{color:var(--fg);font-weight:500}
+.down .steps .c{color:var(--fg-4)}
+.down .steps .e{color:var(--fail)}
+main.is-down > .pane{display:none}
+
+/* execute form */
+.xf{display:grid;gap:18px;margin-top:22px}
+.f{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 20px;align-items:start}
+.f-l{padding-top:8px;font:500 12.5px/1.3 var(--mono);color:var(--fg)}
+.f-l .rq{display:block;margin-top:4px;font:400 11px/1 var(--sans);color:var(--fg-3)}
+.f-l .rq.req{color:var(--fg-2)}
+.f-l .rq.req::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--fg);margin-right:5px;vertical-align:1px}
+.f-c{display:grid;gap:6px;min-width:0}
+.in{
+  width:100%;height:34px;padding:0 11px;border-radius:8px;border:0;
+  background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line);
+  font:400 13px/1 var(--mono);color:var(--fg);
+  transition-property:box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+textarea.in{height:auto;min-height:68px;padding:9px 11px;line-height:1.5;resize:vertical;font-size:12.5px}
+.in::placeholder{color:var(--fg-4)}
+.in:hover{box-shadow:inset 0 0 0 1px var(--line-strong)}
+.in:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--fg-3), 0 0 0 3px oklch(0.94 0.012 85 / .09);border-radius:8px}
+.in[aria-invalid="true"]{box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 70%, transparent)}
+.in[aria-invalid="true"]:focus-visible{box-shadow:inset 0 0 0 1px var(--fail), 0 0 0 3px color-mix(in oklch, var(--fail) 18%, transparent)}
+.f-h{display:flex;gap:10px;justify-content:space-between;font:400 11.5px/1.35 var(--mono);color:var(--fg-4);min-height:15px}
+.f-h .err{color:var(--fail);font-family:var(--sans)}
+.f-h .okm{color:var(--ok)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line);justify-self:start;max-width:100%;overflow-x:auto}
+.seg button{
+  height:28px;padding:0 12px;border-radius:7px;font:400 12.5px/1 var(--mono);color:var(--fg-3);white-space:nowrap;
+  transition-property:background-color,color,box-shadow;transition-duration:var(--t1);transition-timing-function:var(--ease);
+}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-checked="true"]{background:var(--raised);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line-strong), 0 1px 2px oklch(0 0 0 / .4)}
+.seg button:focus-visible{outline-offset:-2px}
+.seg.invalid{box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--fail) 70%, transparent)}
+.keycard{
+  border-radius:12px;padding:14px 16px;display:grid;gap:6px;background:var(--bg);
+  box-shadow:inset 0 0 0 1px var(--line-soft);
+  transition-property:box-shadow,background-color;transition-duration:var(--t2);transition-timing-function:var(--ease);
+}
+.keycard .k1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font:400 12px/1.4 var(--mono);color:var(--fg-3)}
+.keycard .k1 .val{font:500 16px/1.2 var(--mono);color:var(--fg);letter-spacing:-0.02em}
+.keycard .k1 .val.pend{color:var(--fg-4);font-weight:400}
+.keycard .k2{font:400 12.5px/1.5 var(--sans);color:var(--fg-2);text-wrap:pretty}
+.keycard .k2 b{font-weight:500;color:var(--fg)}
+.keycard .k3{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font:400 12px/1.4 var(--mono);color:var(--fg-3)}
+.keycard .k3 b{font:500 13px/1.4 var(--sans);color:var(--fg)}
+.keycard.dedup{background:color-mix(in oklch, var(--sus) 6%, var(--bg));box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--sus) 40%, transparent)}
+.keycard.dedup .k2{color:var(--fg)}
+.keycard.dedup .k2 .lead{color:var(--sus)}
+.keycard.fresh .k2 .lead{color:var(--ok)}
+.keycard .open{font:500 12px/1 var(--mono);color:var(--fg);text-decoration:underline;text-decoration-color:var(--fg-4);text-underline-offset:3px}
+.keycard .open:hover{text-decoration-color:var(--fg)}
+.sw-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center}
+.sw{width:32px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background-color var(--t2) var(--ease)}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--fg-2);transition-property:transform,background-color;transition-duration:var(--t2);transition-timing-function:var(--ease)}
+.sw[aria-checked="true"]{background:var(--fg)}
+.sw[aria-checked="true"]::after{transform:translateX(12px);background:var(--bg)}
+.sw:focus-visible{outline-offset:3px;border-radius:999px}
+.sw-l{font:500 12.5px/1.3 var(--mono)}
+.sw-d{grid-column:2;font:400 12px/1.5 var(--sans);color:var(--fg-3);text-wrap:pretty}
+.pj{border-radius:10px;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft);overflow:hidden}
+.pj .h{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line-soft);font:400 11px/1 var(--mono);color:var(--fg-3)}
+.pj pre{padding:10px 12px;font:400 12px/1.6 var(--mono);color:var(--fg-2);overflow-x:auto;white-space:pre}
+.form-acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sig{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font:400 11.5px/1.4 var(--mono);color:var(--fg-3)}
+.sig b{font-weight:400;color:var(--fg-2)}
+.sig .ann{color:var(--sus)}
+.d-desc{color:var(--fg-2);font-size:13.5px;line-height:1.55;margin-top:8px;max-width:62ch;text-wrap:pretty}
+.d-wf{font:500 28px/1.1 var(--sans);letter-spacing:-0.03em;margin-top:10px}
+
+
+/* help dialog */
+dialog.keys{
+  margin:auto;width:min(620px,calc(100vw - 32px));border:0;border-radius:16px;padding:22px 24px 20px;color:var(--fg);
+  background:var(--raised);box-shadow:inset 0 0 0 1px var(--line), 0 30px 80px oklch(0 0 0 / .6);
+}
+dialog.keys[open]{animation:pop var(--t2) var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(4px)}to{opacity:1;transform:none}}
+dialog.keys::backdrop{background:oklch(0.1 0 0 / .55)}
+.keys h2{font:500 16px/1.3 var(--sans)}
+.keys .lead{color:var(--fg-3);font-size:12.5px;margin-top:4px}
+.keys .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px;margin-top:18px}
+.keys h3{font:500 11.5px/1 var(--sans);color:var(--fg-3);margin-bottom:8px}
+.keys dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;align-items:center;font-size:12.5px;color:var(--fg-2)}
+.keys dt{display:flex;gap:3px}
+.keys .x{position:absolute;top:14px;right:14px}
+
+/* ───────── reduced motion ───────── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:1ms !important;animation-iteration-count:1 !important;transition-duration:1ms !important}
+  .sg.s-running::after{display:none}
+  .sk::after{display:none}
+  .sk{opacity:.7}
+  .brand .tip{animation:none}
+  .ex.pending .sg,.tv .bar.live::after{animation:none !important}
+  .spin{animation:none !important;border-right-color:currentColor;opacity:.6}
+  @keyframes fadeOnly{from{opacity:.35}to{opacity:1}}
+}
+
+/* ───────── mobile: its own composition ───────── */
+@media (max-width: 760px){
+  body{grid-template-rows:auto minmax(0,1fr);font-size:14px}
+  .top{grid-template-columns:auto 1fr auto;padding:0 6px 0 14px;min-height:48px;padding-top:env(safe-area-inset-top)}
+  .server .opt,.server .st{display:none}
+  .server{justify-content:flex-end}
+  main{display:block;overflow:hidden}
+  .pane{position:absolute;inset:0;display:none;border-right:0}
+  main[data-screen="workflows"] .pane-wf,main[data-screen="list"] .pane-list,main[data-screen="detail"] .pane-detail{display:flex}
+  .pane.in-fwd{animation:inFwd var(--t3) var(--ease) both}
+  .pane.in-back{animation:inBack var(--t3) var(--ease) both}
+  @keyframes inFwd{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+  @keyframes inBack{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+  .pane-head{height:50px;padding:0 10px 0 6px}
+  .pane-wf .pane-head{padding-left:16px}
+  .pane-title{font-size:15px;color:var(--fg)}
+  .back{display:inline-flex;align-items:center;gap:2px;height:40px;padding:0 10px 0 4px;border-radius:9px;color:var(--fg-2);font:500 14px/1 var(--sans)}
+  .back .g{width:18px;height:18px}
+  .back:active{background:var(--hover)}
+  .pane-detail .pane-title{display:none}
+  .pane-list .pane-title{font-size:13px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pane-wf{background:var(--bg)}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 14px 4px}
+  .tile{display:grid;gap:8px;padding:14px 14px 13px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-soft);text-align:left;transition:background-color var(--t1) var(--ease)}
+  .tile:active{transform:scale(.96)}
+  .tile .n{font:500 34px/1 var(--mono);letter-spacing:-0.05em;color:var(--fg)}
+  .tile .l{display:flex;align-items:center;gap:6px;font:500 13px/1 var(--sans)}
+  .tile.wide{grid-column:1/-1;grid-template-columns:repeat(3,1fr);gap:0;padding:0;overflow:hidden}
+  .tile.wide button{display:grid;gap:7px;padding:13px 14px;text-align:left;border-right:1px solid var(--line-soft)}
+  .tile.wide button:last-child{border-right:0}
+  .tile.wide button:active{background:var(--hover)}
+  .tile.wide .n{font-size:22px}
+  .tile.wide .l{font-size:12px}
+  .tiles-h{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px 2px;font:400 12px/1.3 var(--sans);color:var(--fg-3)}
+  .wf-list{padding:10px 8px}
+  .wf{width:calc(100% - 4px);margin:2px;padding:14px 12px 14px 14px;gap:9px 10px}
+  .wf-name{font-size:15px}
+  .wf-x{opacity:1;position:static;grid-column:2;grid-row:1;height:30px}
+  .wf .wf-total{display:none}
+  .wf-all .wf-total{display:block}
+  .engine{font-size:11.5px;margin:6px 16px 24px}
+  .ex{padding:13px 16px 14px;row-gap:5px;--px:16px}
+  .ex-l{font-size:14px}
+  .ex-sub{font-size:13px}
+  .tools{padding:10px 14px}
+  .search input{height:38px;font-size:14px}
+  .search kbd{display:none}
+  .chip{height:32px;padding:0 11px;font-size:12.5px}
+  .detail{padding:18px 16px 40px}
+  .d-head{display:block}
+  .actions{margin-top:16px}
+  .actions .btn{flex:1;height:42px;font-size:14px}
+  .actions .btn kbd{display:none}
+  .meta{grid-template-columns:1fr 1fr}
+  .sec{grid-template-columns:1fr;gap:12px;padding:20px 0}
+  #detailBody:has(> .xd){overflow:auto}
+  .xd{display:block;height:auto}
+  .xd-h{padding:16px 16px 14px}
+  .xd .d-label{font-size:17px}
+  .xd-trace{max-height:none;overflow-x:auto}
+  .xd-split{display:none}
+  .tv{--treew:58cqw;min-width:0}
+  .tlab .ty{display:none}
+  .tr{height:38px}
+  .tv .bar{top:14px}
+  .tv .bar.thin{top:17px}
+  .blab{top:12px}
+  .tv .lgm{top:7px}
+  .trh-l .m{display:none}
+  .lg,.logs.src .lg{grid-template-columns:78px 40px minmax(0,1fr)}
+  .logs.src .lg .msg{grid-column:1/-1}
+  .insp{overflow:visible;border-top:1px solid var(--line-soft)}
+  .ih{position:static;padding:14px 16px 0}
+  .ib{padding:14px 16px 32px}
+  .f{grid-template-columns:1fr;gap:6px}
+  .f-l{padding-top:0;display:flex;align-items:baseline;gap:8px}
+  .f-l .rq{display:inline;margin:0}
+  .in{height:42px;font-size:15px}
+  .seg button{height:34px;font-size:13.5px}
+  .void{padding:36px 18px}
+  .void h2{font-size:25px}
+  .down{display:block;padding:32px 18px;overflow:auto}
+  .down h2{font-size:30px}
+  .down .steps{margin-top:28px}
+  main.is-down .down{position:absolute;inset:0}
+  .keys .cols{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="g-running" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.6" fill="currentColor"/></symbol>
+  <symbol id="g-suspended" viewBox="0 0 16 16"><rect x="4.6" y="4" width="2.3" height="8" rx=".7" fill="currentColor"/><rect x="9.1" y="4" width="2.3" height="8" rx=".7" fill="currentColor"/></symbol>
+  <symbol id="g-succeeded" viewBox="0 0 16 16"><path d="M3.8 8.6l2.7 2.6 5.7-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-failed" viewBox="0 0 16 16"><path d="M4.7 4.7l6.6 6.6M11.3 4.7l-6.6 6.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="g-interrupted" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.6 11.4l6.8-6.8" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="g-deferred" viewBox="0 0 16 16"><path d="M8 2.6L13.4 8 8 13.4 2.6 8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="g-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.3l2.1 1.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="g-child" viewBox="0 0 16 16"><path d="M4.5 3v6.5h7M9.2 7.2l2.3 2.3-2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-parent" viewBox="0 0 16 16"><path d="M11.5 13V6.5h-7M6.8 4.2L4.5 6.5l2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-comp" viewBox="0 0 16 16"><path d="M4.5 6.5h5a3 3 0 010 6H6M6.8 4.2L4.5 6.5l2.3 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-end" viewBox="0 0 16 16"><path d="M4 8h8M12 4.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="g-chev" viewBox="0 0 16 16"><path d="M4.5 10l3.5-3.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-back" viewBox="0 0 16 16"><path d="M10 3.5L5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-ret" viewBox="0 0 16 16"><path d="M12.5 3.5V8a1 1 0 01-1 1H4.2M6.8 6.4L4.2 9l2.6 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-play" viewBox="0 0 16 16"><path d="M5.5 4.2v7.6L11.6 8z" fill="currentColor"/></symbol>
+</svg>
+
+<header class="top" id="top">
+  <a class="brand" href="?" aria-label="kymo home">
+    <svg viewBox="0 0 44 16" aria-hidden="true"><path d="M0 11h9l2-6 3 9 2.5-11 2.5 8h7l1.5-3 1.5 3h6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/><circle class="tip" cx="41" cy="11" r="2" fill="var(--fg)"/></svg>
+    <span class="wordmark">kymo</span>
+  </a>
+  <div class="server wait" id="server" role="status" aria-live="polite"></div>
+  <div class="top-r">
+    <button class="ghost-btn" id="statesBtn" aria-expanded="false" aria-controls="states" type="button">States</button>
+    <button class="ghost-btn" id="keysBtn" type="button" aria-label="Keyboard map">?</button>
+  </div>
+  <nav class="states" id="states" hidden aria-label="Review states"></nav>
+</header>
+
+<main id="main" data-screen="workflows">
+  <section class="pane pane-wf" id="paneWf" aria-labelledby="hWf" data-pane="wf">
+    <div class="pane-head"><h2 class="pane-title" id="hWf">Workflows</h2><span class="pane-count" id="wfCount"></span><span class="sp"></span></div>
+    <div class="pane-body" id="wfBody"></div>
+  </section>
+  <section class="pane pane-list active" id="paneList" aria-labelledby="hList" data-pane="list">
+    <div class="pane-head">
+      <button class="back" data-back="workflows" type="button"><svg class="g"><use href="#g-back"/></svg>Workflows</button>
+      <h2 class="pane-title" id="hList">Executions</h2><span class="pane-count" id="listCount"></span><span class="sp"></span><span class="pane-count" title="Newest first, by each execution's most recent journal entry">by last entry ↓</span>
+    </div>
+    <div class="tools" id="tools"></div>
+    <div class="pane-body" id="listBody" role="listbox" aria-label="Executions" tabindex="-1"></div>
+  </section>
+  <section class="pane pane-detail" id="paneDetail" aria-labelledby="hDetail" data-pane="detail">
+    <div class="pane-head">
+      <button class="back" data-back="list" type="button"><svg class="g"><use href="#g-back"/></svg>Executions</button>
+      <h2 class="pane-title" id="hDetail">Execution</h2><span class="sp"></span><span class="pane-count" id="detailHint"></span>
+    </div>
+    <div class="pane-body" id="detailBody" tabindex="-1"></div>
+  </section>
+  <section class="down" id="down" hidden aria-live="assertive"></section>
+</main>
+
+
+<dialog class="keys" id="keys" aria-labelledby="keysH">
+  <h2 id="keysH">Keyboard map</h2>
+  <p class="lead">Keyboard-first. Every operation has a key.</p>
+  <button class="ghost-btn x" type="button" data-close-keys aria-label="Close">esc</button>
+  <div class="cols">
+    <div><h3>Move</h3><dl>
+      <dt><kbd>j</kbd><kbd>k</kbd></dt><dd>next / previous row</dd>
+      <dt><kbd>h</kbd><kbd>l</kbd></dt><dd>previous / next pane</dd>
+      <dt><kbd>enter</kbd></dt><dd>open the selected row</dd>
+      <dt><kbd>esc</kbd></dt><dd>back, close, cancel</dd>
+      <dt><kbd>/</kbd></dt><dd>filter executions by label, id or key</dd>
+    </dl></div>
+    <div><h3>Operate</h3><dl>
+      <dt><kbd>e</kbd></dt><dd>execute the selected Workflow</dd>
+      <dt><kbd>r</kbd></dt><dd>resume (suspended only)</dd>
+      <dt><kbd>i</kbd></dt><dd>interrupt, then <kbd>y</kbd> to confirm</dd>
+      <dt><kbd>⌘</kbd><kbd>↵</kbd></dt><dd>submit the execute form</dd>
+    </dl></div>
+    <div><h3>Trace</h3><dl>
+      <dt><kbd>t</kbd></dt><dd>focus the trace</dd>
+      <dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>previous / next span</dd>
+      <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>collapse / expand</dd>
+      <dt><kbd>enter</kbd></dt><dd>open a child execution</dd>
+      <dt><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>zoom in / out / fit (or ⌘ + scroll)</dd>
+      <dt><kbd>f</kbd></dt><dd>zoom to the span (or double-click it)</dd>
+    </dl></div>
+  </div>
+</dialog>
+
+<script src="data.js"></script>
+<script>
+/* ═════════ core: clock, data, formatting ═════════ */
+const K = window.KYMO, S = K.state;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const STATUSES = ["running", "suspended", "succeeded", "failed", "interrupted"];
+const LIVE = ["running", "suspended"];
+const params = new URLSearchParams(location.search);
+const REVIEW = ["loading", "down", "empty", "nomatch", "notfound"].includes(params.get("state")) ? params.get("state") : "live";
+const NOTFOUND_ID = "4b1d2c3e5f607182";
+const mqMobile = matchMedia("(max-width: 760px)");
+const mqReduce = matchMedia("(prefers-reduced-motion: reduce)");
+const isMobile = () => mqMobile.matches;
+const reduced = () => mqReduce.matches;
+
+// page clock: KYMO.NOW at load, advanced by real elapsed time
+const T0 = Date.parse(K.NOW), P0 = performance.now();
+const now = () => T0 + (performance.now() - P0);
+const isoNow = () => new Date(now()).toISOString();
+const ts = (x) => (typeof x === "number" ? x : Date.parse(x));
+
+function dur(ms) {
+  ms = Math.max(0, Math.round(ms));
+  if (ms < 1000) return ms + "ms";
+  const s = ms / 1000;
+  if (s < 10) return s.toFixed(2) + "s";
+  if (s < 60) return s.toFixed(1) + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m " + Math.floor(s % 60) + "s";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h " + (m % 60) + "m";
+  const d = Math.floor(h / 24);
+  return d + "d " + (h % 24) + "h";
+}
+function coarse(ms) {
+  ms = Math.max(0, ms);
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h " + (m % 60) + "m";
+  const d = Math.floor(h / 24);
+  return d + "d " + (h % 24) + "h";
+}
+const ago = (t) => coarse(now() - ts(t)) + " ago";
+const until = (t) => (ts(t) <= now() ? "now" : "in " + coarse(ts(t) - now()));
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function stamp(t, ms) {
+  const d = new Date(ts(t)), n = new Date(now());
+  const hm = d.toISOString().slice(11, ms ? 23 : 19);
+  return d.toISOString().slice(0, 10) === n.toISOString().slice(0, 10) ? hm + "Z" : MON[d.getUTCMonth()] + " " + d.getUTCDate() + " " + hm.slice(0, 5) + "Z";
+}
+
+// data helpers
+const byId = (id) => S.executions.find((e) => e.id === id);
+const wfByName = (n) => S.workflows.find((w) => w.name === n);
+const wfNames = () => S.workflows.map((w) => w.name);
+// one ordering everywhere: the most recent journal entry (start, Activity, wait, child, compensation, exit)
+function lastEntry(e) {
+  const cap = now();
+  let t = ts(e.startedAt);
+  const add = (x) => { if (x) { const v = ts(x); if (v <= cap && v > t) t = v; } };
+  add(e.endedAt);
+  e.activities.forEach((a) => { add(a.startedAt); add(a.endedAt); });
+  (e.waits || []).forEach((w) => { add(w.since); add(w.doneAt); if (w.status === "done") add(w.wakeAt); });
+  (e.childCalls || []).forEach((c) => { add(c.startedAt); add(c.endedAt); });
+  (e.compensations || []).forEach((c) => add(c.at));
+  return t;
+}
+const lastIso = (e) => new Date(lastEntry(e)).toISOString();
+const sortedExecs = () => [...S.executions].sort((a, b) => lastEntry(b) - lastEntry(a));
+function countBy(list) {
+  const c = { running: 0, suspended: 0, succeeded: 0, failed: 0, interrupted: 0 };
+  list.forEach((e) => c[e.status]++);
+  return c;
+}
+const REASON = { deferred: "DurableDeferred", clock: "DurableClock", failure: "SuspendOnFailure", child: "child" };
+const keyFields = (w) => w.idempotencyKey.split("+").map((s) => s.trim().replace(/^payload\./, ""));
+function deriveKey(w, p) {
+  const vals = keyFields(w).map((k) => p[k]);
+  if (vals.some((v) => v === undefined || v === null || v === "")) return null;
+  return vals.map(String).join(":");
+}
+function resolveId(arg) {
+  if (!arg) return { missing: true };
+  const p = String(arg).toLowerCase();
+  if (byId(p)) return { id: p };
+  const m = S.executions.filter((e) => e.id.startsWith(p));
+  if (m.length === 1) return { id: m[0].id, expanded: p };
+  if (m.length > 1) return { ambiguous: m, prefix: p };
+  return { id: p };
+}
+const shortId = (id) => id.slice(0, 8);
+
+// API wrapper: server-down simulation + timestamp rewrite onto the page clock
+async function call(name, ...args) {
+  if (S.server.status === "down") {
+    await sleep(K.api.latency);
+    throw { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` };
+  }
+  return K.api[name](...args);
+}
+
+// glyphs + value rendering
+const G = (name, cls = "") => `<svg class="g ${cls}" aria-hidden="true"><use href="#g-${name}"/></svg>`;
+const sg = (status) => `<span class="sg s-${status}" aria-hidden="true">${G(status)}</span>`;
+function compact(v) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(compact).join(", ") + "]";
+  const e = Object.entries(v);
+  return e.length ? "{ " + e.map(([k, x]) => k + ": " + compact(x)).join(", ") + " }" : "{}";
+}
+function val(v) {
+  if (v === null || v === undefined) return '<span class="v-null">null</span>';
+  if (typeof v === "number" || typeof v === "boolean") return `<span class="v-n">${v}</span>`;
+  if (typeof v === "string") return `<span class="v-s">"${esc(v)}"</span>`;
+  return `<span class="v-s">${esc(compact(v))}</span>`;
+}
+// box-drawing tree lines for an object
+function treeLines(obj, prefix) {
+  const ent = Object.entries(obj);
+  return ent.map(([k, x], i) => {
+    const last = i === ent.length - 1;
+    const br = prefix + (last ? "└─ " : "├─ ");
+    if (x && typeof x === "object" && Object.keys(x).length) {
+      return `<div class="tl"><span class="br">${br}</span><span class="v-k">${esc(k)}</span></div>` + treeLines(x, prefix + (last ? "   " : "│  "));
+    }
+    return `<div class="tl"><span class="br">${br}</span><span class="v-k">${esc(k)}</span>  ${val(x)}</div>`;
+  }).join("");
+}
+function causeSummary(c) {
+  if (!c) return "";
+  if (c._tag === "Fail") {
+    const { _tag, ...rest } = c.error || {};
+    return "Fail " + (_tag || "") + (Object.keys(rest).length ? " " + compact(rest) : "");
+  }
+  if (c._tag === "Die") return "Die " + (c.defect?.name || "defect") + ": " + (c.defect?.message || "");
+  if (c._tag === "Interrupt") return "Interrupt " + (c.fiberId || "");
+  return c._tag;
+}
+function exitSummary(x) {
+  if (!x) return "";
+  if (x._tag === "Success") return "Success " + (x.value === null || x.value === undefined ? "null" : compact(x.value));
+  return causeSummary(x.cause);
+}
+</script>
+<script>
+/* ═════════ UI state + views ═════════ */
+const ui = {
+  boot: "loading", downErr: null, retrying: false,
+  wf: null, status: null, q: "", sel: null,
+  pane: "list", screen: "workflows",
+  mode: "detail", execWf: null, form: null, discard: false, pendingExecute: false, execResult: null,
+  confirm: null, pending: {}, opError: {}, notice: null, notFound: null, detailLoading: null,
+  expanded: new Set(), fresh: new Set(), bump: null,
+};
+
+const labelOf = (e) => K.labelOf(e.workflow, e.payload);
+function filtered() {
+  const q = ui.q.trim().toLowerCase();
+  return sortedExecs().filter((e) => (!ui.wf || e.workflow === ui.wf) && (!ui.status || e.status === ui.status) &&
+    (!q || e.id.startsWith(q) || String(e.idempotencyKey).toLowerCase().includes(q) || (labelOf(e) || "").toLowerCase().includes(q)));
+}
+// children sit under their parent when both pass the filter; an orphaned child points at its parent instead
+function nestRows(items) {
+  const inSet = new Set(items.map((e) => e.id)), out = [];
+  const walk = (e, d, last, rails) => {
+    const kids = (e.children || []).map(byId).filter((k) => k && inSet.has(k.id));
+    out.push({ e, d, last, rails, kids: kids.length });
+    kids.forEach((k, i) => walk(k, d + 1, i === kids.length - 1, d && !last ? rails.concat(d - 1) : rails));
+  };
+  items.filter((e) => !e.parent || !inSet.has(e.parent)).forEach((e) => walk(e, 0, true, []));
+  return out;
+}
+function keepFocus(container, fn) {
+  const a = document.activeElement;
+  const key = a && a !== container && container.contains(a) ? a.dataset.key || null : null;
+  fn();
+  if (key) {
+    const el = container.querySelector(`[data-key="${CSS.escape(key)}"]`);
+    if (el) el.focus({ preventScroll: true });
+  }
+}
+
+/* header */
+function renderServer() {
+  const s = S.server, el = $("#server");
+  const down = ui.boot === "down", loading = ui.boot === "loading";
+  el.className = "server" + (down ? " down" : loading ? " wait" : "");
+  const host = s.url.replace(/^https?:\/\//, "");
+  el.innerHTML = `<span class="dot"></span><span class="app">${esc(s.app)}</span><span class="sep opt">·</span><span class="opt">${esc(host)}</span>` +
+    (down ? `<span class="sep st">·</span><span class="st">unreachable</span>`
+      : loading ? `<span class="sep st">·</span><span class="st">connecting…</span>`
+      : `<span class="sep opt">·</span><span class="opt">effect ${esc(s.effect)}</span><span class="sep opt">·</span><span class="opt">${esc(s.runner)}</span><span class="sep opt">·</span><span class="opt">up ${esc(s.uptime)}</span>`);
+}
+
+/* workflows pane */
+function traceHtml(c, total) {
+  if (!total) return `<span class="trace zero" aria-hidden="true"></span>`;
+  return `<span class="trace" aria-hidden="true">${STATUSES.filter((s) => c[s]).map((s) => `<i class="s-${s}" style="flex-grow:${c[s]}"></i>`).join("")}</span>`;
+}
+function countsHtml(c) {
+  return `<span class="wf-counts" aria-hidden="true">${STATUSES.map((s) => c[s]
+    ? `<span title="${s}"><span class="s-${s}">${G(s)}</span>${c[s]}</span>`
+    : `<span class="z" title="${s}">${G(s)}0</span>`).join("")}</span>`;
+}
+function tilesHtml(c) {
+  return `<div class="tiles">
+    <div class="tiles-h"><span>Journal · ${S.executions.length} executions</span><span class="m">${esc(S.server.app)}</span></div>
+    ${["running", "suspended"].map((s) => `<button class="tile" type="button" data-tile="${s}"><span class="n">${c[s]}</span><span class="l"><span class="s-${s}">${G(s)}</span>${s}</span></button>`).join("")}
+    <div class="tile wide">${["succeeded", "failed", "interrupted"].map((s) => `<button type="button" data-tile="${s}"><span class="n">${c[s]}</span><span class="l"><span class="s-${s}">${G(s)}</span>${s}</span></button>`).join("")}</div>
+  </div>`;
+}
+function engineHtml() {
+  const s = S.server;
+  return `<div class="engine" aria-label="Engine">
+    <div><span class="k">app     </span> <b>${esc(s.app)}</b></div>
+    <div><span class="k">engine  </span> ClusterWorkflowEngine</div>
+    <div><span class="k">runner  </span> ${esc(s.runner)} · effect ${esc(s.effect)}</div>
+    <div><span class="k">storage </span> ${esc(s.storage)}</div>
+  </div>`;
+}
+function renderWorkflows() {
+  const body = $("#wfBody");
+  $("#wfCount").textContent = ui.boot === "ready" ? S.workflows.length : "";
+  if (ui.boot !== "ready") {
+    body.innerHTML = `<div class="wf-list" aria-busy="true">${[52, 70, 58, 64, 48, 60].map((w) => `<div class="wf" aria-hidden="true"><span class="sk" style="height:11px;width:${w}%"></span><span></span><span class="sk" style="grid-column:1/-1;height:3px"></span><span class="sk" style="grid-column:1/-1;height:8px;width:70%"></span></div>`).join("")}</div>`;
+    return;
+  }
+  const all = countBy(S.executions);
+  const rows = [{ name: "", c: all, total: S.executions.length }].concat(S.workflows.map((w) => {
+    const l = S.executions.filter((e) => e.workflow === w.name);
+    return { name: w.name, c: countBy(l), total: l.length };
+  }));
+  const selName = ui.wf || "";
+  keepFocus(body, () => {
+    body.innerHTML = tilesHtml(all) + `<div class="wf-list" role="listbox" aria-label="Workflows">` + rows.map((r) => {
+      const sel = selName === r.name;
+      const label = r.name || "All workflows";
+      const desc = STATUSES.filter((s) => r.c[s]).map((s) => `${r.c[s]} ${s}`).join(", ") || "no executions";
+      return `<div class="wf${r.name ? "" : " wf-all"}" role="option" tabindex="${sel ? 0 : -1}" aria-selected="${sel}" data-key="wf:${r.name}" data-wf="${r.name}" aria-label="${esc(label)}: ${desc}">
+        <span class="wf-name">${esc(label)}</span><span class="wf-total m">${r.total}</span>
+        ${r.name ? `<button class="wf-x" type="button" tabindex="-1" data-exec="${r.name}" aria-label="Execute ${r.name}">${G("play")}Execute</button>` : ""}
+        ${traceHtml(r.c, r.total)}${countsHtml(r.c)}
+      </div>`;
+    }).join("") + `</div>` + engineHtml();
+  });
+}
+
+/* executions pane */
+function renderTools() {
+  const t = $("#tools");
+  if (ui.boot !== "ready") {
+    t.innerHTML = `<span class="sk" style="height:30px;border-radius:7px"></span><span class="sk" style="height:22px;width:84%"></span>`;
+    return;
+  }
+  const base = S.executions.filter((e) => !ui.wf || e.workflow === ui.wf);
+  const c = countBy(base);
+  const chips = [["", "all", base.length]].concat(STATUSES.map((s) => [s, s, c[s]]));
+  keepFocus(t, () => {
+    t.innerHTML = `<div class="search"><input id="q" type="search" placeholder="filter by label, id prefix or key" value="${esc(ui.q)}" aria-label="Filter executions by label, id prefix or idempotencyKey" data-key="q"><kbd>/</kbd></div>
+    <div class="chips" role="group" aria-label="Filter by status">${chips.map(([s, l, n]) => `<button type="button" class="chip" data-status="${s}" data-key="st:${s}" aria-pressed="${(ui.status || "") === s}">${s ? `<span class="s-${s}">${G(s)}</span>` : ""}${l} <b>${n}</b></button>`).join("")}</div>`;
+  });
+}
+function rowHtml(e, focusable, m = { d: 0, last: true, rails: [], kids: 0 }) {
+  const sel = ui.sel === e.id, lab = labelOf(e);
+  const reason = e.status === "suspended" && e.suspendedReason ? `<span class="tag">${e.suspendedReason === "failure" ? "SuspendOnFailure" : e.suspendedReason}</span>` : "";
+  const t = `<span class="ex-t" title="last journal entry" data-ago="${lastIso(e)}">${ago(lastEntry(e))}</span>`;
+  const cls = "ex" + (m.d ? " kid" : "") + (ui.pending[e.id] ? " pending" : "") + (ui.fresh.has(e.id) ? " enter" : "") + (ui.bump === e.id ? " flash" : "");
+  const cn = (l, c) => `<i class="cn ${c}" style="--l:${l}" aria-hidden="true"></i>`;
+  const lines = (m.d ? m.rails.map((l) => cn(l, "vt")).join("") + cn(m.d - 1, "el") + (m.last ? "" : cn(m.d - 1, "vt")) : "") + (m.kids ? cn(m.d, "dn") : "");
+  const par = e.parent && !m.d && byId(e.parent);
+  return `<div class="${cls}" style="--d:${m.d}" role="option" aria-selected="${sel}" tabindex="${focusable ? 0 : -1}" data-key="ex:${e.id}" data-id="${e.id}" aria-level="${m.d + 1}" aria-label="${esc(lab || e.idempotencyKey)}: ${esc(e.workflow)} ${e.id}, ${e.status}${e.suspendedReason ? " on " + e.suspendedReason : ""}${par ? ", child of " + par.id : ""}">
+    ${lines}${sg(e.status)}<span class="ex-l${lab ? "" : " nolabel"}">${esc(lab || e.idempotencyKey)}</span>${t}
+    <span class="ex-sub"><span class="wfn">${esc(e.workflow)}</span><span class="sid">${shortId(e.id)}</span>${reason}${par ? `<span class="par" title="child of ${par.id}">${G("parent")}${esc(par.workflow)} ${shortId(par.id)}</span>` : ""}</span>
+  </div>`;
+}
+function renderList() {
+  const body = $("#listBody");
+  const title = $("#hList");
+  title.textContent = isMobile() ? ui.wf || "All workflows" : "Executions";
+  if (ui.boot !== "ready") {
+    $("#listCount").textContent = "";
+    body.setAttribute("aria-busy", "true");
+    body.innerHTML = Array.from({ length: 8 }, () => `<div class="sk-row" aria-hidden="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>`).join("");
+    return;
+  }
+  body.removeAttribute("aria-busy");
+  const items = filtered();
+  $("#listCount").textContent = items.length === S.executions.length ? String(items.length) : `${items.length} of ${S.executions.length}`;
+  if (!S.executions.length) { body.innerHTML = emptyJournalHtml(); return; }
+  if (!items.length) { body.innerHTML = noMatchHtml(); return; }
+  const anySel = items.some((e) => e.id === ui.sel);
+  keepFocus(body, () => {
+    body.innerHTML = nestRows(items).map((m, i) => rowHtml(m.e, anySel ? m.e.id === ui.sel : i === 0, m)).join("");
+  });
+  ui.fresh.clear();
+}
+function emptyJournalHtml() {
+  const w = ui.wf || S.workflows[0].name;
+  return `<div class="blank"><span class="big">The journal is empty.</span>
+    <p>No Workflow has been executed against <span class="m">${esc(S.server.storage.split(" ")[1] || "the database")}</span> yet. Executions appear here the moment the engine journals them.</p>
+    <div class="row"><button class="btn btn-primary" type="button" data-exec="${w}">${G("play")}Execute ${w}</button></div></div>`;
+}
+function noMatchHtml() {
+  const wfTotal = ui.wf ? S.executions.filter((e) => e.workflow === ui.wf).length : S.executions.length;
+  if (ui.wf && !wfTotal) {
+    return `<div class="blank"><span class="big">${esc(ui.wf)} has never been executed.</span>
+      <p>Nothing in the journal for this Workflow yet. Execute it and the first execution lands here.</p>
+      <div class="row"><button class="btn btn-primary" type="button" data-exec="${ui.wf}">${G("play")}Execute ${esc(ui.wf)}</button></div></div>`;
+  }
+  const what = [ui.status, ui.wf].filter(Boolean).join(" ");
+  const q = ui.q.trim();
+  return `<div class="blank"><span class="big">No ${esc(what)}${what ? " " : ""}executions${q ? ` match “${esc(q)}”` : ""}.</span>
+    <p>The journal holds ${wfTotal} ${ui.wf ? esc(ui.wf) + " " : ""}execution${wfTotal === 1 ? "" : "s"}; none pass this filter.</p>
+    <div class="row"><button class="btn" type="button" data-act="clear-filters">Clear filters</button>${ui.status ? `<button class="btn" type="button" data-status-only="">Any status</button>` : ""}</div>
+    </div>`;
+}
+
+/* detail pane */
+function causeTree(c, e, root) {
+  let h = `<div class="tl root">${root || "Exit.Failure"}</div>`;
+  if (!c) return h;
+  if (c._tag === "Fail") {
+    const { _tag, ...rest } = c.error || {};
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-failed">Cause.Fail</span></div>`;
+    h += `<div class="tl"><span class="br">   └─ </span><span class="tg">${esc(_tag || "error")}</span></div>`;
+    h += treeLines(rest, "      ");
+  } else if (c._tag === "Die") {
+    const d = c.defect || {};
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-failed">Cause.Die</span>  <span class="v-k">defect</span></div>`;
+    h += `<div class="tl"><span class="br">   ├─ </span><span class="v-k">name   </span>  <span class="tg">${esc(d.name || "Error")}</span></div>`;
+    h += `<div class="tl"><span class="br">   ├─ </span><span class="v-k">message</span>  ${val(d.message)}</div>`;
+    h += `<div class="tl"><span class="br">   └─ </span><span class="v-k">stack</span></div><pre>${esc((d.stack || "").split("\n").map((l) => "         " + l).join("\n"))}</pre>`;
+  } else if (c._tag === "Interrupt") {
+    const by = e && e.interruptedBy;
+    h += `<div class="tl"><span class="br">└─ </span><span class="tg s-interrupted">Cause.Interrupt</span></div>`;
+    h += `<div class="tl"><span class="br">   ${by ? "├─" : "└─"} </span><span class="v-k">fiberId</span>  <span class="v-n">${esc(c.fiberId || "?")}</span></div>`;
+    if (by) h += `<div class="tl"><span class="br">   └─ </span><span class="v-k">interruptedBy</span>  ${val(by)}</div>`;
+  }
+  return h;
+}
+function successTree(v) {
+  return `<div class="tl root">Exit.Success</div>` + (v && typeof v === "object" && Object.keys(v).length
+    ? treeLines(v, "")
+    : `<div class="tl"><span class="br">└─ </span>${val(v)}</div>`);
+}
+function exitInline(x) {
+  if (!x) return "";
+  if (x._tag === "Success") return `<span class="ok">Success</span> ${esc(x.value === null || x.value === undefined ? "null" : compact(x.value))}`;
+  const s = causeSummary(x.cause), i = s.indexOf(" ");
+  const head = i < 0 ? s : s.slice(0, i), tail = i < 0 ? "" : s.slice(i + 1);
+  return `<span class="${x.cause && x.cause._tag === "Interrupt" ? "ir" : "bad"}">${esc(head)}</span> ${esc(tail)}`;
+}
+/* trace: tree + waterfall; the span inspector sits beneath it */
+const tr = { id: null, sel: null, expanded: new Set(), tab: "Overview", h: null, z: 1, lvl: 0 };
+const exEnd = (e) => (e.endedAt ? ts(e.endedAt) : now());
+function spanStatus(a, ex) {
+  if (a.status === "success") return "succeeded";
+  if (a.status === "running") return LIVE.includes(ex.status) ? "running" : "interrupted";
+  return a.exit && a.exit.cause && a.exit.cause._tag === "Interrupt" ? "interrupted" : "failed";
+}
+function execNodes(ex, seen = new Set()) {
+  seen.add(ex.id);
+  const items = [], groups = new Map(), live = LIVE.includes(ex.status);
+  const attEnd = (a) => (a.endedAt ? ts(a.endedAt) : live ? now() : exEnd(ex));
+  ex.activities.forEach((a) => { if (!groups.has(a.name)) groups.set(a.name, []); groups.get(a.name).push(a); });
+  for (const [name, atts] of groups) {
+    const key = `${ex.id}/a/${name}`, last = atts[atts.length - 1];
+    items.push({
+      key, type: "act", name, ex, atts, a: last, start: ts(atts[0].startedAt), end: attEnd(last), status: spanStatus(last, ex),
+      segs: atts.map((a) => ({ s: ts(a.startedAt), e: attEnd(a), st: spanStatus(a, ex) })),
+      children: atts.length > 1 ? atts.map((a) => ({ key: `${key}/${a.attempt}`, type: "att", name: `attempt ${a.attempt}`, ex, a, atts, start: ts(a.startedAt), end: attEnd(a), status: spanStatus(a, ex), children: [] })) : [],
+    });
+  }
+  (ex.waits || []).forEach((w) => {
+    const done = w.status === "done";
+    const end = done ? ts(w.doneAt || w.wakeAt) : !live ? exEnd(ex) : w.kind === "clock" ? ts(w.wakeAt) : now();
+    items.push({ key: `${ex.id}/w/${w.name}`, type: w.kind === "clock" ? "clock" : "def", name: w.name, ex, w, start: ts(w.since), end,
+      status: done ? "done" : live ? "waiting" : "abandoned", children: [] });
+  });
+  (ex.childCalls || []).forEach((c) => {
+    const ch = byId(c.execution);
+    items.push({ key: `${ex.id}/c/${c.execution}`, type: "child", name: c.name, ex, call: c, child: ch, start: ts(c.startedAt),
+      end: c.endedAt ? ts(c.endedAt) : ch ? exEnd(ch) : now(), status: ch ? ch.status : "running",
+      children: ch && !seen.has(ch.id) ? execNodes(ch, seen) : [] });
+  });
+  (ex.compensations || []).filter((c) => c.ran && c.at).forEach((c) => items.push({ key: `${ex.id}/k/${c.name}`, type: "comp", name: c.name, ex, comp: c,
+    start: ts(c.at), end: ts(c.at), status: c.exit && c.exit._tag === "Failure" ? "failed" : "succeeded", children: [] }));
+  return items.sort((a, b) => a.start - b.start);
+}
+const rootNode = (e) => ({ key: e.id, type: "exec", name: e.workflow, ex: e, start: ts(e.startedAt), end: exEnd(e), status: e.status, children: execNodes(e) });
+function allNodes(root) { const out = []; (function w(n) { out.push(n); n.children.forEach(w); })(root); return out; }
+function visibleRows(root) { const out = []; (function w(n, d) { out.push({ n, d }); if (tr.expanded.has(n.key)) n.children.forEach((c) => w(c, d + 1)); })(root, 0); return out; }
+function pathTo(root, key) {
+  const path = [];
+  (function w(n) { if (n.key === key) return true; path.push(n.key); for (const c of n.children) if (w(c)) return true; path.pop(); return false; })(root);
+  return path;
+}
+function selNode(e) { const all = allNodes(rootNode(e)); return all.find((n) => n.key === tr.sel) || all[0]; }
+function trInit(e) {
+  if (tr.id === e.id) return;
+  const all = allNodes(rootNode(e));
+  tr.id = e.id; tr.sel = e.id; tr.tab = "Overview"; tr.expanded = new Set([e.id]); tr.z = 1; tr.lvl = 0;
+  all.forEach((n) => { if (n.type === "child" || (n.type === "act" && n.children.length && n.status !== "succeeded")) tr.expanded.add(n.key); });
+  // land on the span that explains a stuck or failed execution
+  if (e.status === "suspended" || e.status === "failed") {
+    const n = all.find((x) => x.status === "waiting") || [...all].reverse().find((x) => x.type === "act" && x.status === "failed");
+    if (n) { tr.sel = n.key; if (n.type === "act") tr.tab = "Exit"; }
+  }
+}
+function niceStep(span) {
+  const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3, 2e3, 5e3, 1e4, 15e3, 3e4, 6e4, 12e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 216e5, 432e5, 864e5, 1728e5];
+  return steps.find((s) => span / s <= 6) || 1728e5;
+}
+const ZMAX = 10000;
+const P = (x) => x.toFixed(5);
+function scaleOf(e) {
+  const root = rootNode(e), all = allNodes(root);
+  const t0 = root.start, t1 = Math.max(root.end, ...all.map((n) => n.end || n.start));
+  return { t0, span: Math.max(t1 - t0, 1) * 1.04 };
+}
+// offset label at the tick's resolution: "1d 2h 4s", "26m", "350ms"
+function offLabel(t, step) {
+  if (t === 0) return "0";
+  let r = Math.round(t);
+  const out = [];
+  for (const [u, s] of [[864e5, "d"], [36e5, "h"], [6e4, "m"], [1e3, "s"], [1, "ms"]]) {
+    if (r >= u) { const q = Math.floor(r / u); r -= q * u; out.push(q + s); }
+    if (u <= step && out.length) break;
+  }
+  return out.join(" ");
+}
+// visible slice of the timeline (plus a viewport either side), so deep zoom renders a handful of ticks
+function tickWin() {
+  const box = $(".xd-trace"), tv = $("#trace");
+  if (tr.z === 1 || !box || !tv) return [0, 1];
+  const tw = $(".trh-l", tv).offsetWidth, vis = box.clientWidth - tw, W = tv.offsetWidth - tw;
+  return [(box.scrollLeft - vis) / W, (box.scrollLeft + 2 * vis) / W];
+}
+function ticksHtml(e) {
+  const { t0, span } = scaleOf(e), z = tr.z, N = now(), pct = (t) => ((t - t0) / span) * 100;
+  const step = niceStep(span / z), [f0, f1] = tickWin(), ticks = [];
+  for (let t = Math.max(0, Math.floor((f0 * span) / step) * step); t < Math.min(span, f1 * span); t += step) ticks.push(t);
+  const showNow = !e.endedAt && N >= t0 && N < t0 + span, nowP = pct(N);
+  const ruler = ticks.map((t) => {
+    const p = pct(t0 + t), hide = p > 100 - 8 / z || (showNow && Math.abs(p - nowP) < (isMobile() ? 30 : 16) / z);
+    return `<span class="tick" style="left:${P(p)}%">${hide ? "" : offLabel(t, step)}</span>`;
+  }).join("") + (showNow ? `<span class="tick now${nowP > 100 - 14 / z ? " flip" : ""}" style="left:${P(nowP)}%">now</span>` : "");
+  const grid = ticks.map((t) => `<i style="left:${P(pct(t0 + t))}%"></i>`).join("") + (showNow ? `<i class="now" style="left:${P(nowP)}%"></i>` : "");
+  return { ruler, grid };
+}
+function drawTicks() {
+  const e = ui.sel && byId(ui.sel), tv = $("#trace");
+  if (!e || !tv) return;
+  const tk = ticksHtml(e);
+  $(".ruler", tv).innerHTML = tk.ruler;
+  $(".trb .grid", tv).innerHTML = tk.grid;
+}
+const TYPE = (n) => ({ exec: "", act: n.atts && n.atts.length > 1 ? `×${n.atts.length}` : "", att: "", def: "DurableDeferred", clock: "DurableClock", child: n.child ? n.child.workflow : "child", comp: "compensation" })[n.type];
+function spanIcon(n) {
+  if (n.type === "def") return `<span class="ic c-def">${G("deferred")}</span>`;
+  if (n.type === "clock" || n.type === "comp") return `<span class="ic c-${n.type}">${G(n.type)}</span>`;
+  if (n.type === "child") return `<span class="ic s-${n.status}">${G("child")}</span>`;
+  return `<span class="ic">${sg(n.status)}</span>`;
+}
+function barsHtml(n, pct, N) {
+  const col = n.status === "abandoned" ? "c-abandoned" : n.type === "def" ? "c-def" : n.type === "clock" ? "c-clock" : n.type === "comp" ? "c-comp" : "c-" + n.status;
+  const seg = (s, e, cls, c = col) => `<i class="bar ${cls} ${c}" style="left:${P(pct(s))}%;width:${P(Math.max(pct(e) - pct(s), 0))}%"></i>`;
+  let h;
+  if (n.type === "comp") h = `<i class="bar pt ${col}" style="left:${P(pct(n.start))}%"></i>`;
+  else if (n.type === "act" && n.segs.length > 1) h = n.segs.map((g) => seg(g.s, g.e, g.st === "running" ? "live" : "", "c-" + g.st)).join("");
+  else if (n.type === "clock" && n.status === "waiting" && n.end > N) h = seg(n.start, N, "wait") + seg(N, n.end, "future");
+  else if (n.type === "def" || n.type === "clock") h = seg(n.start, n.end, n.status === "done" ? "" : "wait");
+  else h = seg(n.start, n.end, n.type === "exec" || n.type === "child" ? "thin" : n.status === "running" ? "live" : "");
+  const txt = n.type === "comp" ? "ran " + stamp(n.comp.at) : n.type === "clock" && n.status === "waiting" ? "wakes " + until(n.w.wakeAt) : dur(n.end - n.start);
+  const l = pct(n.start), r = pct(n.end);
+  if (r <= 80) h += `<span class="blab" style="left:calc(${P(r)}% + 7px)">${txt}</span>`;
+  else if (l >= 20) h += `<span class="blab" style="right:calc(${P(100 - l)}% + 7px)">${txt}</span>`;
+  const marks = n.type === "act" ? n.atts.flatMap((a) => a.logs || []) : n.type === "att" ? n.a.logs || [] : [];
+  h += marks.filter((x) => LV[x.level] >= 3).map((x) => `<i class="lgm lv-${x.level}" style="left:${P(pct(ts(x.at)))}%"></i>`).join("");
+  return h;
+}
+function spanTreeHtml(e) {
+  const root = rootNode(e), all = allNodes(root), N = now();
+  if (!all.some((n) => n.key === tr.sel)) tr.sel = root.key;
+  const rows = visibleRows(root);
+  const { t0, span } = scaleOf(e), pct = (t) => ((t - t0) / span) * 100;
+  const body = rows.map(({ n, d }, i) => {
+    const kids = n.children.length, open = tr.expanded.has(n.key);
+    const du = n.type === "comp" ? "" : n.type === "clock" && n.status === "waiting" ? until(n.w.wakeAt) : dur(n.end - n.start);
+    return `<div class="tr" data-t="${n.type}" role="treeitem" id="tr-${i}" data-k="${esc(n.key)}" aria-level="${d + 1}" aria-selected="${n.key === tr.sel}"${kids ? ` aria-expanded="${open}"` : ""}>
+      <div class="tlab" style="--d:${d}"><button class="tog${kids ? "" : " none"}" type="button" tabindex="-1" data-tog aria-label="${open ? "Collapse" : "Expand"} ${esc(n.name)}" aria-expanded="${open}">${G("chev")}</button>${spanIcon(n)}<span class="nm">${esc(n.name)}</span><span class="ty">${esc(TYPE(n))}</span><span class="du">${du}</span></div>
+      <div class="wfc">${barsHtml(n, pct, N)}</div></div>`;
+  }).join("");
+  const selI = rows.findIndex((r) => r.n.key === tr.sel);
+  const zl = tr.z < 10 ? +tr.z.toFixed(1) : Math.round(tr.z), tk = ticksHtml(e);
+  return `<div class="tv" id="trace" style="--z:${tr.z}" data-key="trace" role="tree" tabindex="0" aria-label="Trace of ${e.id}"${selI >= 0 ? ` aria-activedescendant="tr-${selI}"` : ""}>
+    <div class="trh"><div class="trh-l">Trace<span class="m">${all.length} span${all.length === 1 ? "" : "s"}</span><span class="zm" role="group" aria-label="Zoom"><button type="button" tabindex="-1" data-zoom="-1" aria-label="Zoom out"${tr.z <= 1 ? " disabled" : ""}>−</button><button type="button" tabindex="-1" data-zoom="0" title="Fit (0)" aria-label="Fit trace">${zl}×</button><button type="button" tabindex="-1" data-zoom="1" aria-label="Zoom in"${tr.z >= ZMAX ? " disabled" : ""}>+</button></span></div><div class="ruler">${tk.ruler}</div></div>
+    <div class="trb"><div class="grid" aria-hidden="true">${tk.grid}</div>${body}</div></div>`;
+}
+const kvs = (pairs) => `<dl class="kv">${pairs.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+const when = (iso) => `${stamp(iso, true)} <span class="v-null" data-ago="${iso}">${ago(iso)}</span>`;
+const exLink = (id) => { const x = byId(id); return `<button class="lnk-id" type="button" data-go="${id}">${shortId(id)}${x ? ` <span>${esc(x.workflow)}</span>` : ""}</button>`; };
+const exitTree = (x) => `<div class="tree">${!x ? `<div class="tl"><span class="root">in flight</span>  <span class="v-null">no exit journaled yet</span></div>` : x._tag === "Success" ? successTree(x.value) : causeTree(x.cause, null)}</div>`;
+// Activity logs (Effect.log* inside an Activity, captured by kymo's Logger into its own table)
+const LV = { Trace: 0, Debug: 1, Info: 2, Warning: 3, Error: 4, Fatal: 5 };
+const LVS = { Trace: "TRACE", Debug: "DEBUG", Info: "INFO", Warning: "WARN", Error: "ERROR", Fatal: "FATAL" };
+const logTime = (iso) => new Date(ts(iso)).toISOString().slice(11, 23);
+function logsOf(n) {
+  const of = (ex, atts) => atts.flatMap((a) => (a.logs || []).map((l) => ({ l, ex, a })));
+  const out = n.type === "exec" ? of(n.ex, n.ex.activities)
+    : n.type === "child" && n.child ? of(n.child, n.child.activities)
+    : n.type === "act" ? of(n.ex, n.atts)
+    : n.type === "att" ? of(n.ex, [n.a]) : [];
+  return out.sort((x, y) => ts(x.l.at) - ts(y.l.at));
+}
+function logsHtml(n) {
+  const all = logsOf(n), whole = n.type === "exec" || n.type === "child";
+  const note = whole ? `<p class="note">From <code>Effect.log*</code> inside Activities. Logs in the Workflow body are left out: every replay would print them again.</p>` : "";
+  if (!all.length) return `<p class="lg-empty">No logs. <code>Effect.log</code> calls inside ${whole ? "this execution's Activities" : "this Activity"} show up here.</p>${note}`;
+  const min = tr.lvl, list = all.filter((x) => LV[x.l.level] >= min);
+  const byAtt = n.type === "act" && n.atts.length > 1;
+  const filt = [[0, "all"], [2, "info+"], [3, "warn+"]].map(([v, l]) => `<button type="button" data-loglvl="${v}" aria-pressed="${min === v}">${l}<b>${all.filter((x) => LV[x.l.level] >= v).length}</b></button>`).join("");
+  let prev = null;
+  const rows = list.map(({ l, ex, a }) => {
+    let head = "";
+    if (byAtt && a !== prev) { head = `<div class="lg-att">${sg(spanStatus(a, ex))}attempt ${a.attempt}</div>`; prev = a; }
+    const multi = ex.activities.filter((x) => x.name === a.name).length > 1;
+    const src = whole ? `<button class="lg-src" type="button" data-span="${esc(`${ex.id}/a/${a.name}${multi ? "/" + a.attempt : ""}`)}">${esc(a.name)}${multi ? `<span>#${a.attempt}</span>` : ""}</button>` : "";
+    const ann = l.annotations ? `<span class="lg-ann">${Object.entries(l.annotations).map(([k, v]) => `<span><i>${esc(k)}=</i>${esc(typeof v === "string" ? v : JSON.stringify(v))}</span>`).join("")}</span>` : "";
+    return `${head}<div class="lg lv-${l.level}"><time datetime="${l.at}" title="${l.at}">${logTime(l.at)}</time><span class="lvl">${LVS[l.level]}</span>${src}<span class="msg">${esc(l.message)}${ann}</span></div>`;
+  }).join("");
+  return `<div class="lgf" role="group" aria-label="Minimum level">${filt}</div><div class="logs${whole ? " src" : ""}">${rows || `<p class="lg-empty">Nothing at this level.</p>`}</div>${note}`;
+}
+function tabsFor(n) {
+  if (n.type === "exec" || (n.type === "child" && n.child)) return ["Overview", "Payload", "Exit", "Logs", "Compensations"];
+  if (n.type === "act" || n.type === "att") return ["Overview", "Exit", "Logs"];
+  if (n.type === "comp") return ["Overview", "Exit"];
+  if (n.type === "def" && n.w.exit) return ["Overview", "Value"];
+  return ["Overview"];
+}
+function inspHtml(n) {
+  const tabs = tabsFor(n);
+  if (!tabs.includes(tr.tab)) tr.tab = "Overview";
+  const t = tr.tab;
+  let body = "";
+  if (n.type === "exec" || (n.type === "child" && n.child)) {
+    const e = n.type === "exec" ? n.ex : n.child;
+    if (t === "Overview") {
+      const w = wfByName(e.workflow), names = new Set(e.activities.map((a) => a.name)).size, waits = (e.waits || []).length;
+      body = kvs([
+        ["status", `<span class="s-${e.status}">${e.status}</span>${e.suspendedReason ? ` <span class="v-null">on ${e.suspendedReason === "failure" ? "SuspendOnFailure" : REASON[e.suspendedReason]}</span>` : ""}`],
+        ["label", labelOf(e) ? `${esc(labelOf(e))} <span class="v-null">← label(payload)</span>` : `<span class="v-null">none · ${esc(e.workflow)} registers no label</span>`],
+        ["executionId", esc(e.id)],
+        ["idempotencyKey", `${esc(e.idempotencyKey)}${w ? ` <span class="v-null">← ${esc(w.idempotencyKey)}</span>` : ""}`],
+        n.type === "child" && ["called as", esc(n.call.name)],
+        e.parent && ["parent", exLink(e.parent)],
+        (e.children || []).length > 0 && ["children", e.children.map(exLink).join("  ")],
+        ["started", when(e.startedAt)],
+        e.endedAt && ["ended", when(e.endedAt)],
+        [e.endedAt ? "took" : "elapsed", e.endedAt ? dur(ts(e.endedAt) - ts(e.startedAt)) : `<span data-el="${e.startedAt}">${dur(now() - ts(e.startedAt))}</span>`],
+        ["journal", `${e.activities.length} attempt${e.activities.length === 1 ? "" : "s"} · ${names} Activit${names === 1 ? "y" : "ies"} · ${waits} wait${waits === 1 ? "" : "s"} · ${(e.childCalls || []).length} child`],
+        e.interruptedBy && ["interrupted by", esc(e.interruptedBy)],
+      ]) + (n.type === "child" ? `<div class="open-child"><button class="btn" type="button" data-go="${e.id}">${G("child")}Open ${shortId(e.id)}</button></div>` : "");
+    } else if (t === "Payload") body = payloadHtml(e);
+    else if (t === "Exit") body = exitHtml(e);
+    else if (t === "Logs") body = logsHtml(n);
+    else body = compsHtml(e);
+  } else if (n.type === "child") {
+    body = kvs([["called as", esc(n.call.name)], ["execution", esc(n.call.execution)], ["started", when(n.call.startedAt)]]) + `<p class="note">This child isn't in the journal kymo can read.</p>`;
+  } else if (n.type === "act" || n.type === "att") {
+    const a = n.a, ex = n.ex;
+    if (t === "Overview") {
+      body = kvs([
+        ["status", `<span class="s-${n.status}">${n.status}</span>`],
+        ["Activity", esc(a.name)],
+        ["attempt", `${a.attempt} <span class="v-null">of ${n.atts.length}</span>`],
+        ["execution", exLink(ex.id)],
+        ["started", when(a.startedAt)],
+        a.endedAt && ["ended", when(a.endedAt)],
+        [a.endedAt ? "took" : "running for", a.endedAt ? dur(ts(a.endedAt) - ts(a.startedAt)) : `<span data-el="${a.startedAt}">${dur(now() - ts(a.startedAt))}</span>`],
+      ]);
+      if (n.atts.length > 1) body += `<div class="atts"><div class="atts-h">Attempts</div>${n.atts.map((x) => `<button type="button" data-span="${esc(`${ex.id}/a/${x.name}/${x.attempt}`)}" aria-current="${n.type === "att" && x === a}">${sg(spanStatus(x, ex))}<span>attempt ${x.attempt}</span><span class="x">${esc(x.exit ? exitSummary(x.exit) : "in flight")}</span><span class="d">${dur((x.endedAt ? ts(x.endedAt) : now()) - ts(x.startedAt))}</span></button>`).join("")}</div>`;
+    } else if (t === "Logs") body = logsHtml(n);
+    else body = exitTree(a.exit);
+  } else if (n.type === "def" || n.type === "clock") {
+    const w = n.w, def = n.type === "def";
+    if (t === "Value") body = exitTree(w.exit);
+    else body = kvs([
+      ["status", `<span class="${n.status === "waiting" ? "c-" + n.type : "c-" + n.status}" style="color:var(--c)">${n.status}</span>`],
+      ["kind", def ? "DurableDeferred" : "DurableClock"],
+      ["name", esc(w.name)],
+      w.schema && ["schema", esc(w.schema)],
+      ["since", when(w.since)],
+      w.wakeAt && ["wakes", `${stamp(w.wakeAt)} <span class="v-null" data-until="${w.wakeAt}">${until(w.wakeAt)}</span>`],
+      w.doneAt && ["done", when(w.doneAt)],
+      ["waited", n.status === "waiting" && def ? `<span data-el="${w.since}">${dur(now() - ts(w.since))}</span>` : dur(n.end - n.start)],
+    ]) + (n.status === "waiting"
+      ? `<p class="note">${def ? "Your app completes it with <code>DurableDeferred.done</code>. kymo shows the wait; it doesn't answer it." : `The engine wakes the execution at <b>${stamp(w.wakeAt)}</b>. Resume re-enters now; the clock suspends it again if the time hasn't come.`}</p>`
+      : n.status === "abandoned" ? `<p class="note">The execution ended before this wait completed.</p>` : "");
+  } else if (n.type === "comp") {
+    const c = n.comp;
+    body = t === "Overview"
+      ? kvs([["status", `<span class="s-${n.status}">${n.status}</span>`], ["compensation", esc(c.name)], ["undoes", esc(c.activity)], ["ran", when(c.at)]]) + `<p class="note">Registered with <code>Workflow.withCompensation</code>. Compensations run in reverse order on interrupt or failure.</p>`
+      : exitTree(c.exit);
+  }
+  const kind = { exec: "Execution", act: "Activity", att: "Activity attempt", def: "DurableDeferred", clock: "DurableClock", child: "child execution", comp: "Compensation" }[n.type];
+  const cnt = (x) => {
+    if (x === "Compensations") return `<span class="c">${(n.type === "exec" ? n.ex : n.child).compensations.length}</span>`;
+    if (x !== "Logs") return "";
+    const l = logsOf(n);
+    return l.length ? `<span class="c${l.some((y) => LV[y.l.level] >= 4) ? " err" : ""}">${l.length}</span>` : "";
+  };
+  return `<div class="ih"><div class="ih-t">${spanIcon(n)}<span class="n">${esc(n.name)}</span><span class="k">${kind}</span></div>
+    <div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab" data-tab="${x}" aria-selected="${x === t}">${x}${cnt(x)}</button>`).join("")}</div></div>
+    <div class="ib" role="tabpanel">${body}</div>`;
+}
+function drawTrace(focus, withInsp) {
+  const e = ui.sel && byId(ui.sel), box = $(".xd-trace");
+  if (!e || !box || ui.mode !== "detail") return;
+  const st = box.scrollTop, sl = box.scrollLeft;
+  box.innerHTML = spanTreeHtml(e);
+  box.scrollTop = st; box.scrollLeft = sl;
+  if (withInsp) drawInsp();
+  if (focus) $("#trace").focus({ preventScroll: true });
+  const row = $('#trace .tr[aria-selected="true"]');
+  if (row) row.scrollIntoView({ block: "nearest" });
+}
+function drawInsp() {
+  const e = ui.sel && byId(ui.sel), box = $("#insp");
+  if (!e || !box) return;
+  box.innerHTML = inspHtml(selNode(e));
+  box.scrollTop = 0;
+}
+function pickSpan(key, focus) {
+  const e = ui.sel && byId(ui.sel);
+  if (!e || !key) return;
+  pathTo(rootNode(e), key).forEach((k) => tr.expanded.add(k));
+  const changed = tr.sel !== key;
+  tr.sel = key;
+  drawTrace(focus, changed);
+}
+function toggleSpan(key) {
+  if (tr.expanded.has(key)) tr.expanded.delete(key); else tr.expanded.add(key);
+  drawTrace(true, false);
+}
+// zoom keeps the time under `ax` (px into the visible timeline) fixed
+function zoomTo(z, ax, focus) {
+  const box = $(".xd-trace"), tv = $("#trace");
+  if (!box || !tv) return;
+  const tw = $(".trh-l", tv).offsetWidth, vis = box.clientWidth - tw;
+  if (ax == null) ax = vis / 2;
+  const f = (box.scrollLeft + ax) / (tv.offsetWidth - tw);
+  tr.z = Math.max(1, Math.min(ZMAX, z));
+  drawTrace(focus, false);
+  box.scrollLeft = f * ($("#trace").offsetWidth - tw) - ax;
+  drawTicks();
+}
+function zoomSpan(n, focus) {
+  const e = ui.sel && byId(ui.sel), box = $(".xd-trace"), tv = $("#trace");
+  if (!e || !n || !box || !tv) return;
+  const { t0, span } = scaleOf(e), tw = $(".trh-l", tv).offsetWidth, vis = box.clientWidth - tw;
+  tr.z = Math.max(1, Math.min(ZMAX, (0.6 * span) / Math.max(n.end - n.start, span / ZMAX)));
+  drawTrace(focus, false);
+  box.scrollLeft = ((n.start - t0) / span) * ($("#trace").offsetWidth - tw) - 0.2 * vis;
+  drawTicks();
+}
+function traceKey(ev) {
+  const e = ui.sel && byId(ui.sel);
+  if (!e) return false;
+  const root = rootNode(e), rows = visibleRows(root), i = rows.findIndex((r) => r.n.key === tr.sel), cur = rows[i] && rows[i].n;
+  const k = ev.key;
+  if (k === "ArrowDown" || k === "j") { if (i < rows.length - 1) pickSpan(rows[i + 1].n.key, true); }
+  else if (k === "ArrowUp" || k === "k") { if (i > 0) pickSpan(rows[i - 1].n.key, true); }
+  else if (k === "ArrowRight") { if (cur && cur.children.length) { if (!tr.expanded.has(cur.key)) toggleSpan(cur.key); else pickSpan(cur.children[0].key, true); } }
+  else if (k === "ArrowLeft") { if (cur && cur.children.length && tr.expanded.has(cur.key)) toggleSpan(cur.key); else { const p = pathTo(root, tr.sel); if (p.length) pickSpan(p[p.length - 1], true); } }
+  else if (k === "Home") pickSpan(rows[0].n.key, true);
+  else if (k === "End") pickSpan(rows[rows.length - 1].n.key, true);
+  else if (k === "Enter" && cur && cur.type === "child" && cur.child) goExec(cur.child.id);
+  else if (k === "+" || k === "=") zoomTo(tr.z * 2, null, true);
+  else if (k === "-" || k === "_") zoomTo(tr.z / 2, null, true);
+  else if (k === "0") zoomTo(1, null, true);
+  else if (k === "f" && cur) zoomSpan(cur, true);
+  else return false;
+  ev.preventDefault();
+  return true;
+}
+function exitHtml(e) {
+  const r = e.result, w = wfByName(e.workflow) || {};
+  if (!r) {
+    const sub = e.status === "running" ? "Still running. The exit is journaled when the Workflow returns." : "Suspended executions have no exit until they resume and finish.";
+    return `<p class="verdict" style="color:var(--fg-2)">No exit yet.</p><p>${sub}</p>`;
+  }
+  let verdict, sub, tree;
+  if (r._tag === "Suspended") {
+    const tag = r.cause && r.cause._tag === "Fail" ? r.cause.error._tag : r.cause && r.cause._tag;
+    verdict = `Suspended on <span class="m s-suspended">${esc(tag)}</span>`;
+    sub = "SuspendOnFailure kept this failure out of the exit. The execution is parked, not failed: fix the cause, then resume.";
+    tree = causeTree(r.cause, e, "Suspended");
+  } else if (r.exit._tag === "Success") {
+    verdict = `<span class="s-succeeded">Succeeded.</span>`;
+    sub = `Returned <span class="m">${esc(w.success || "a value")}</span>.`;
+    tree = successTree(r.exit.value);
+  } else {
+    const c = r.exit.cause;
+    if (c._tag === "Fail") {
+      verdict = `Failed with <span class="m s-failed">${esc(c.error._tag)}</span>`;
+      sub = `A typed error from the error channel <span class="m">${esc(w.error || "")}</span>.`;
+    } else if (c._tag === "Die") {
+      verdict = `Died on a defect: <span class="m s-failed">${esc(c.defect.name)}</span>`;
+      sub = "Not a typed error. Something threw inside the Workflow; the stack points at it.";
+    } else {
+      verdict = `<span class="s-interrupted">Interrupted.</span>`;
+      sub = e.interruptedBy ? `By <span class="m">${esc(e.interruptedBy)}</span>.` : "Interrupted by its parent or the runtime.";
+    }
+    tree = causeTree(c, e);
+  }
+  return `<p class="verdict">${verdict}</p><p>${sub}</p><div class="tree">${tree}</div>`;
+}
+function compsHtml(e) {
+  const cs = e.compensations || [];
+  const live = LIVE.includes(e.status);
+  const body = cs.length ? cs.map((c) => `<div class="comp"><span class="${c.ran ? "s-succeeded" : ""}" style="${c.ran ? "" : "color:var(--fg-3)"}">${G("comp")}</span>
+      <span class="n">${esc(c.name)}<span class="for">for ${esc(c.activity)}</span></span>
+      <span class="st${c.ran ? " ran" : ""}">${c.ran ? "ran " + stamp(c.at, true) : live ? "registered · runs on interrupt" : e.status === "succeeded" ? "registered · not needed" : "registered · did not run"}</span>
+      ${c.ran && c.exit ? `<span class="ex2">${esc(exitSummary(c.exit))}</span>` : ""}</div>`).join("")
+    : `<p class="muted">None registered.${live ? " An interrupt would have nothing to undo." : ""}</p>`;
+  return body;
+}
+function payloadHtml(e) {
+  const w = wfByName(e.workflow);
+  const kf = w ? keyFields(w) : [];
+  const ent = Object.entries(e.payload || {});
+  return `<dl class="kv">${ent.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${val(v)}${kf.includes(k) ? ` <span class="tag" style="color:var(--fg-3);margin-left:6px">idempotencyKey</span>` : ""}</dd>`).join("")}</dl>`;
+}
+function actionsHtml(e) {
+  const p = ui.pending[e.id];
+  const btns = [];
+  if (e.status === "suspended") btns.push(`<button class="btn btn-primary" type="button" data-act="resume" ${p ? "disabled" : ""}>${p === "resume" ? `<span class="spin"></span>Resuming…` : `${G("play")}Resume`} <kbd>r</kbd></button>`);
+  if (LIVE.includes(e.status)) btns.push(`<button class="btn btn-danger" type="button" data-act="ask-interrupt" ${p ? "disabled" : ""} aria-expanded="${ui.confirm === e.id}">${p === "interrupt" ? `<span class="spin"></span>Interrupting…` : "Interrupt"} <kbd>i</kbd></button>`);
+  if (!btns.length) return "";
+  return `<div class="actions">${btns.join("")}</div>`;
+}
+function noticeHtml(e) {
+  const n = ui.notice;
+  if (!n || n.id !== e.id) return "";
+  const map = {
+    dedup: ["dedup", "deduplicated", `idempotencyKey <code>${esc(e.idempotencyKey)}</code> already maps to this execution, so Effect returned it instead of running ${esc(e.workflow)} again.`],
+    created: ["info", "executed", `A new ${esc(e.workflow)} execution. Each Activity appears in the journal as the engine records it.`],
+    resumed: ["info", "resumed", `Running again. The engine replays the journal: completed Activities return their recorded exits instead of running twice.`],
+    interrupted: ["info", "interrupted", `${n.comps ? `${n.comps} compensation${n.comps > 1 ? "s" : ""} ran` : "No compensations to run"}${n.kids ? `; ${n.kids} child execution${n.kids > 1 ? "s" : ""} interrupted` : ""}. This is terminal.`],
+  };
+  const [cls, code, msg] = map[n.kind];
+  return `<div class="alert ${cls}" role="status"><span class="code">${code}</span><span class="msg">${msg}</span><span class="acts"><button class="ghost-btn" type="button" data-act="dismiss-notice">dismiss</button></span></div>`;
+}
+function opErrorHtml(e) {
+  const er = ui.opError[e.id];
+  if (!er) return "";
+  const net = er.error === "server_unreachable";
+  return `<div class="alert" role="alert"><span class="code">error: ${esc(er.error)}</span>
+    <span class="msg">${esc(er.message)}${net ? `. Is ${esc(S.server.app)} up at <code>${esc(S.server.url)}</code>?` : ""}</span>
+    <span class="acts">${net ? `<button class="btn" type="button" data-act="retry-op" data-op="${er.op}">Retry ${er.op}</button>` : ""}<button class="ghost-btn" type="button" data-act="dismiss-error">dismiss</button></span></div>`;
+}
+function suspNoteHtml(e) {
+  if (e.status !== "suspended") return "";
+  const w = (e.waits || []).find((x) => x.status === "waiting");
+  if (e.suspendedReason === "deferred" && w) return `<p class="note">Parked on DurableDeferred <b>${esc(w.name)}</b>. Your app completes it with <code>DurableDeferred.done</code>; kymo won't fake the answer. Resume re-enters the Workflow, and it suspends again while the deferred is open.</p>`;
+  if (e.suspendedReason === "clock" && w) return `<p class="note">Sleeping on DurableClock <b>${esc(w.name)}</b> until <b>${stamp(w.wakeAt)}</b>, <span data-until="${w.wakeAt}">${until(w.wakeAt)}</span>. Resume re-enters the Workflow; the clock still decides when it wakes.</p>`;
+  if (e.suspendedReason === "failure") {
+    const a = [...e.activities].reverse().find((x) => x.status === "failure");
+    const tag = a && a.exit && a.exit.cause && a.exit.cause.error ? a.exit.cause.error._tag : "a failure";
+    return `<p class="note">SuspendOnFailure parked this execution after <b>${a ? esc(a.name) : "an Activity"}</b> failed on attempt ${a ? a.attempt : "?"} with <code>${esc(tag)}</code>. Fix the cause, then resume: the journal replays and ${a ? esc(a.name) : "it"} runs again.</p>`;
+  }
+  return `<p class="note">Waiting on a child execution. Resume re-enters once you have reason to.</p>`;
+}
+function confirmHtml(e) {
+  if (ui.confirm !== e.id || !LIVE.includes(e.status)) return "";
+  const comps = e.compensations.filter((c) => c.registered && !c.ran).slice().reverse();
+  const kids = (e.children || []).map(byId).filter((k) => k && LIVE.includes(k.status));
+  const p = ui.pending[e.id] === "interrupt";
+  return `<div class="confirm" role="alertdialog" aria-labelledby="cfH" aria-describedby="cfD" data-confirm="${e.id}">
+    <h3 id="cfH">Interrupt <span class="m">${shortId(e.id)}</span>? There is no undo.</h3>
+    <p id="cfD">The fiber is interrupted, registered compensations run, and the execution can never be resumed.</p>
+    <div class="lst"><div class="lst-h">Compensations that will run, last registered first</div>
+      ${comps.length ? `<ol>${comps.map((c, i) => `<li><span class="i">${i + 1}</span><span style="color:var(--fail)">${G("comp")}</span><span>${esc(c.name)} <span class="r">undoes ${esc(c.activity)}</span></span><span class="r">registered</span></li>`).join("")}</ol>` : `<div class="none">No compensations registered. Nothing gets undone.</div>`}
+    </div>
+    <div class="lst"><div class="lst-h">Child executions interrupted with it</div>
+      ${kids.length ? `<ul>${kids.map((k) => `<li><span class="i">↳</span>${sg(k.status)}<span><span class="m">${shortId(k.id)}</span> ${esc(k.workflow)}</span><span class="r">${k.status}</span></li>`).join("")}</ul>` : `<div class="none">No live child executions.</div>`}
+    </div>
+    <div class="foot" style="justify-content:flex-end"><div class="actions"><button class="btn" type="button" data-act="cancel-interrupt">Keep ${e.status} <kbd>esc</kbd></button><button class="btn btn-danger solid" type="button" data-act="interrupt" ${p ? "disabled" : ""}>${p ? `<span class="spin"></span>Interrupting…` : "Interrupt execution"} <kbd>y</kbd></button></div></div>
+  </div>`;
+}
+function detailHtml(e) {
+  trInit(e);
+  const anc = [];
+  for (let p = e.parent && byId(e.parent); p && anc.length < 8; p = p.parent && byId(p.parent)) anc.unshift(p);
+  const lab = labelOf(e);
+  const st = e.status;
+  const why = st === "suspended" && e.suspendedReason ? ` <span class="why">on ${e.suspendedReason === "failure" ? "SuspendOnFailure" : REASON[e.suspendedReason]}</span>` : "";
+  const since = e.endedAt ? `<span class="since">ended <span data-ago="${e.endedAt}">${ago(e.endedAt)}</span></span>` : `<span class="since">open for <span data-el="${e.startedAt}">${dur(now() - ts(e.startedAt))}</span></span>`;
+  return `<article class="xd" data-detail="${e.id}">
+    <div class="xd-h">
+      <nav class="crumb" aria-label="Execution path">${anc.map((p) => `<button class="anc" type="button" data-go="${p.id}" title="${esc(labelOf(p) || p.idempotencyKey)}">${esc(p.workflow)}<span class="m">${shortId(p.id)}</span></button><span class="chev" aria-hidden="true">›</span>`).join("")}<span class="wfname">${esc(e.workflow)}</span></nav>
+      <div class="d-head">
+        <div><h3 class="d-label${lab ? "" : " nolabel"}">${esc(lab || e.idempotencyKey)}</h3>
+          <div class="d-status"><span class="badge s-${st}${ui.bump === e.id ? " bump" : ""}">${sg(st)}${st}${why}</span>${since}<span class="since" title="executionId">${e.id}</span></div></div>
+        <div>${actionsHtml(e)}</div>
+      </div>
+      ${noticeHtml(e)}${opErrorHtml(e)}${suspNoteHtml(e)}${confirmHtml(e)}
+    </div>
+    <div class="xd-trace${tr.h ? " sized" : ""}"${tr.h ? ` style="height:${tr.h}px"` : ""}>${spanTreeHtml(e)}</div>
+    <div class="xd-split" data-split role="separator" aria-orientation="horizontal" aria-label="Resize trace" title="Drag to resize"></div>
+    <section class="insp" id="insp" aria-label="Selected span">${inspHtml(selNode(e))}</section>
+  </article>`;
+}
+function skDetail() {
+  const meta = `<div><span class="sk" style="height:9px;width:60%"></span><span class="sk" style="height:11px;width:80%;margin-top:8px"></span></div>`.repeat(4);
+  const rows = [1, 2, 3, 4, 5].map((i) => `<div style="display:grid;grid-template-columns:62px 16px 150px 1fr 56px;gap:10px;padding:10px 0;align-items:center"><span class="sk" style="height:8px"></span><span class="sk" style="height:12px;border-radius:50%"></span><span class="sk" style="height:10px;width:${48 + i * 9}%"></span><span class="sk" style="height:6px;width:${16 + i * 11}%;margin-left:${i * 10}%"></span><span class="sk" style="height:8px"></span></div>`).join("");
+  return `<div class="detail" aria-busy="true" aria-label="Loading execution"><span class="sk" style="height:10px;width:120px"></span><span class="sk" style="height:28px;width:min(440px,80%);margin-top:16px"></span><span class="sk" style="height:22px;width:150px;margin-top:14px;border-radius:999px"></span><div class="meta">${meta}</div><div style="margin-top:22px">${rows}</div></div>`;
+}
+function noSelHtml() {
+  const wf = ui.wf || (S.workflows[0] && S.workflows[0].name);
+  if (!S.executions.length) {
+    return `<div class="void"><div class="code" style="color:var(--fg-3)">executions[0]</div><h2>Nothing has run yet.</h2>
+      <p>kymo draws what the engine journals. Execute a Workflow and its Activities, waits and exit trace across this pane as they happen.</p>
+      <div class="row"><button class="btn btn-primary" type="button" data-exec="${wf}">${G("play")}Execute ${esc(wf)}</button></div></div>`;
+  }
+  return `<div class="void"><div class="code" style="color:var(--fg-3)">no selection</div><h2>Pick an execution.</h2>
+    <p>Move with <kbd>j</kbd> <kbd>k</kbd> through the executions; the trace opens here.</p></div>`;
+}
+function notFoundHtml(id) {
+  let near = sortedExecs().filter((e) => e.id[0] === id[0]).slice(0, 3);
+  const same = near.length > 0;
+  if (!same) near = sortedExecs().slice(0, 3);
+  return `<div class="void"><div class="code">error: not_found</div>
+    <h2>No execution <span class="m">${esc(id)}</span> in this journal.</h2>
+    <p>executionIds derive from the Workflow name and its idempotencyKey. An id from another app, or from a database that was reset, won't resolve here.</p>
+    <div class="row"><button class="btn" type="button" data-act="back-to-list">Back to executions</button></div>
+    ${near.length ? `<div class="near"><div class="h">${same ? `Also starting with “${esc(id[0])}”` : "Most recent instead"}</div>${near.map((e) => `<button class="near-i" type="button" data-go="${e.id}">${sg(e.status)}<span>${e.id}</span><span class="w">${esc(e.workflow)}</span></button>`).join("")}</div>` : ""}</div>`;
+}
+function renderDetail() {
+  const body = $("#detailBody");
+  const hint = $("#detailHint");
+  if (ui.mode === "execute" && ui.execWf && ui.boot === "ready") {
+    hint.textContent = "execute";
+    if (body.dataset.form !== ui.execWf) mountForm(ui.execWf);
+    else syncForm();
+    return;
+  }
+  body.dataset.form = "";
+  hint.textContent = ui.sel && !ui.notFound ? shortId(ui.sel) : "";
+  let html;
+  if (ui.boot !== "ready" || ui.detailLoading) html = skDetail();
+  else if (ui.notFound) html = notFoundHtml(ui.notFound);
+  else if (!ui.sel || !byId(ui.sel)) html = noSelHtml();
+  else html = detailHtml(byId(ui.sel));
+  const same = body.dataset.shown === (ui.sel || "") + (ui.notFound || "");
+  body.dataset.shown = (ui.sel || "") + (ui.notFound || "");
+  if (same) {
+    const keep = [$(".xd-trace", body), $("#insp", body)].map((el) => el && [el.scrollTop, el.scrollLeft]);
+    keepFocus(body, () => (body.innerHTML = html));
+    [$(".xd-trace", body), $("#insp", body)].forEach((el, i) => { if (el && keep[i]) [el.scrollTop, el.scrollLeft] = keep[i]; });
+    if (tr.z !== 1) drawTicks();
+  } else { body.innerHTML = html; body.scrollTop = 0; }
+}
+function renderDown() {
+  const d = $("#down"), down = ui.boot === "down";
+  $("#main").classList.toggle("is-down", down);
+  d.hidden = !down;
+  if (!down) { d.innerHTML = ""; return; }
+  const err = ui.downErr || { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` };
+  d.innerHTML = `<div class="void"><div class="code">error: ${esc(err.error)}</div>
+    <h2>kymo can't reach <span class="m">${esc(S.server.app)}</span>.</h2>
+    <p><code>${esc(err.message)}</code>. The journal is safe in SQLite. When ${esc(S.server.app)} comes back, the engine picks up every running and suspended execution where it left off.</p>
+    <div class="row"><button class="btn btn-primary" type="button" data-act="retry-boot" ${ui.retrying ? "disabled" : ""}>${ui.retrying ? `<span class="spin"></span>Reconnecting…` : "Retry connection"}</button></div></div>
+    <div class="steps"><div class="c"># what kymo tried</div><div><b>GET</b> ${esc(S.server.url)}/executions</div><div class="e">✕ ECONNREFUSED after ${K.api.latency}ms</div><br>
+    <div class="c"># worth checking</div><div>1  is ${esc(S.server.app)} running?</div><div>2  is <b>Kymo.layer({ port: 4400 })</b> in its layer graph?</div><div>3  is anything else bound to :4400?</div></div>`;
+}
+function renderPanes() {
+  $("#main").dataset.screen = ui.screen;
+  $$(".pane").forEach((p) => p.classList.toggle("active", p.dataset.pane === ui.pane));
+}
+function renderAll() {
+  renderServer(); renderDown(); renderWorkflows(); renderTools(); renderList(); renderDetail(); renderPanes();
+}
+</script>
+<script>
+/* ═════════ execute form (generated from the payload JSON Schema) ═════════ */
+function samplePattern(p) {
+  const src = p.replace(/^\^/, "").replace(/\$$/, "");
+  let out = "", i = 0;
+  while (i < src.length) {
+    let unit;
+    if (src[i] === "[") { const j = src.indexOf("]", i); unit = { cls: src.slice(i + 1, j) }; i = j + 1; }
+    else if (src[i] === "\\") { unit = src[i + 1]; i += 2; }
+    else { unit = src[i]; i++; }
+    let n = 1;
+    const q = src.slice(i).match(/^\{(\d+)\}|^\+|^\*/);
+    if (q) { n = q[1] ? +q[1] : q[0] === "+" ? 3 : 0; i += q[0].length; }
+    for (let k = 0; k < n; k++) out += typeof unit === "object" ? (unit.cls.includes("a-z") ? "9b14c7"[k % 6] : "5532847"[k % 7]) : unit;
+  }
+  return out;
+}
+function validate(w, p) {
+  const issues = [], props = w.payload.properties, req = w.payload.required || [];
+  for (const [k, s] of Object.entries(props)) {
+    const v = p[k];
+    if (v === undefined || v === null || v === "") { if (req.includes(k)) issues.push({ path: k, message: "required" }); continue; }
+    if (s.type === "integer") {
+      if (typeof v !== "number" || !Number.isInteger(v)) { issues.push({ path: k, message: "expected an integer" }); continue; }
+      if (s.minimum !== undefined && v < s.minimum) issues.push({ path: k, message: `must be ≥ ${s.minimum}` });
+      continue;
+    }
+    if (typeof v !== "string") { issues.push({ path: k, message: "expected a string" }); continue; }
+    if (s.enum && !s.enum.includes(v)) issues.push({ path: k, message: "expected " + s.enum.join(" | ") });
+    else if (s.pattern && !new RegExp(s.pattern).test(v)) issues.push({ path: k, message: `doesn't match ${s.pattern}` });
+    else if (s.format === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) issues.push({ path: k, message: "not an email address" });
+    else if (s.format === "date" && !(/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + "T00:00:00Z")))) issues.push({ path: k, message: "expected a date, YYYY-MM-DD" });
+    else if (s.maxLength && v.length > s.maxLength) issues.push({ path: k, message: `at most ${s.maxLength} characters` });
+  }
+  for (const k of Object.keys(p)) if (!props[k]) issues.push({ path: k, message: "not in the payload schema" });
+  return issues;
+}
+function formPayload(w, values) {
+  const p = {};
+  for (const [k, s] of Object.entries(w.payload.properties)) {
+    let v = values[k];
+    if (v === undefined || v === "") continue;
+    if (s.type === "integer") { const t = String(v).trim(); v = /^-?\d+$/.test(t) ? Number(t) : t; }
+    p[k] = v;
+  }
+  return p;
+}
+function exampleJson(w) {
+  const o = {};
+  for (const [k, s] of Object.entries(w.payload.properties)) {
+    if (!(w.payload.required || []).includes(k)) continue;
+    o[k] = s.enum ? s.enum[0] : s.type === "integer" ? 4900 : s.examples ? s.examples[0] : s.pattern ? samplePattern(s.pattern) : s.format === "email" ? "owner@example.com" : s.format === "date" ? isoNow().slice(0, 10) : "…";
+  }
+  return JSON.stringify(o);
+}
+function money(c, cur) {
+  try { return new Intl.NumberFormat("en", { style: "currency", currency: cur || "USD" }).format(c / 100) + (cur ? "" : " (if USD)"); }
+  catch { return (c / 100).toFixed(2); }
+}
+function fieldHtml(k, s, req, v) {
+  const lab = `<div class="f-l" id="l-${k}">${esc(k)}<span class="rq${req ? " req" : ""}">${req ? "required" : "optional"}</span></div>`;
+  let ctl, hint;
+  if (s.enum) {
+    ctl = `<div class="seg" role="radiogroup" aria-labelledby="l-${k}" aria-describedby="m-${k}" data-field="${k}">${s.enum.map((o, i) => `<button type="button" role="radio" aria-checked="${v === o}" tabindex="${v === o || (!s.enum.includes(v) && i === 0) ? 0 : -1}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
+    hint = `${s.enum.length} options`;
+  } else if (s.maxLength && s.maxLength > 120) {
+    ctl = `<textarea class="in" id="f-${k}" data-field="${k}" rows="2" aria-labelledby="l-${k}" aria-describedby="m-${k}" placeholder="optional context for the approver">${esc(v || "")}</textarea>`;
+    hint = `≤ ${s.maxLength} chars`;
+  } else {
+    const ph = s.examples ? s.examples[0] : s.pattern ? samplePattern(s.pattern) : s.format === "email" ? "owner@company.com" : s.format === "date" ? "YYYY-MM-DD" : s.type === "integer" ? "4900" : "";
+    const type = s.format === "email" ? ' type="email" inputmode="email"' : s.type === "integer" ? ' inputmode="numeric"' : "";
+    ctl = `<input class="in" id="f-${k}" data-field="${k}"${type} value="${esc(v === undefined ? "" : v)}" placeholder="${esc(ph)}" aria-labelledby="l-${k}" aria-describedby="m-${k}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+    hint = s.pattern || (s.format === "date" ? "date · YYYY-MM-DD" : s.format) || (s.type === "integer" ? `integer ≥ ${s.minimum === undefined ? "−∞" : s.minimum}` : "string");
+  }
+  return `<div class="f">${lab}<div class="f-c">${ctl}<div class="f-h" id="m-${k}"><span class="msg"></span><span class="hint">${esc(hint)}</span></div></div></div>`;
+}
+function mountForm(name) {
+  const w = wfByName(name), body = $("#detailBody");
+  if (!ui.form || ui.form.wf !== name) {
+    const values = {};
+    if (w.payload.properties.date && w.payload.properties.date.format === "date") values.date = isoNow().slice(0, 10);
+    ui.form = { wf: name, values, touched: {}, submitted: false };
+  }
+  const req = w.payload.required || [];
+  const fields = Object.entries(w.payload.properties).map(([k, s]) => fieldHtml(k, s, req.includes(k), ui.form.values[k])).join("");
+  body.dataset.form = name;
+  body.dataset.shown = "";
+  body.innerHTML = `<article class="detail exec" aria-labelledby="xH">
+    <div class="crumb"><span>Execute</span><span class="wfname">Workflow</span></div>
+    <h3 class="d-wf" id="xH">${esc(name)}</h3>
+    <p class="d-desc">${esc(w.description)}</p>
+    <div class="sig"><span><b>success</b> ${esc(w.success)}</span><span><b>error</b> ${esc(w.error)}</span>${w.annotations.map((a) => `<span class="ann">${esc(a)}</span>`).join("")}</div>
+    <form class="xf" id="xform" novalidate>
+      ${fields}
+      <div class="f"><div class="f-l">idempotencyKey<span class="rq">derived</span></div><div class="f-c"><div class="keycard" id="keycard" aria-live="polite"></div></div></div>
+      <div class="f"><div class="f-l">mode</div><div class="f-c"><div class="sw-row"><button type="button" class="sw" role="switch" id="discard" aria-checked="${ui.discard}" aria-labelledby="swl" aria-describedby="swd"></button><span class="sw-l" id="swl">discard</span><span class="sw-d" id="swd"></span></div></div></div>
+      <div class="f"><div class="f-l">payload.json</div><div class="f-c"><div class="pj"><div class="h"><span>what the engine receives</span><span id="pjv"></span></div><pre id="pjson"></pre></div></div></div>
+      <div class="f"><div></div><div class="f-c"><div class="form-acts"><button class="btn btn-primary" type="submit" id="xsubmit">Execute</button><button class="btn" type="button" data-act="cancel-exec">Cancel <kbd>esc</kbd></button></div><div id="xresult"></div></div></div>
+    </form>
+  </article>`;
+  body.scrollTop = 0;
+  syncForm();
+}
+function syncForm() {
+  const f = ui.form;
+  if (!f || !$("#xform")) return;
+  const w = wfByName(f.wf), props = w.payload.properties;
+  const p = formPayload(w, f.values), issues = validate(w, p);
+  const byPath = {};
+  issues.forEach((i) => { if (!byPath[i.path]) byPath[i.path] = i.message; });
+  for (const [k, s] of Object.entries(props)) {
+    const v = f.values[k], filled = v !== undefined && v !== "";
+    const msg = byPath[k];
+    const show = !!msg && (f.submitted || !!f.touched[k] || (filled && msg !== "required"));
+    const el = $(`#xform [data-field="${k}"]`);
+    if (el) {
+      if (el.classList.contains("seg")) el.classList.toggle("invalid", show);
+      else el.setAttribute("aria-invalid", show ? "true" : "false");
+    }
+    const m = $(`#m-${k} .msg`);
+    if (!m) continue;
+    if (show) { m.className = "msg err"; m.textContent = msg; }
+    else if (filled && s.type === "integer") { m.className = "msg okm"; m.textContent = k.toLowerCase().includes("cents") ? "= " + money(p[k], p.currency) : "✓"; }
+    else if (filled && s.maxLength) { m.className = "msg"; m.textContent = `${String(v).length} / ${s.maxLength}`; }
+    else if (filled) { m.className = "msg okm"; m.textContent = "✓"; }
+    else { m.className = "msg"; m.textContent = ""; }
+  }
+  const kf = keyFields(w);
+  const key = deriveKey(w, p);
+  const keyOk = key !== null && kf.every((k) => !byPath[k]);
+  const existing = keyOk ? S.executions.find((e) => e.workflow === w.name && e.idempotencyKey === key) : null;
+  const kc = $("#keycard");
+  kc.className = "keycard" + (existing ? " dedup" : keyOk ? " fresh" : "");
+  const lab = keyOk ? K.labelOf(w.name, p) : null;
+  kc.innerHTML = `<div class="k1"><span>${esc(w.idempotencyKey)} →</span><span class="val${key ? "" : " pend"}">${key ? esc(key) : "not derived yet"}</span></div>${lab ? `<div class="k3"><span>label →</span><b>${esc(lab)}</b></div>` : ""}
+    <div class="k2">${existing
+      ? `<span class="lead">returns existing execution</span> <button type="button" class="open" data-go="${existing.id}">${existing.id}</button> (${existing.status}) — Effect does not re-run it.`
+      : keyOk ? `<span class="lead">New execution.</span> No execution holds this key yet; the engine derives a fresh executionId from it.`
+      : key ? `Fix ${kf.filter((k) => byPath[k]).join(", ")} first. The key is only as good as its fields.`
+      : `Fill ${kf.join(" and ")} to derive it. Same key, same execution: that's how Effect deduplicates.`}</div>`;
+  $("#discard").setAttribute("aria-checked", String(ui.discard));
+  $("#swd").textContent = ui.discard
+    ? "Fire and forget. The engine hands back the executionId at once; kymo won't wait for an exit."
+    : "Off. kymo follows the execution into its journal once the engine accepts it.";
+  $("#pjson").textContent = JSON.stringify(p, null, 2);
+  $("#pjv").textContent = issues.length ? `${issues.length} issue${issues.length > 1 ? "s" : ""}` : "valid";
+  const btn = $("#xsubmit");
+  btn.disabled = ui.pendingExecute;
+  btn.innerHTML = ui.pendingExecute ? `<span class="spin"></span>Executing…` : `${G("play")}${existing ? "Execute · returns existing" : "Execute"} <kbd>⌘↵</kbd>`;
+  const r = ui.execResult, xr = $("#xresult");
+  xr.innerHTML = !r ? ""
+    : r.error ? `<div class="alert" role="alert"><span class="code">error: ${esc(r.error.error)}</span><span class="msg">${esc(r.error.message)}${r.error.error === "server_unreachable" ? `. Nothing was executed; submit again once ${esc(S.server.app)} answers.` : ""}</span></div>`
+    : `<div class="alert info" role="status"><span class="code">dispatched</span><span class="msg"><code>${r.executionId}</code> · discard: true. kymo didn't wait for an exit.</span><span class="acts"><button class="btn" type="button" data-go="${r.executionId}">Open</button></span></div>`;
+}
+function submitForm() {
+  const f = ui.form;
+  if (!f || ui.pendingExecute) return;
+  const w = wfByName(f.wf);
+  f.submitted = true;
+  ui.execResult = null;
+  const issues = validate(w, formPayload(w, f.values));
+  syncForm();
+  if (issues.length) {
+    const el = $(`#xform [data-field="${issues[0].path}"]`);
+    if (el) (el.classList.contains("seg") ? el.querySelector('[tabindex="0"]') : el).focus();
+    return;
+  }
+  doExecute(w, formPayload(w, f.values));
+}
+function openExecute(name) {
+  if (!wfByName(name) || ui.boot !== "ready") return;
+  ui.mode = "execute"; ui.execWf = name; ui.execResult = null; ui.confirm = null;
+  $("#detailBody").dataset.form = "";
+  renderDetail();
+  if (isMobile()) go("detail");
+  ui.pane = "detail"; renderPanes();
+  const first = $("#xform [data-field]");
+  if (first) (first.classList.contains("seg") ? first.querySelector('[tabindex="0"]') : first).focus({ preventScroll: true });
+}
+function closeExecute() {
+  ui.mode = "detail"; ui.execWf = null; ui.execResult = null; ui.pendingExecute = false;
+  renderDetail();
+  if (isMobile() && !ui.sel) go("list", false);
+}
+function pickSeg(btn) {
+  const seg = btn.closest(".seg"), k = seg.dataset.field;
+  ui.form.values[k] = btn.dataset.v;
+  ui.form.touched[k] = true;
+  $$('[role="radio"]', seg).forEach((b) => { const on = b === btn; b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; });
+  ui.execResult = null;
+  syncForm();
+}
+</script>
+<script>
+/* ═════════ operations: execute, resume, interrupt ═════════ */
+async function doExecute(w, payload) {
+  const discard = ui.discard;
+  ui.pendingExecute = true;
+  syncForm();
+  try {
+    const res = await call("execute", w.name, payload, { discard });
+    ui.pendingExecute = false;
+    const e = byId(res.executionId);
+    if (!res.deduplicated && e) { e.startedAt = isoNow(); ui.fresh.add(e.id); }
+    afterExecute(res, discard);
+  } catch (err) {
+    ui.pendingExecute = false;
+    ui.execResult = { error: err };
+    syncForm();
+  }
+}
+function afterExecute(res, discard) {
+  if (discard && !res.deduplicated) {
+    if (ui.mode === "execute") ui.execResult = { executionId: res.executionId };
+    renderWorkflows(); renderTools(); renderList(); renderDetail();
+    return;
+  }
+  ui.mode = "detail"; ui.execWf = null; ui.execResult = null; ui.form = null;
+  ui.notice = { id: res.executionId, kind: res.deduplicated ? "dedup" : "created" };
+  const e = byId(res.executionId);
+  if (e && ((ui.status && ui.status !== e.status) || (ui.wf && ui.wf !== e.workflow))) { ui.status = null; ui.wf = e.workflow; }
+  ui.q = "";
+  ui.bump = res.deduplicated ? res.executionId : null;
+  renderWorkflows(); renderTools(); renderList();
+  select(res.executionId);
+  ui.bump = null;
+  if (isMobile()) go("detail");
+}
+function refreshAll() { renderWorkflows(); renderTools(); renderList(); renderDetail(); }
+function refreshExec(id) { renderList(); if (ui.sel === id && ui.mode === "detail") renderDetail(); }
+</script>
+<script>
+/* ═════════ navigation ═════════ */
+const SCREENS = ["workflows", "list", "detail"];
+const PANE_OF = { workflows: "wf", list: "list", detail: "detail" };
+function go(screen, fwd) {
+  if (ui.screen === screen) return;
+  if (fwd === undefined) fwd = SCREENS.indexOf(screen) > SCREENS.indexOf(ui.screen);
+  ui.screen = screen;
+  ui.pane = PANE_OF[screen];
+  renderPanes();
+  if (isMobile()) {
+    const el = $({ workflows: "#paneWf", list: "#paneList", detail: "#paneDetail" }[screen]);
+    el.classList.remove("in-fwd", "in-back");
+    void el.offsetWidth;
+    el.classList.add(fwd ? "in-fwd" : "in-back");
+    if (title(screen)) document.title = title(screen);
+  }
+}
+const title = (screen) => screen === "detail" && ui.sel ? `${shortId(ui.sel)} · kymo` : screen === "list" ? `${ui.wf || "Executions"} · kymo` : "kymo · console";
+function back() {
+  if (ui.mode === "execute") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); return; }
+  if (ui.screen === "detail") go("list", false);
+  else if (ui.screen === "list") go("workflows", false);
+}
+function select(id, { focus = false } = {}) {
+  const changed = ui.sel !== id;
+  ui.sel = id; ui.notFound = null; ui.detailLoading = null;
+  if (ui.mode === "execute") { ui.mode = "detail"; ui.execWf = null; ui.execResult = null; }
+  if (changed) { ui.confirm = null; if (ui.notice && ui.notice.id !== id) ui.notice = null; }
+  let row = null;
+  $$("#listBody .ex").forEach((r) => {
+    const on = r.dataset.id === id;
+    r.setAttribute("aria-selected", String(on));
+    r.tabIndex = on ? 0 : -1;
+    if (on) row = r;
+  });
+  renderDetail();
+  if (row) {
+    row.scrollIntoView({ block: "nearest" });
+    if (focus) row.focus({ preventScroll: true });
+  }
+  history.replaceState(null, "", location.search + "#" + id);
+}
+function setFilter({ wf, status }) {
+  ui.wf = wf || null;
+  ui.status = status || null;
+  renderWorkflows(); renderTools(); renderList();
+}
+function openRow(id, viaKey) {
+  select(id, { focus: viaKey });
+  if (isMobile()) go("detail");
+}
+function goExec(id) {
+  if (byId(id)) { if (!isMobile()) ui.pane = "detail"; openRow(id, false); renderPanes(); return; }
+  ui.notFound = id; ui.sel = null; renderDetail();
+  if (isMobile()) go("detail");
+}
+function pickWf(name, viaKey) {
+  setFilter({ wf: name, status: ui.status });
+  if (isMobile() && !viaKey) go("list");
+}
+function pickStatus(s, fromTile) {
+  if (fromTile) ui.wf = null;
+  setFilter({ wf: ui.wf, status: s || null });
+  if (isMobile() && fromTile) go("list");
+}
+async function opResume(id) {
+  if (!byId(id) || ui.pending[id]) return;
+  ui.pending[id] = "resume"; delete ui.opError[id];
+  refreshExec(id);
+  try {
+    await call("resume", id);
+    delete ui.pending[id];
+    ui.notice = { id, kind: "resumed" };
+    ui.bump = id; refreshAll(); ui.bump = null;
+  } catch (err) {
+    delete ui.pending[id];
+    if (byId(id)) ui.opError[id] = Object.assign({ op: "resume" }, err);
+    refreshAll();
+  }
+}
+function askInterrupt(id) {
+  const e = byId(id);
+  if (!e || !LIVE.includes(e.status)) return;
+  ui.confirm = ui.confirm === id ? null : id;
+  renderDetail();
+  const btn = ui.confirm ? $('[data-act="cancel-interrupt"]') : $('[data-act="ask-interrupt"]');
+  if (btn) { btn.focus({ preventScroll: true }); btn.scrollIntoView({ block: "nearest" }); }
+}
+async function opInterrupt(id) {
+  const e = byId(id);
+  if (!e || ui.pending[id]) return;
+  const plan = e.compensations.filter((c) => c.registered && !c.ran).slice().reverse();
+  const kids = e.children.map(byId).filter((k) => k && LIVE.includes(k.status));
+  ui.pending[id] = "interrupt"; delete ui.opError[id];
+  refreshExec(id);
+  try {
+    await call("interrupt", id);
+    const at = isoNow();
+    e.endedAt = at;
+    e.interruptedBy = "kymo ui · 127.0.0.1";
+    plan.forEach((c) => (c.at = at));
+    const stopActs = (x, fiber) => x.activities.forEach((a) => { if (a.status === "running") { a.status = "failure"; a.endedAt = at; a.exit = { _tag: "Failure", cause: { _tag: "Interrupt", fiberId: fiber } }; } });
+    stopActs(e, e.result.exit.cause.fiberId);
+    (e.childCalls || []).forEach((c) => { if (!c.endedAt) c.endedAt = at; });
+    kids.forEach((k) => {
+      const fiber = "#" + Math.floor(Math.random() * 9000 + 1000);
+      k.endedAt = at; delete k.suspendedReason;
+      k.result = { _tag: "Complete", exit: { _tag: "Failure", cause: { _tag: "Interrupt", fiberId: fiber } } };
+      k.interruptedBy = `parent ${id} was interrupted`;
+      stopActs(k, fiber);
+    });
+    delete ui.pending[id];
+    ui.confirm = null;
+    ui.notice = { id, kind: "interrupted", comps: plan.length, kids: kids.length };
+    ui.bump = id; refreshAll(); ui.bump = null;
+  } catch (err) {
+    delete ui.pending[id];
+    ui.opError[id] = Object.assign({ op: "interrupt" }, err);
+    refreshAll();
+  }
+}
+function currentWf() {
+  if (ui.wf) return ui.wf;
+  const e = ui.sel && byId(ui.sel);
+  return e ? e.workflow : S.workflows[0].name;
+}
+function focusPane(p) {
+  ui.pane = p || ui.pane;
+  renderPanes();
+  let el;
+  if (ui.pane === "wf") el = $('#wfBody .wf[aria-selected="true"]') || $("#wfBody .wf");
+  else if (ui.pane === "list") el = $('#listBody .ex[aria-selected="true"]') || $("#listBody .ex") || $("#q");
+  else el = $("#trace") || $("#detailBody");
+  if (el) el.focus({ preventScroll: false });
+}
+function move(d) {
+  if (ui.pane === "wf") {
+    const rows = $$("#wfBody .wf");
+    if (!rows.length) return;
+    let i = rows.findIndex((r) => r.getAttribute("aria-selected") === "true");
+    i = Math.max(0, Math.min(rows.length - 1, i + d));
+    pickWf(rows[i].dataset.wf || null, true);
+    const r = $$("#wfBody .wf")[i];
+    if (r) { r.focus({ preventScroll: true }); r.scrollIntoView({ block: "nearest" }); }
+    return;
+  }
+  if (ui.pane === "detail") {
+    const el = $("#trace");
+    if (el) { el.focus({ preventScroll: true }); traceKey({ key: d > 0 ? "ArrowDown" : "ArrowUp", preventDefault() {} }); }
+    return;
+  }
+  const rows = $$("#listBody .ex");
+  if (!rows.length) return;
+  let i = rows.findIndex((r) => r.dataset.id === ui.sel);
+  i = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + d));
+  const id = rows[i].dataset.id;
+  if (id === ui.sel) { rows[i].focus({ preventScroll: true }); return; }
+  select(id, { focus: true });
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = "copied"; }
+  catch { btn.textContent = "⌘C it"; }
+  setTimeout(() => (btn.textContent = "copy"), 1200);
+}
+
+
+/* ═════════ events ═════════ */
+document.addEventListener("click", (ev) => {
+  const t = ev.target;
+  if (!(t instanceof Element)) return;
+  const at = (s) => t.closest(s);
+  let x;
+  if ((x = at("[data-copy]"))) return copyText(x.dataset.copy, x);
+  if ((x = at("[data-close-keys]"))) return $("#keys").close();
+  if ((x = at("[data-exec]"))) return openExecute(x.dataset.exec);
+  if ((x = at("[data-go]"))) return goExec(x.dataset.go);
+  if ((x = at("[data-tile]"))) return pickStatus(x.dataset.tile, true);
+  if ((x = at("#wfBody [data-wf]"))) { ui.pane = "wf"; renderPanes(); return pickWf(x.dataset.wf || null, false); }
+  if ((x = at("#tools [data-status]"))) return pickStatus(x.dataset.status);
+  if ((x = at("[data-status-only]"))) return pickStatus("");
+  if ((x = at("[data-back]"))) return back();
+  if ((x = at("[data-tab]"))) { tr.tab = x.dataset.tab; return drawInsp(); }
+  if ((x = at("[data-loglvl]"))) { tr.lvl = +x.dataset.loglvl; return drawInsp(); }
+  if ((x = at("[data-zoom]"))) { const v = x.dataset.zoom; return zoomTo(v === "0" ? 1 : tr.z * (v === "1" ? 2 : 0.5)); }
+  if ((x = at("[data-span]"))) return pickSpan(x.dataset.span, false);
+  if ((x = at("#trace .tr"))) {
+    ui.pane = "detail"; renderPanes();
+    if (t.closest("[data-tog]")) return toggleSpan(x.dataset.k);
+    if (ev.detail === 2) { const e = byId(ui.sel), n = e && allNodes(rootNode(e)).find((y) => y.key === x.dataset.k); return zoomSpan(n, true); }
+    return pickSpan(x.dataset.k, true);
+  }
+  if ((x = at("#listBody .ex"))) { ui.pane = "list"; renderPanes(); return openRow(x.dataset.id, false); }
+  if ((x = at('.seg [role="radio"]'))) return pickSeg(x);
+  if ((x = at("#discard"))) { ui.discard = !ui.discard; ui.execResult = null; return syncForm(); }
+  if ((x = at("[data-act]"))) {
+    const a = x.dataset.act, id = ui.sel;
+    if (a === "resume") return opResume(id);
+    if (a === "ask-interrupt") return askInterrupt(id);
+    if (a === "cancel-interrupt") { ui.confirm = null; renderDetail(); const b = $('[data-act="ask-interrupt"]'); return b && b.focus(); }
+    if (a === "interrupt") return opInterrupt(id);
+    if (a === "dismiss-notice") { ui.notice = null; return renderDetail(); }
+    if (a === "dismiss-error") { delete ui.opError[id]; return renderDetail(); }
+    if (a === "retry-op") { delete ui.opError[id]; return x.dataset.op === "resume" ? opResume(id) : opInterrupt(id); }
+    if (a === "retry-boot") return retryBoot();
+    if (a === "clear-filters") { ui.q = ""; setFilter({ wf: null, status: null }); return; }
+    if (a === "back-to-list") { ui.notFound = null; renderDetail(); history.replaceState(null, "", location.search); if (isMobile()) go("list", false); else focusPane("list"); return; }
+    if (a === "cancel-exec") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); return; }
+  }
+});
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.id === "q") { ui.q = t.value; renderList(); return; }
+  if (t.dataset && t.dataset.field && ui.form) { ui.form.values[t.dataset.field] = t.value; ui.execResult = null; syncForm(); }
+});
+document.addEventListener("focusout", (ev) => {
+  const t = ev.target;
+  if (t.matches && t.matches("input[data-field], textarea[data-field]") && ui.form && t.value !== "") { ui.form.touched[t.dataset.field] = true; syncForm(); }
+});
+document.addEventListener("focusin", (ev) => {
+  const p = ev.target.closest && ev.target.closest(".pane");
+  if (p && ui.pane !== p.dataset.pane) { ui.pane = p.dataset.pane; renderPanes(); }
+});
+document.addEventListener("submit", (ev) => {
+  if (ev.target.id === "xform") { ev.preventDefault(); submitForm(); }
+});
+document.addEventListener("pointerdown", (ev) => {
+  const s = ev.target instanceof Element && ev.target.closest("[data-split]");
+  const box = $(".xd-trace"), xd = $(".xd");
+  if (!s || !box || !xd) return;
+  ev.preventDefault();
+  s.setPointerCapture(ev.pointerId);
+  s.classList.add("drag");
+  const y0 = ev.clientY, h0 = box.getBoundingClientRect().height;
+  const max = xd.getBoundingClientRect().height - $(".xd-h", xd).offsetHeight - 140;
+  const mv = (e) => { tr.h = Math.round(Math.max(96, Math.min(max, h0 + e.clientY - y0))); box.style.height = tr.h + "px"; box.classList.add("sized"); };
+  const up = () => { s.classList.remove("drag"); s.removeEventListener("pointermove", mv); s.removeEventListener("pointerup", up); };
+  s.addEventListener("pointermove", mv);
+  s.addEventListener("pointerup", up);
+});
+// ⌘/ctrl + wheel (and trackpad pinch) zooms the trace around the pointer; one redraw per frame
+let wz = null;
+document.addEventListener("wheel", (ev) => {
+  if (!(ev.ctrlKey || ev.metaKey)) return;
+  const box = ev.target instanceof Element && ev.target.closest(".xd-trace");
+  if (!box) return;
+  ev.preventDefault();
+  const tw = ($("#trace .trh-l") || {}).offsetWidth || 0;
+  if (!wz) { wz = { z: tr.z, ax: 0 }; requestAnimationFrame(() => { const w = wz; wz = null; zoomTo(w.z, w.ax); }); }
+  wz.z *= Math.exp(-ev.deltaY * 0.01);
+  wz.ax = Math.max(0, ev.clientX - box.getBoundingClientRect().left - tw);
+}, { passive: false });
+let tickRaf = 0;
+document.addEventListener("scroll", (ev) => {
+  if (tr.z === 1 || tickRaf || !(ev.target instanceof Element) || !ev.target.classList.contains("xd-trace")) return;
+  tickRaf = requestAnimationFrame(() => { tickRaf = 0; drawTicks(); });
+}, true);
+$("#keysBtn").addEventListener("click", () => $("#keys").showModal());
+$("#keys").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); });
+$("#statesBtn").addEventListener("click", (ev) => {
+  const nav = $("#states"), open = nav.hidden;
+  nav.hidden = !open;
+  ev.currentTarget.setAttribute("aria-expanded", String(open));
+});
+
+document.addEventListener("keydown", (ev) => {
+  const t = ev.target, k = ev.key;
+  const mod = ev.metaKey || ev.ctrlKey;
+  if (mod && k === "Enter" && ui.mode === "execute") { ev.preventDefault(); submitForm(); return; }
+  if ($("#keys").open) return;
+  if (t.closest && t.closest(".seg") && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) {
+    ev.preventDefault();
+    const btns = $$('[role="radio"]', t.closest(".seg"));
+    const i = btns.indexOf(t), n = btns[(i + (k === "ArrowLeft" || k === "ArrowUp" ? -1 : 1) + btns.length) % btns.length];
+    pickSeg(n); n.focus();
+    return;
+  }
+  if (k === "Escape") { onEscape(t, ev); return; }
+  const inField = t.matches && t.matches("input, textarea, select, [contenteditable]");
+  if (inField) {
+    if (t.id === "q" && (k === "ArrowDown" || k === "Enter")) { ev.preventDefault(); focusPane("list"); }
+    return;
+  }
+  if (mod || ev.altKey) return;
+  if (t.id === "trace" && traceKey(ev)) return;
+  const onRow = t.matches && t.matches(".ex, .wf");
+  switch (k) {
+    case "j": case "ArrowDown":
+      if (k === "ArrowDown" && !onRow) return;
+      ev.preventDefault(); move(1); break;
+    case "k": case "ArrowUp":
+      if (k === "ArrowUp" && !onRow) return;
+      ev.preventDefault(); move(-1); break;
+    case "h": ev.preventDefault(); if (isMobile()) back(); else focusPane(PANE_OF[SCREENS[Math.max(0, SCREENS.indexOf(Object.keys(PANE_OF).find((s) => PANE_OF[s] === ui.pane)) - 1)]]); break;
+    case "l": ev.preventDefault(); if (!isMobile()) focusPane(PANE_OF[SCREENS[Math.min(2, SCREENS.indexOf(Object.keys(PANE_OF).find((s) => PANE_OF[s] === ui.pane)) + 1)]]); break;
+    case "Enter": case " ":
+      if (!onRow) return;
+      ev.preventDefault();
+      if (t.matches(".wf")) { if (k === " " || t.getAttribute("aria-selected") !== "true") pickWf(t.dataset.wf || null, false); if (isMobile()) go("list"); else focusPane("list"); }
+      else { if (t.dataset.id !== ui.sel || k === " ") openRow(t.dataset.id, false); else if (isMobile()) go("detail"); else focusPane("detail"); }
+      break;
+    case "/": ev.preventDefault(); if (isMobile()) go("list"); $("#q") && $("#q").focus(); break;
+    case "?": ev.preventDefault(); $("#keys").showModal(); break;
+    case "t": { const el = $("#trace"); if (el) { ev.preventDefault(); if (isMobile()) go("detail"); ui.pane = "detail"; renderPanes(); el.focus(); } break; }
+    case "e": ev.preventDefault(); openExecute(currentWf()); break;
+    case "r": { const e = ui.sel && byId(ui.sel); if (e && e.status === "suspended" && ui.mode === "detail") { ev.preventDefault(); opResume(e.id); } break; }
+    case "i": { const e = ui.sel && byId(ui.sel); if (e && LIVE.includes(e.status) && ui.mode === "detail") { ev.preventDefault(); askInterrupt(e.id); } break; }
+    case "y": if (ui.confirm) { ev.preventDefault(); opInterrupt(ui.confirm); } break;
+  }
+});
+function onEscape(t, ev) {
+  if (t.id === "q") { ev.preventDefault(); if (t.value) { t.value = ""; ui.q = ""; renderList(); } else focusPane("list"); return; }
+  if (ui.confirm) { ui.confirm = null; renderDetail(); const b = $('[data-act="ask-interrupt"]'); if (b) b.focus(); return; }
+  if (ui.mode === "execute") { closeExecute(); if (isMobile()) go(ui.sel ? "detail" : "list", false); else focusPane("list"); return; }
+  if (isMobile() && ui.screen !== "workflows") { back(); return; }
+  if (ui.notFound) { ui.notFound = null; renderDetail(); focusPane("list"); return; }
+  if (ui.pane === "detail") { focusPane("list"); return; }
+  if (ui.pane === "list" && (ui.status || ui.wf)) return;
+}
+
+/* ═════════ clock tick: running executions keep moving ═════════ */
+setInterval(() => {
+  $$("[data-ago]").forEach((el) => (el.textContent = ago(el.dataset.ago)));
+  $$("[data-el]").forEach((el) => (el.textContent = (el.dataset.prefix || "") + dur(now() - ts(el.dataset.el))));
+  $$("[data-until]").forEach((el) => (el.textContent = until(el.dataset.until)));
+}, 1000);
+setInterval(() => {
+  const e = ui.sel && byId(ui.sel);
+  if (e && LIVE.includes(e.status) && ui.mode === "detail" && !ui.confirm && !ui.pending[e.id] && ui.boot === "ready") renderDetail();
+}, 15000);
+
+/* ═════════ review states + boot ═════════ */
+function renderStates() {
+  const items = ["live", "loading", "down", "empty", "nomatch", "notfound"];
+  $("#states").innerHTML = `<span class="lbl">Review states</span>` +
+    items.map((s) => `<a href="?state=${s}" aria-current="${REVIEW === s}">${s}</a>`).join("") +
+    `<button type="button" id="failNext" aria-pressed="${K.api.fail}" title="Makes the next KYMO.api call reject with server_unreachable">fail next call</button><span class="note">also ?state=… in the URL</span>`;
+  $("#failNext").addEventListener("click", (ev) => {
+    K.api.fail = !K.api.fail;
+    ev.currentTarget.setAttribute("aria-pressed", String(K.api.fail));
+  });
+}
+function applyInitial() {
+  const hashId = location.hash.slice(1).toLowerCase();
+  if (REVIEW === "nomatch") { ui.wf = "NightlyExport"; ui.status = "failed"; ui.sel = null; ui.screen = "list"; return; }
+  if (REVIEW === "notfound") { ui.notFound = NOTFOUND_ID; ui.sel = null; ui.screen = "detail"; ui.pane = "detail"; return; }
+  if (REVIEW === "empty") { ui.sel = null; ui.screen = "workflows"; return; }
+  if (hashId && byId(hashId)) { ui.sel = hashId; ui.screen = "detail"; return; }
+  if (hashId) { ui.notFound = hashId; ui.screen = "detail"; return; }
+  const first = filtered()[0];
+  ui.sel = first ? first.id : null;
+  ui.screen = "workflows";
+}
+async function boot() {
+  if (REVIEW === "down") S.server.status = "down";
+  if (REVIEW === "empty") S.executions.splice(0);
+  ui.boot = "loading";
+  renderAll();
+  renderStates();
+  if (REVIEW !== "live") { $("#states").hidden = false; $("#statesBtn").setAttribute("aria-expanded", "true"); }
+  if (REVIEW === "loading") return; // held on purpose: the first load never resolves
+  try {
+    await call("listExecutions", {});
+    ui.boot = "ready";
+    applyInitial();
+  } catch (err) {
+    ui.boot = "down";
+    ui.downErr = err;
+  }
+  renderAll();
+  if (ui.boot === "ready" && ui.sel) history.replaceState(null, "", location.search + "#" + ui.sel);
+}
+async function retryBoot() {
+  if (ui.retrying) return;
+  ui.retrying = true;
+  renderDown();
+  S.server.status = "up"; // simulated: the app came back
+  try {
+    await call("listExecutions", {});
+    ui.boot = "ready"; ui.downErr = null;
+    applyInitial();
+  } catch (err) {
+    ui.downErr = err;
+  }
+  ui.retrying = false;
+  renderAll();
+}
+mqMobile.addEventListener("change", () => renderAll());
+boot();
+</script>
+</body>
+</html>

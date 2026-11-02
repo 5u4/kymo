@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>kymo · trace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0d10; --side:#0f1013; --panel:#121317; --raise:#17181d; --hover:#1b1d22; --sel:#1f2130;
+  --line:#1f2127; --line2:#2b2e36;
+  --fg:#e3e4e8; --fg2:#a4a8b1; --mute:#6c717c;
+  --accent:#7d75ff; --accent2:#a29dff;
+  --run:#4d8dff; --sus:#f2a93b; --ok:#34c27a; --fail:#f2554f; --int:#8a8f9a; --clock:#2fc6b4; --comp:#c77dff;
+  --sans:"Geist",ui-sans-serif,system-ui,-apple-system,sans-serif; --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --treew:300px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-size:12px}
+.mute{color:var(--mute)} .fg2{color:var(--fg2)}
+svg{flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* shell */
+.app{display:grid;grid-template-columns:216px minmax(0,1fr);height:100vh}
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{display:flex;align-items:center;gap:8px;padding:14px 14px 10px;font-weight:600;letter-spacing:-.01em}
+.logo{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--accent),#4d8dff);display:grid;place-items:center;font:600 11px var(--mono);color:#fff}
+.envbox{margin:4px 10px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+.envbox .row1{display:flex;align-items:center;gap:7px;font-weight:500}
+.envbox .row2{color:var(--mute);font:11px var(--mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px #34c27a22}
+.dot.down{background:var(--fail);box-shadow:0 0 0 3px #f2554f22}
+.navh{padding:10px 16px 4px;color:var(--mute);font-size:11px;font-weight:500}
+.nav a{display:flex;align-items:center;gap:9px;margin:1px 8px;padding:6px 8px;border-radius:6px;color:var(--fg2)}
+.nav a:hover{background:var(--hover);color:var(--fg)}
+.nav a[aria-current=page]{background:var(--sel);color:var(--fg)}
+.badge{margin-left:auto;min-width:18px;padding:0 5px;border-radius:9px;background:#f2a93b22;color:var(--sus);font:500 11px/18px var(--mono);text-align:center}
+.sidefoot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--line);color:var(--mute);font:11px/1.6 var(--mono)}
+main{min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 20px;border-bottom:1px solid var(--line);flex:none}
+.crumbs{display:flex;align-items:center;gap:6px;color:var(--fg2);min-width:0;white-space:nowrap;overflow:hidden}
+.crumbs a:hover{color:var(--fg)} .crumbs .sep{color:var(--mute)} .crumbs b{font-weight:500;color:var(--fg);overflow:hidden;text-overflow:ellipsis}
+.topbar .sp{flex:1}
+.page{padding:16px 20px 28px}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:6px;border:1px solid var(--line2);background:var(--raise);cursor:pointer;white-space:nowrap;font-weight:500}
+.btn:hover:not(:disabled){background:var(--hover);border-color:#3a3e48}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){background:#8d86ff}
+.btn.danger{color:#ff8a85;border-color:#5a2a2a;background:#2a1517}
+.btn.danger:hover:not(:disabled){background:#371a1c}
+.btn.danger.solid{background:#c93f3a;border-color:#c93f3a;color:#fff}
+.btn.sm{height:24px;padding:0 8px;font-size:12px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--fg2)} .btn.ghost:hover{color:var(--fg)}
+kbd{font:10px var(--mono);padding:1px 4px;border-radius:3px;border:1px solid #ffffff30;opacity:.8}
+.input,select.input,textarea.input{height:28px;padding:0 9px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);outline:none;min-width:0}
+textarea.input{height:auto;padding:8px 9px;resize:vertical}
+.input:focus{border-color:var(--accent)}
+.input.bad{border-color:var(--fail)}
+
+/* status */
+.pill{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px 0 5px;border-radius:5px;font-size:12px;font-weight:500;white-space:nowrap;background:color-mix(in srgb,var(--c) 13%,transparent);color:var(--c)}
+.s-run{--c:var(--run)} .s-sus{--c:var(--sus)} .s-ok{--c:var(--ok)} .s-fail{--c:var(--fail)} .s-int{--c:var(--int)} .s-clock{--c:var(--clock)} .s-comp{--c:var(--comp)}
+.ic{color:var(--c)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1.1s linear infinite}
+
+/* filter bar + table */
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ph h1{font-size:16px;font-weight:600;margin:0;letter-spacing:-.01em}
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:6px;border:1px solid var(--line2);background:transparent;cursor:pointer;color:var(--fg2);font-size:12px}
+.chip:hover{color:var(--fg);background:var(--hover)}
+.chip[aria-pressed=true]{background:var(--sel);color:var(--fg);border-color:#3b3f68}
+.chip .n{font:11px var(--mono);color:var(--mute)}
+.search{position:relative;margin-left:auto}
+.search svg{position:absolute;left:8px;top:7px;color:var(--mute)}
+.search .input{padding-left:27px;width:260px}
+.tw{border:1px solid var(--line);border-radius:8px;overflow-x:auto;background:var(--panel)}
+table.t{width:100%;border-collapse:collapse;white-space:nowrap}
+.t th{font-weight:500;color:var(--mute);text-align:left;font-size:12px;padding:0 12px;height:32px;border-bottom:1px solid var(--line);background:var(--side)}
+.t td{padding:0 12px;height:38px;border-bottom:1px solid var(--line)}
+.t tr:last-child td{border-bottom:0}
+.t tbody tr{cursor:pointer}
+.t tbody tr:hover td{background:var(--hover)}
+.t td.r,.t th.r{text-align:right}
+.idc{display:inline-flex;align-items:center;gap:6px}
+.copy{opacity:0;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:4px;border:0;background:transparent;color:var(--mute);cursor:pointer}
+tr:hover .copy,.copy:focus-visible,.always .copy{opacity:1} .copy:hover{background:var(--line2);color:var(--fg)}
+.kid{color:var(--mute);margin-right:2px;font-family:var(--mono)}
+.step{display:inline-flex;align-items:center;gap:6px;color:var(--fg2);max-width:300px;overflow:hidden;text-overflow:ellipsis} .step .sub{color:var(--mute)}
+.t td.dur{min-width:84px}
+.empty{padding:48px 16px;text-align:center;color:var(--fg2)}
+.empty h3{margin:0 0 4px;font-size:14px;color:var(--fg);font-weight:500}
+.empty p{margin:0 0 14px}
+.loading{padding:28px 16px;color:var(--mute);display:flex;align-items:center;gap:8px;justify-content:center}
+
+/* detail */
+.dh{padding:14px 20px 12px;border-bottom:1px solid var(--line);flex:none}
+.dh1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dh1 h1{font-size:16px;font-weight:600;margin:0}
+.dh1 .acts{margin-left:auto;display:flex;gap:8px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 22px;margin-top:9px;color:var(--fg2);font-size:12px}
+.meta span b{color:var(--mute);font-weight:400;margin-right:6px}
+.banner{display:flex;gap:9px;align-items:flex-start;margin-top:12px;padding:9px 11px;border-radius:7px;border:1px solid color-mix(in srgb,var(--c) 30%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent);color:var(--fg)}
+.banner svg{margin-top:1px;color:var(--c)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:var(--left,58%) 5px minmax(300px,1fr)}
+.pane{min-width:0;min-height:0;overflow:auto}
+.gutter{cursor:col-resize;background:var(--line);position:relative}
+.gutter:hover,.gutter.drag{background:var(--accent)}
+.trace{position:relative;outline:none;min-width:520px}
+.trh{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:var(--treew) 1fr;height:30px;background:var(--side);border-bottom:1px solid var(--line);font-size:11px;color:var(--mute)}
+.trh>div:first-child{padding:0 12px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--line)}
+.ruler{position:relative;overflow:hidden}
+.tick{position:absolute;top:0;bottom:0;border-left:1px solid var(--line2);padding:8px 0 0 4px;font:10px var(--mono);white-space:nowrap}
+.tick.now{border-left:1px dashed var(--accent);color:var(--accent2)}
+.tick.now.flip{transform:translateX(-100%);border-left:0;border-right:1px dashed var(--accent);padding:8px 4px 0 0}
+.grid{position:absolute;top:30px;bottom:0;left:var(--treew);right:0;pointer-events:none}
+.grid i{position:absolute;top:0;bottom:0;border-left:1px solid #ffffff08}
+.grid i.now{border-left:1px dashed #7d75ff88}
+.tr{display:grid;grid-template-columns:var(--treew) 1fr;height:30px;cursor:pointer;position:relative}
+.tr:hover{background:#ffffff06}
+.tr[aria-selected=true]{background:var(--sel)}
+.tr[aria-selected=true]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
+.tl{display:flex;align-items:center;gap:6px;min-width:0;padding-right:10px;border-right:1px solid var(--line)}
+.tl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;min-width:24px}
+.tl .ty{color:var(--mute);font-size:11px;white-space:nowrap;flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.brand .dot{display:none}
+.tl .x{color:var(--mute);font:11px var(--mono);margin-left:auto;white-space:nowrap}
+.tog{width:16px;height:16px;display:grid;place-items:center;border:0;background:none;color:var(--mute);cursor:pointer;padding:0;border-radius:3px;flex:none}
+.tog:hover{background:var(--line2);color:var(--fg)}
+.tog svg{transition:transform .12s} .tog[aria-expanded=true] svg{transform:rotate(90deg)}
+.tog.nokids{visibility:hidden}
+.guide{width:14px;align-self:stretch;flex:none;border-left:1px solid var(--line2);margin-left:7px}
+.wf{position:relative;overflow:hidden}
+.bar{position:absolute;top:10px;height:10px;min-width:2px;border-radius:2px;background:var(--c)}
+.bar.thin{top:13px;height:4px;opacity:.75}
+.bar.wait{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 70%,transparent) 0 4px,color-mix(in srgb,var(--c) 30%,transparent) 4px 8px)}
+.bar.future{background:transparent;border:1px dashed var(--c);opacity:.7}
+.bar.pt{width:9px;height:9px;min-width:0;border-radius:1px;transform:translateX(-4px) rotate(45deg);top:10px}
+.blab{position:absolute;top:8px;font:10px/14px var(--mono);color:var(--fg2);white-space:nowrap}
+.insp{border-left:0;background:var(--panel);display:flex;flex-direction:column}
+.ih{padding:12px 16px 0;border-bottom:1px solid var(--line);flex:none;position:sticky;top:0;background:var(--panel);z-index:2}
+.ih .t1{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;min-width:0}
+.ih .t1 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ih .t2{color:var(--mute);font-size:12px;margin:2px 0 10px}
+.tabs{display:flex;gap:16px}
+.tabs button{border:0;background:none;padding:0 0 8px;color:var(--mute);cursor:pointer;border-bottom:2px solid transparent;font-weight:500}
+.tabs button:hover{color:var(--fg2)}
+.tabs button[aria-selected=true]{color:var(--fg);border-color:var(--accent)}
+.ib{padding:14px 16px 24px}
+dl.props{display:grid;grid-template-columns:120px 1fr;gap:9px 12px;margin:0}
+dl.props dt{color:var(--mute)} dl.props dd{margin:0;min-width:0;word-break:break-word}
+.sec{margin:20px 0 8px;font-size:11px;font-weight:500;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.code{position:relative;margin:0;padding:10px 12px;border-radius:7px;background:var(--bg);border:1px solid var(--line);font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;overflow:auto}
+.code .copy{position:absolute;top:6px;right:6px;opacity:.7}
+.j-k{color:#9fb4ff}.j-s{color:#8fd5a6}.j-n{color:#f5c27a}.j-b{color:#e39bd8}
+.exittag{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--mono);margin-bottom:8px}
+.cause{border:1px solid #5a2a2a;background:#1d1113;border-radius:7px;overflow:hidden}
+.cause.die{border-color:#6b2a2a}
+.cause.intr{border-color:var(--line2);background:var(--bg)}
+.cause .chd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #ffffff10}
+.cause .ctag{font:500 11px var(--mono);padding:1px 6px;border-radius:4px;background:#f2554f26;color:#ff8a85}
+.cause.intr .ctag{background:#8a8f9a26;color:var(--fg2)}
+.cause .cname{font:600 13px var(--mono)}
+.cause .cbody{padding:10px 12px}
+.cause pre{margin:8px 0 0;font:11.5px/1.6 var(--mono);color:#e8b3b0;white-space:pre-wrap;word-break:break-word}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font:12px var(--mono)} .kv span:nth-child(odd){color:var(--mute)}
+.atts{width:100%;border-collapse:collapse;font-size:12px}
+.atts td{padding:6px 4px;border-top:1px solid var(--line)} .atts tr{cursor:pointer} .atts tr:hover td{background:var(--hover)}
+.note{color:var(--fg2);font-size:12px;padding:9px 11px;border-radius:7px;background:var(--raise);border:1px solid var(--line);margin-top:14px}
+.comp{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.comp .n{font:11px var(--mono);color:var(--mute);width:16px;padding-top:2px}
+.lnk{color:var(--accent2)} .lnk:hover{text-decoration:underline}
+
+/* workflows + execute */
+.wfname{font-weight:600} .wfdesc{color:var(--mute);font-size:12px;white-space:normal;max-width:440px;margin-top:2px}
+.t.wfs td{height:auto;padding-top:11px;padding-bottom:11px;vertical-align:top}
+.ann{display:inline-block;font:11px var(--mono);padding:1px 6px;border-radius:4px;background:var(--raise);border:1px solid var(--line2);color:var(--fg2)}
+.counts{display:flex;gap:4px;flex-wrap:wrap}
+.counts a.pill:hover{filter:brightness(1.25)}
+.exgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.card{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.card>header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:500}
+.card>.cb{padding:14px}
+.field{margin-bottom:14px}
+.field label{display:flex;gap:6px;align-items:baseline;margin-bottom:5px;font-weight:500}
+.field label .req{color:var(--fail)}
+.field label .hint{margin-left:auto;color:var(--mute);font:11px var(--mono);font-weight:400}
+.field .input{width:100%}
+.field .err{color:#ff8a85;font-size:12px;margin-top:4px}
+.field .help{color:var(--mute);font-size:11px;margin-top:4px}
+.exfoot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 14px;border-top:1px solid var(--line)}
+.check{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--fg2)}
+.check input{accent-color:var(--accent)}
+.keyprev{font:12px var(--mono);color:var(--fg2)} .keyprev .warn{color:var(--sus)}
+.recent button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:9px 14px;cursor:pointer}
+.recent button:first-child{border-top:0}
+.recent button:hover{background:var(--hover)}
+.recent .r1{display:flex;align-items:center;gap:8px;font-size:12px}
+.recent .r2{font:11px var(--mono);color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notice{display:flex;gap:10px;padding:11px 13px;border-radius:8px;margin-bottom:14px;border:1px solid #f2a93b55;background:#f2a93b10}
+.notice.err{border-color:#f2554f55;background:#f2554f10}
+.notice h4{margin:0 0 3px;font-size:13px;font-weight:600}
+.notice p{margin:0;color:var(--fg2)}
+
+/* down, dialog, toast */
+.down{margin:12vh auto;max-width:460px;text-align:center;padding:0 20px}
+.down .ico{width:40px;height:40px;margin:0 auto 14px;border-radius:10px;display:grid;place-items:center;background:#f2554f18;color:var(--fail)}
+.down h2{font-size:16px;margin:0 0 6px}
+.down p{color:var(--fg2);margin:0 0 12px}
+.down .code{text-align:left;margin-bottom:16px}
+dialog{border:1px solid var(--line2);border-radius:10px;background:var(--raise);color:var(--fg);padding:0;width:min(460px,calc(100vw - 24px));box-shadow:0 20px 60px #0009}
+dialog::backdrop{background:#05060899;backdrop-filter:blur(2px)}
+.dlg-b{padding:18px 18px 4px} .dlg-b h3{margin:0 0 6px;font-size:15px} .dlg-b p{margin:0 0 12px;color:var(--fg2)}
+.dlg-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line);margin-top:12px}
+ol.cl{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+ol.cl li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--line)} ol.cl li:first-child{border-top:0}
+.toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:50}
+.toast{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;background:var(--raise);border:1px solid var(--line2);box-shadow:0 8px 30px #0008;max-width:360px}
+
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto;min-height:100vh}
+  .side{flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
+  .brand{padding:10px 10px} .brand .dot{display:block} .envbox,.navh,.sidefoot{display:none}
+  .nav{display:flex} .nav a{margin:0 2px}
+  main{overflow:visible}
+  .topbar{padding:0 12px} .page{padding:12px}
+  .search{margin-left:0;width:100%} .search .input{width:100%}
+  .dh{padding:12px}
+  .split{display:block}
+  .gutter{display:none}
+  .pane.left{max-height:none}
+  .trace{min-width:0}
+  :root{--treew:60%}
+  .tl .ty{display:none}
+  .exgrid{grid-template-columns:1fr}
+  dl.props{grid-template-columns:100px 1fr}
+  .dh1 .acts{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">k</div>kymo<span class="dot" id="mdot"></span></div>
+    <div class="envbox" id="env"></div>
+    <div class="navh">Navigate</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidefoot" id="sidefoot"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<dialog id="dlg"></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script>
+const K = window.KYMO, S = K.state, NOW = Date.parse(K.NOW);
+const DOWN = new URLSearchParams(location.search).get("state") === "down";
+if (DOWN) S.server.status = "down";
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const T = (s) => (s ? Date.parse(s) : null);
+const short = (id) => id.slice(0, 8);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pad = (n) => String(n).padStart(2, "0");
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function fmtDur(ms) {
+  if (ms == null || isNaN(ms)) return "–";
+  ms = Math.max(0, ms);
+  if (ms < 1000) return Math.round(ms) + "ms";
+  const s = ms / 1000; if (s < 60) return (s < 10 ? s.toFixed(2) : s.toFixed(1)) + "s";
+  const m = Math.floor(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  if (m < 60) return `${m}m ${Math.floor(s % 60)}s`;
+  if (h < 24) return `${h}h ${m % 60}m`;
+  return `${d}d ${h % 24}h`;
+}
+function rel(iso) {
+  const d = T(iso) - NOW, a = Math.abs(d);
+  if (a < 45e3) return d > 0 ? "in <1m" : "just now";
+  const v = a < 36e5 ? Math.round(a / 6e4) + "m" : a < 864e5 ? Math.round(a / 36e5) + "h" : Math.round(a / 864e5) + "d";
+  return d > 0 ? `in ${v}` : `${v} ago`;
+}
+function abs(iso, ms = true) {
+  const d = new Date(iso);
+  return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}${ms ? "." + String(d.getUTCMilliseconds()).padStart(3, "0") : ""}`;
+}
+const execEnd = (e) => T(e.endedAt) ?? NOW;
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+// The fixture stamps mutations with the wall clock, but the UI treats KYMO.NOW as "now"; pull those stamps back to it.
+function alignToNow(e) {
+  if (T(e.endedAt) > NOW) e.endedAt = K.NOW;
+  e.compensations.forEach((c) => { if (T(c.at) > NOW) c.at = K.NOW; });
+}
+
+/* ---------- icons ---------- */
+const sv = (p, sz = 14, cls = "") => `<svg class="${cls}" width="${sz}" height="${sz}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I = {
+  check: sv('<circle cx="8" cy="8" r="6.25"/><path d="m5.5 8.2 1.7 1.7 3.3-3.6"/>'),
+  x: sv('<circle cx="8" cy="8" r="6.25"/><path d="m6 6 4 4m0-4-4 4"/>'),
+  pause: sv('<circle cx="8" cy="8" r="6.25"/><path d="M6.6 5.8v4.4M9.4 5.8v4.4"/>'),
+  spin: sv('<circle cx="8" cy="8" r="6.25" opacity=".25"/><path d="M8 1.75A6.25 6.25 0 0 1 14.25 8"/>', 14, "spin"),
+  stop: sv('<circle cx="8" cy="8" r="6.25"/><path d="m4.2 11.8 7.6-7.6"/>'),
+  act: sv('<path d="M9 1.8 3.8 9h4l-.8 5.2L12.2 7h-4z"/>'),
+  def: sv('<path d="M4.5 2h7M4.5 14h7M5 2c0 3.3 6 3.7 6 6s-6 2.7-6 6M11 2c0 3.3-6 3.7-6 6s6 2.7 6 6"/>'),
+  clock: sv('<circle cx="8" cy="8" r="6.25"/><path d="M8 4.5V8l2.3 1.5"/>'),
+  child: sv('<circle cx="4" cy="3.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v3.4c0 2 1.6 4 4 4h2.4"/>'),
+  comp: sv('<path d="M5.5 4 2.5 7l3 3"/><path d="M2.5 7h7a4 4 0 0 1 0 8H7"/>'),
+  root: sv('<rect x="1.8" y="1.8" width="5" height="5" rx="1"/><rect x="9.2" y="9.2" width="5" height="5" rx="1"/><path d="M4.3 6.8v2.4c0 1 .8 1.8 1.8 1.8h3.1"/>'),
+  copy: sv('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.8c0-.7-.6-1.3-1.3-1.3H3.8c-.7 0-1.3.6-1.3 1.3v5.4c0 .7.6 1.3 1.3 1.3h1.7"/>', 13),
+  chev: sv('<path d="m6 4 4 4-4 4"/>', 12),
+  search: sv('<circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>'),
+  list: sv('<path d="M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h0M2.5 8h0M2.5 12h0"/>'),
+  wf: sv('<rect x="1.8" y="1.8" width="5" height="5" rx="1"/><rect x="9.2" y="9.2" width="5" height="5" rx="1"/><path d="M4.3 6.8v2.4c0 1 .8 1.8 1.8 1.8h3.1"/>'),
+  play: sv('<path d="M5 3.5v9l7-4.5z"/>'),
+  plug: sv('<path d="M6 2v3M10 2v3M4.5 5h7v3a3.5 3.5 0 0 1-7 0zM8 11.5V14"/>', 18),
+  info: sv('<circle cx="8" cy="8" r="6.25"/><path d="M8 7.5V11M8 5h0"/>'),
+};
+const ST = {
+  running: ["Running", "run", "spin"], suspended: ["Suspended", "sus", "pause"], succeeded: ["Succeeded", "ok", "check"],
+  failed: ["Failed", "fail", "x"], interrupted: ["Interrupted", "int", "stop"], waiting: ["Waiting", "sus", "pause"], done: ["Done", "ok", "check"],
+};
+const pill = (s) => { const [l, c, i] = ST[s] || [s, "int", "info"]; return `<span class="pill s-${c}">${I[i]}${l}</span>`; };
+const sIcon = (s) => { const [, c, i] = ST[s] || ["", "int", "info"]; return `<span class="ic s-${c}" style="display:inline-flex">${I[i]}</span>`; };
+const copyBtn = (text, label = "Copy") => `<button class="copy" data-copy="${esc(text)}" title="${label}" aria-label="${label}">${I.copy}</button>`;
+
+function jsonHTML(v) {
+  const s = JSON.stringify(v, null, 2);
+  if (s === undefined) return '<span class="j-b">undefined</span>';
+  return esc(s).replace(/(&quot;(?:[^&\\]|\\.|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/g,
+    (m, str, colon, kw) => str ? (colon ? `<span class="j-k">${str}</span>${colon}` : `<span class="j-s">${str}</span>`) : kw ? `<span class="j-b">${m}</span>` : `<span class="j-n">${m}</span>`);
+}
+const codeBlock = (v) => `<pre class="code">${copyBtn(JSON.stringify(v, null, 2))}${jsonHTML(v)}</pre>`;
+
+/* ---------- api ---------- */
+const cache = { list: null };
+async function call(fn, ...args) {
+  if (S.server.status === "down") { await sleep(350); throw { error: "server_unreachable", message: `connect ECONNREFUSED ${S.server.url}` }; }
+  return K.api[fn](...args);
+}
+
+/* ---------- cause / exit ---------- */
+function causeHTML(c) {
+  if (!c) return "";
+  if (c._tag === "Fail") {
+    const { _tag, ...fields } = c.error || {};
+    const kv = Object.entries(fields).map(([k, v]) => `<span>${esc(k)}</span><span>${esc(JSON.stringify(v))}</span>`).join("");
+    return `<div class="cause"><div class="chd"><span class="ctag">Fail</span><span class="cname">${esc(_tag || "Error")}</span><span class="mute" style="margin-left:auto;font-size:11px">expected error</span></div>${kv ? `<div class="cbody"><div class="kv">${kv}</div></div>` : ""}</div>`;
+  }
+  if (c._tag === "Die") {
+    const d = c.defect || {};
+    return `<div class="cause die"><div class="chd"><span class="ctag">Die</span><span class="cname">${esc(d.name || "Defect")}</span><span class="mute" style="margin-left:auto;font-size:11px">defect · unexpected</span></div><div class="cbody">${esc(d.message || JSON.stringify(d))}${d.stack ? `<pre>${esc(d.stack)}</pre>` : ""}</div></div>`;
+  }
+  if (c._tag === "Interrupt") return `<div class="cause intr"><div class="chd"><span class="ctag">Interrupt</span><span class="cname">fiber ${esc(c.fiberId || "")}</span></div></div>`;
+  return codeBlock(c);
+}
+function exitHTML(exit) {
+  if (!exit) return `<div class="note">No exit yet — still running.</div>`;
+  if (exit._tag === "Success") return `<div class="exittag s-ok"><span class="ic">${I.check}</span>Exit.Success</div>${codeBlock(exit.value)}`;
+  return `<div class="exittag s-fail"><span class="ic">${I.x}</span>Exit.Failure</div>${causeHTML(exit.cause)}`;
+}
+function resultHTML(ex) {
+  const r = ex.result;
+  if (!r) return `<div class="note">No result yet — the execution is ${ex.status}. A result is recorded when the workflow completes or suspends.</div>`;
+  if (r._tag === "Suspended") return `<div class="exittag s-sus"><span class="ic">${I.pause}</span>Workflow.Suspended</div>${r.cause ? causeHTML(r.cause) : ""}`;
+  return exitHTML(r.exit);
+}
+
+/* ---------- derived ---------- */
+function currentStep(e) {
+  const wait = e.waits.find((w) => w.status === "waiting");
+  const last = e.activities[e.activities.length - 1];
+  const openChild = e.childCalls.find((c) => !c.endedAt);
+  if (["running", "suspended"].includes(e.status)) {
+    if (e.status === "suspended" && e.suspendedReason === "failure" && last)
+      return { c: "fail", i: I.x, t: last.name, sub: `failed ×${e.activities.filter((a) => a.name === last.name).length}` };
+    if (last?.status === "running") return { c: "run", i: I.act, t: last.name, sub: last.attempt > 1 ? `attempt ${last.attempt}` : "" };
+    if (openChild) return { c: "run", i: I.child, t: `child · ${openChild.name}` };
+    if (wait?.kind === "deferred") return { c: "sus", i: I.def, t: `waiting · ${wait.name}` };
+    if (wait?.kind === "clock") return { c: "clock", i: I.clock, t: `sleeping · ${wait.name}`, sub: `wakes ${rel(wait.wakeAt)}` };
+  }
+  if (e.status === "running" && !last) return { c: "run", i: I.spin, t: "starting…" };
+  if (e.status === "failed") {
+    const cause = e.result?.exit?.cause, at = [...e.activities].reverse().find((a) => a.status === "failure");
+    if (cause?._tag === "Fail") return { c: "fail", i: I.x, t: `Fail · ${cause.error?._tag || "Error"}`, sub: at ? `at ${at.name}` : "" };
+    if (cause?._tag === "Die") return { c: "fail", i: I.x, t: `Die · ${cause.defect?.name || "defect"}` };
+    return { c: "fail", i: I.x, t: "failed" };
+  }
+  if (e.status === "interrupted") {
+    const ran = e.compensations.filter((c) => c.ran).length;
+    return { c: "int", i: I.stop, t: "interrupted", sub: ran ? `${plural(ran, "compensation")} ran` : "" };
+  }
+  if (e.status === "succeeded") return { c: "ok", i: I.check, t: "completed", sub: last ? `after ${last.name}` : "", dim: true };
+  return last ? { c: "int", i: I.act, t: last.name, dim: true } : { t: "—", dim: true };
+}
+const counts = (list) => list.reduce((m, e) => ((m[e.status] = (m[e.status] || 0) + 1), m), {});
+
+/* ---------- shell ---------- */
+function renderShell(route) {
+  const s = S.server, down = s.status === "down";
+  $("#env").innerHTML = `<div class="row1"><span class="dot ${down ? "down" : ""}"></span>${esc(s.app)}<span class="mute" style="margin-left:auto;font-weight:400;font-size:11px">${down ? "unreachable" : "up " + esc(s.uptime)}</span></div><div class="row2">${esc(s.url.replace(/^https?:\/\//, ""))}</div>`;
+  $("#mdot").className = "dot" + (down ? " down" : ""); $("#mdot").title = `${s.app} ${down ? "unreachable" : "up"}`;
+  const sus = cache.list ? cache.list.filter((e) => e.status === "suspended").length : 0;
+  const sec = route.parts[0] || "executions";
+  $("#nav").innerHTML =
+    `<a href="#/executions" ${sec === "executions" ? 'aria-current="page"' : ""}>${I.list}Executions${sus ? `<span class="badge" title="${sus} suspended">${sus}</span>` : ""}</a>` +
+    `<a href="#/workflows" ${sec === "workflows" ? 'aria-current="page"' : ""}>${I.wf}Workflows</a>`;
+  $("#sidefoot").innerHTML = `effect ${esc(s.effect)}<br>${esc(s.runner)}<br>sqlite · ledgerly.db`;
+}
+const topbar = (crumbs, right = "") => `<div class="topbar"><div class="crumbs">${crumbs}</div><div class="sp"></div>${right}</div>`;
+function downHTML(err) {
+  return `<div class="down"><div class="ico">${I.plug}</div><h2>Can't reach ${esc(S.server.app)}</h2>
+  <p>kymo couldn't connect to the workflow server. Executions are durable in SQLite — nothing is lost while it's down.</p>
+  <pre class="code">${esc(err.error)}: ${esc(err.message)}</pre><button class="btn" data-act="retry">Retry</button>
+  <div class="mute" style="margin-top:10px;font-size:12px" id="retrynote"></div></div>`;
+}
+function toast(html, kind = "ok") {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<span class="ic s-${kind}" style="display:inline-flex">${kind === "fail" ? I.x : I.check}</span><span>${html}</span>`;
+  $("#toasts").append(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+/* ---------- router ---------- */
+let navToken = 0;
+function parseHash() {
+  const h = location.hash.slice(1) || "/executions";
+  const [path, q] = h.split("?");
+  return { parts: path.split("/").filter(Boolean).map(decodeURIComponent), q: new URLSearchParams(q || "") };
+}
+async function route() {
+  const r = parseHash(), tok = ++navToken, main = $("#main");
+  renderShell(r);
+  const [a, b, c] = r.parts;
+  try {
+    if (a === "workflows" && b && c === "execute") await viewExecute(b, r.q, tok);
+    else if (a === "workflows") await viewWorkflows(tok);
+    else if (a === "executions" && b) await viewDetail(b, tok);
+    else await viewList(r.q, tok);
+  } catch (err) {
+    if (tok !== navToken) return;
+    if (err?.error === "server_unreachable") main.innerHTML = topbar(`<b>${esc(S.server.app)}</b>`) + downHTML(err);
+    else if (err?.error === "not_found") main.innerHTML = topbar(`<a href="#/executions">Executions</a><span class="sep">/</span><b>${esc(b)}</b>`) +
+      `<div class="empty"><h3>Execution not found</h3><p class="mono">${esc(err.message)}</p><a class="btn" href="#/executions">Back to executions</a></div>`;
+    else { main.innerHTML = `<div class="empty"><h3>Something went wrong</h3><p class="mono">${esc(err?.message || err)}</p></div>`; console.error(err); }
+  }
+  renderShell(r);
+}
+window.addEventListener("hashchange", route);
+
+/* ---------- executions list ---------- */
+const STATUSES = ["running", "suspended", "succeeded", "failed", "interrupted"];
+async function viewList(q, tok) {
+  const main = $("#main");
+  const f = { workflow: q.get("workflow") || "", status: q.get("status") || "", q: q.get("q") || "" };
+  main.innerHTML = topbar(`<b>Executions</b>`, `<a class="btn primary" href="#/workflows">${I.play}Execute…</a>`) + `<div class="page"><div class="loading">${I.spin}Loading executions…</div></div>`;
+  const all = await call("listExecutions", {});
+  if (tok !== navToken) return;
+  cache.list = all.slice();
+  renderShell(parseHash());
+  const setF = (patch) => {
+    Object.assign(f, patch);
+    const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+    history.replaceState(null, "", "#/executions" + (qs ? "?" + qs : ""));
+    draw();
+  };
+  const draw = () => {
+    const inWf = all.filter((e) => !f.workflow || e.workflow === f.workflow);
+    const cn = counts(inWf);
+    const needle = f.q.trim().toLowerCase();
+    const rows = inWf.filter((e) => (!f.status || e.status === f.status) && (!needle || e.id.includes(needle) || String(e.idempotencyKey).toLowerCase().includes(needle)))
+      .sort((x, y) => T(y.startedAt) - T(x.startedAt));
+    const ids = new Set(rows.map((e) => e.id));
+    const ordered = [];
+    rows.filter((e) => !e.parent || !ids.has(e.parent)).forEach(function add(e) {
+      ordered.push(e);
+      rows.filter((c) => c.parent === e.id).forEach(add);
+    });
+    const depth = (e) => (e.parent && ids.has(e.parent) ? 1 + depth(rows.find((x) => x.id === e.parent)) : 0);
+    const bar = `<div class="filters">
+      <select class="input" id="fwf" aria-label="Workflow"><option value="">All workflows</option>${S.workflows.map((w) => `<option ${w.name === f.workflow ? "selected" : ""}>${esc(w.name)}</option>`).join("")}</select>
+      <div class="seg" role="group" aria-label="Status"><button class="chip" data-st="" aria-pressed="${!f.status}">All <span class="n">${inWf.length}</span></button>${STATUSES.map((s) =>
+        `<button class="chip" data-st="${s}" aria-pressed="${f.status === s}"><span class="ic s-${ST[s][1]}" style="display:inline-flex">${I[ST[s][2]]}</span>${ST[s][0]} <span class="n">${cn[s] || 0}</span></button>`).join("")}</div>
+      <label class="search">${I.search}<input class="input" id="fq" placeholder="Search executionId or idempotency key" value="${esc(f.q)}" aria-label="Search"></label></div>`;
+    const body = ordered.length ? ordered.map((e) => {
+      const st = currentStep(e), d = depth(e);
+      const orphan = e.parent && !ids.has(e.parent);
+      return `<tr data-id="${e.id}">
+        <td>${pill(e.status)}</td>
+        <td><span class="idc" style="padding-left:${d * 16}px">${d || orphan ? `<span class="kid" title="child of ${e.parent}">↳</span>` : ""}<span class="mono" title="${e.id}">${short(e.id)}</span>${copyBtn(e.id, "Copy executionId")}</span></td>
+        <td>${esc(e.workflow)}</td>
+        <td class="mono fg2">${esc(e.idempotencyKey)}</td>
+        <td><span class="step ${st.dim ? "mute" : ""}">${st.i ? `<span class="ic s-${st.c}" style="display:inline-flex">${st.i}</span>` : ""}${esc(st.t)}${st.sub ? `<span class="sub">· ${esc(st.sub)}</span>` : ""}</span></td>
+        <td class="fg2" title="${abs(e.startedAt)} UTC">${rel(e.startedAt)}</td>
+        <td class="r mono fg2 dur" ${e.endedAt ? "" : 'title="still running · duration so far"'}>${fmtDur(execEnd(e) - T(e.startedAt))}</td></tr>`;
+    }).join("") : `<tr><td colspan="7"><div class="empty"><h3>No executions match</h3><p>Nothing ${f.status ? `<b>${ST[f.status][0].toLowerCase()}</b>` : ""} ${f.workflow ? `for <b>${esc(f.workflow)}</b>` : ""} ${f.q ? `matching <span class="mono">${esc(f.q)}</span>` : ""}.</p><button class="btn" data-act="clear">Clear filters</button></div></td></tr>`;
+    const page = $(".page", main);
+    const hadFocus = document.activeElement?.id === "fq";
+    page.innerHTML = bar + `<div class="tw"><table class="t"><thead><tr><th>Status</th><th>Execution</th><th>Workflow</th><th>Idempotency key</th><th>Current step</th><th>Started</th><th class="r">Duration</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    $("#fwf").onchange = (ev) => setF({ workflow: ev.target.value });
+    const fq = $("#fq");
+    fq.oninput = (ev) => setF({ q: ev.target.value });
+    if (hadFocus) { fq.focus(); fq.setSelectionRange(fq.value.length, fq.value.length); }
+    page.querySelectorAll("[data-st]").forEach((b) => (b.onclick = () => setF({ status: b.dataset.st })));
+    const clr = $("[data-act=clear]", page); if (clr) clr.onclick = () => setF({ workflow: "", status: "", q: "" });
+    page.querySelectorAll("tr[data-id]").forEach((tr) => (tr.onclick = (ev) => { if (!ev.target.closest(".copy")) location.hash = `#/executions/${tr.dataset.id}`; }));
+  };
+  draw();
+}
+
+/* ---------- execution detail ---------- */
+let D = null; // detail ui state
+function actStatus(a, ex) {
+  if (a.status === "success") return "succeeded";
+  if (a.status === "running") return ["running", "suspended"].includes(ex.status) ? "running" : "interrupted";
+  return a.exit?.cause?._tag === "Interrupt" ? "interrupted" : "failed";
+}
+function execNodes(ex) {
+  const items = [], groups = new Map();
+  ex.activities.forEach((a) => { if (!groups.has(a.name)) groups.set(a.name, []); groups.get(a.name).push(a); });
+  const live = ["running", "suspended"].includes(ex.status);
+  for (const [name, atts] of groups) {
+    const key = `${ex.id}/a/${name}`, last = atts[atts.length - 1];
+    const attEnd = (a) => T(a.endedAt) ?? (live ? NOW : execEnd(ex));
+    items.push({
+      key, type: "act", name, ex, atts, start: T(atts[0].startedAt), end: attEnd(last), status: actStatus(last, ex),
+      segs: atts.map((a) => ({ s: T(a.startedAt), e: attEnd(a), st: actStatus(a, ex) })),
+      children: atts.length > 1 ? atts.map((a) => ({ key: `${key}/${a.attempt}`, type: "att", name: `Attempt ${a.attempt}`, ex, a, atts, start: T(a.startedAt), end: attEnd(a), status: actStatus(a, ex), children: [] })) : [],
+    });
+  }
+  ex.waits.forEach((w) => {
+    const done = w.status === "done";
+    const end = done ? (T(w.doneAt) ?? T(w.wakeAt)) : !live ? execEnd(ex) : w.kind === "clock" ? T(w.wakeAt) : NOW;
+    items.push({ key: `${ex.id}/w/${w.name}`, type: w.kind === "clock" ? "clock" : "def", name: w.name, ex, w, start: T(w.since), end,
+      status: done ? "done" : live ? "waiting" : "interrupted", children: [] });
+  });
+  ex.childCalls.forEach((c) => {
+    const ch = D.cache[c.execution];
+    items.push({ key: `${ex.id}/c/${c.execution}`, type: "child", name: c.name, ex, call: c, child: ch, start: T(c.startedAt),
+      end: T(c.endedAt) ?? (ch ? execEnd(ch) : NOW), status: ch?.status || "running", children: ch ? execNodes(ch) : [] });
+  });
+  ex.compensations.filter((c) => c.ran).forEach((c) => items.push({ key: `${ex.id}/k/${c.name}`, type: "comp", name: c.name, ex, comp: c,
+    start: T(c.at), end: T(c.at), status: c.exit?._tag === "Failure" ? "failed" : "succeeded", children: [] }));
+  return items.sort((a, b) => a.start - b.start);
+}
+async function loadChildren(ex) {
+  for (const c of ex.childCalls) {
+    if (!D.cache[c.execution]) {
+      try { D.cache[c.execution] = await call("getExecution", c.execution); } catch { continue; }
+    }
+    await loadChildren(D.cache[c.execution]);
+  }
+}
+async function viewDetail(id, tok) {
+  const main = $("#main");
+  if (!D || D.id !== id) D = { id, cache: {}, expanded: new Set(), sel: id, tab: "Overview", left: D?.left };
+  main.innerHTML = topbar(`<a href="#/executions">Executions</a><span class="sep">/</span><b class="mono">${short(id)}</b>`) + `<div class="loading">${I.spin}Loading execution…</div>`;
+  const ex = await call("getExecution", id);
+  D.cache[id] = ex;
+  await loadChildren(ex);
+  if (tok !== navToken) return;
+  if (!D.init) {
+    D.init = true;
+    D.expanded.add(id);
+    const walk = (ns) => ns.forEach((n) => { if (n.type === "child" || (n.type === "act" && n.status !== "succeeded")) D.expanded.add(n.key); walk(n.children); });
+    walk(execNodes(ex));
+  }
+  drawDetail();
+}
+function rootNode() {
+  const ex = D.cache[D.id];
+  return { key: ex.id, type: "exec", name: ex.workflow, ex, start: T(ex.startedAt), end: execEnd(ex), status: ex.status, children: execNodes(ex) };
+}
+function flatten(root) {
+  const out = [];
+  (function walk(n, depth) { out.push({ n, depth }); if (D.expanded.has(n.key)) n.children.forEach((c) => walk(c, depth + 1)); })(root, 0);
+  return out;
+}
+function niceStep(span) {
+  const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3, 2e3, 5e3, 1e4, 15e3, 3e4, 6e4, 12e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 216e5, 432e5, 864e5, 1728e5];
+  return steps.find((s) => span / s <= 7) || 864e5 * 2;
+}
+function drawDetail() {
+  const main = $("#main"), ex = D.cache[D.id], root = rootNode();
+  const rows = flatten(root);
+  const allNodes = []; (function w(n) { allNodes.push(n); n.children.forEach(w); })(root);
+  if (!allNodes.find((n) => n.key === D.sel)) D.sel = root.key;
+  const sel = allNodes.find((n) => n.key === D.sel);
+  // timeline range
+  const t0 = root.start;
+  let t1 = Math.max(...allNodes.map((n) => n.end ?? n.start), root.end);
+  const span = Math.max(t1 - t0, 1) * 1.04;
+  const pct = (t) => ((t - t0) / span) * 100;
+  const step = niceStep(span);
+  const ticks = []; for (let t = 0; t < span; t += step) ticks.push(t);
+  const showNow = !ex.endedAt && NOW >= t0 && NOW < t0 + span;
+  const unit = step < 1e3 ? [1, "ms"] : step < 6e4 ? [1e3, "s"] : step < 36e5 ? [6e4, "m"] : step < 864e5 ? [36e5, "h"] : [864e5, "d"];
+  const tickLabel = (t) => (t === 0 ? "0" : +(t / unit[0]).toFixed(1) + unit[1]);
+  const live = ["running", "suspended"].includes(ex.status);
+
+  // header
+  const wait = ex.waits.find((w) => w.status === "waiting");
+  const lastFail = [...ex.activities].reverse().find((a) => a.status === "failure");
+  let banner = "";
+  if (ex.status === "suspended") {
+    const why = ex.suspendedReason === "deferred" && wait ? `Suspended on <b>DurableDeferred</b> <span class="mono">${esc(wait.name)}</span> since ${rel(wait.since)}. It resumes when the deferred is completed; <b>Resume</b> re-runs it from the journal now.`
+      : ex.suspendedReason === "clock" && wait ? `Sleeping on <b>DurableClock</b> <span class="mono">${esc(wait.name)}</span> — wakes ${abs(wait.wakeAt, false)} UTC (${rel(wait.wakeAt)}). <b>Resume</b> re-runs it from the journal now.`
+      : ex.suspendedReason === "failure" && lastFail ? `Suspended on failure (<span class="mono">SuspendOnFailure</span>): <b>${esc(lastFail.name)}</b> failed ${ex.activities.filter((a) => a.name === lastFail.name).length} attempts with <span class="mono">${esc(lastFail.exit?.cause?.error?._tag || "")}</span>. Fix the cause, then <b>Resume</b> to retry from the journal.`
+      : `Suspended (${esc(ex.suspendedReason || "unknown")}).`;
+    banner = `<div class="banner ${ex.suspendedReason === "failure" ? "s-fail" : ex.suspendedReason === "clock" ? "s-clock" : "s-sus"}">${I.info}<div>${why}</div></div>`;
+  } else if (ex.status === "interrupted") {
+    const ran = ex.compensations.filter((c) => c.ran).length;
+    banner = `<div class="banner s-int">${I.stop}<div>Interrupted${ex.interruptedBy ? ` by <span class="mono">${esc(ex.interruptedBy)}</span>` : ""}. ${ran ? `${ran} compensation${ran > 1 ? "s" : ""} ran in reverse order.` : "No compensations were registered."}</div></div>`;
+  }
+  const canResume = ex.status === "suspended", canInt = live;
+  const header = `<div class="dh"><div class="dh1">${pill(ex.status)}<h1>${esc(ex.workflow)}</h1>
+    <span class="idc always"><span class="mono fg2">${ex.id}</span>${copyBtn(ex.id, "Copy executionId")}</span>
+    <div class="acts">
+      <button class="btn" data-act="resume" ${canResume ? "" : "disabled"} title="${canResume ? "Re-run from the journal" : "Only suspended executions can be resumed"}">${I.play}Resume</button>
+      <button class="btn danger" data-act="interrupt" ${canInt ? "" : "disabled"} title="${canInt ? "Interrupt and run compensations" : `Execution is ${ex.status}`}">${I.stop}Interrupt</button>
+    </div></div>
+    <div class="meta"><span><b>Started</b>${rel(ex.startedAt)} · ${abs(ex.startedAt, false)} UTC</span><span><b>Duration</b>${fmtDur(execEnd(ex) - T(ex.startedAt))}${ex.endedAt ? "" : " so far"}</span>
+    <span><b>Idempotency key</b><span class="mono">${esc(ex.idempotencyKey)}</span></span>
+    ${ex.parent ? `<span><b>Parent</b><a class="lnk mono" href="#/executions/${ex.parent}">${short(ex.parent)}</a></span>` : ""}</div>${banner}</div>`;
+
+  // trace
+  const label = (n) => ({ exec: "", act: n.atts?.length > 1 ? `×${n.atts.length}` : "", att: "", def: "DurableDeferred", clock: "DurableClock", child: n.child?.workflow || "", comp: "compensation" })[n.type];
+  const icon = (n) => {
+    const c = { exec: "s-" + ST[n.status][1], act: "s-" + (ST[n.status] || ST.done)[1], att: "s-" + ST[n.status][1], def: "s-sus", clock: "s-clock", child: "s-" + ST[n.status][1], comp: "s-comp" }[n.type];
+    return `<span class="ic ${c}" style="display:inline-flex">${{ exec: I.root, act: I.act, att: sIcon(n.status), def: I.def, clock: I.clock, child: I.child, comp: I.comp }[n.type]}</span>`;
+  };
+  const barHTML = (n) => {
+    const col = { exec: "s-" + ST[n.status][1], child: "s-" + ST[n.status][1], def: "s-sus", clock: "s-clock", comp: "s-comp" }[n.type] || "s-" + ST[n.status][1];
+    let h = "";
+    const seg = (s, e, cls, c = col) => `<div class="bar ${cls} ${c}" style="left:${pct(s)}%;width:${Math.max(pct(e) - pct(s), 0)}%"></div>`;
+    if (n.type === "comp") h = `<div class="bar pt ${col}" style="left:${pct(n.start)}%"></div>`;
+    else if (n.type === "act" && n.segs.length > 1) h = n.segs.map((g) => seg(g.s, g.e, "", "s-" + ST[g.st][1])).join("");
+    else if (n.type === "clock" && n.status === "waiting" && n.end > NOW) h = seg(n.start, NOW, "wait") + seg(NOW, n.end, "future");
+    else if ((n.type === "def" || n.type === "clock")) h = seg(n.start, n.end, n.status === "waiting" ? "wait" : "");
+    else h = seg(n.start, n.end, n.type === "exec" || n.type === "child" ? "thin" : "");
+    const r = pct(n.end ?? n.start), txt = n.type === "comp" ? abs(new Date(n.start).toISOString(), false).split(", ")[1] : n.type === "clock" && n.status === "waiting" ? `wakes ${rel(n.w.wakeAt)}` : fmtDur(n.end - n.start);
+    const l = pct(n.start);
+    if (r <= 84) h += `<span class="blab" style="left:calc(${r}% + 6px)">${txt}</span>`;
+    else if (l >= 16) h += `<span class="blab" style="right:calc(${100 - l}% + 6px)">${txt}</span>`;
+    return h;
+  };
+  const rowsHTML = rows.map(({ n, depth }) => `<div class="tr" role="treeitem" data-key="${esc(n.key)}" aria-selected="${n.key === D.sel}" ${n.children.length ? `aria-expanded="${D.expanded.has(n.key)}"` : ""} aria-level="${depth + 1}">
+    <div class="tl" style="padding-left:${6 + depth * 16}px">
+      <button class="tog ${n.children.length ? "" : "nokids"}" tabindex="-1" aria-label="Toggle" aria-expanded="${D.expanded.has(n.key)}">${I.chev}</button>
+      ${icon(n)}<span class="nm ${n.type === "att" ? "fg2" : ""}">${esc(n.name)}</span><span class="ty">${esc(label(n))}</span>
+      <span class="x">${n.type === "comp" ? "" : fmtDur((n.end ?? n.start) - n.start)}</span></div>
+    <div class="wf">${barHTML(n)}</div></div>`).join("");
+  const trace = `<div class="trace" id="trace" tabindex="0" role="tree" aria-label="Execution trace">
+    <div class="trh"><div>Trace <span class="mono">${rows.length} rows</span></div><div class="ruler">${ticks.map((t) => `<span class="tick" style="left:${pct(t0 + t)}%">${tickLabel(t)}</span>`).join("")}${showNow ? `<span class="tick now ${pct(NOW) > 88 ? "flip" : ""}" style="left:${pct(NOW)}%">now</span>` : ""}</div></div>
+    <div class="grid">${ticks.map((t) => `<i style="left:${pct(t0 + t)}%"></i>`).join("")}${showNow ? `<i class="now" style="left:${pct(NOW)}%"></i>` : ""}</div>
+    ${rowsHTML}</div>`;
+
+  main.innerHTML = topbar(`<a href="#/executions">Executions</a><span class="sep">/</span><a href="#/executions?workflow=${encodeURIComponent(ex.workflow)}">${esc(ex.workflow)}</a><span class="sep">/</span><b class="mono">${short(ex.id)}</b>`) + header +
+    `<div class="split" style="${D.left ? `--left:${D.left}px` : ""}"><div class="pane left">${trace}</div><div class="gutter" id="gutter" role="separator" aria-orientation="vertical" title="Drag to resize"></div><div class="pane insp" id="insp">${inspectorHTML(sel)}</div></div>`;
+
+  // wiring
+  const tr = $("#trace");
+  tr.querySelectorAll(".tr").forEach((row) => (row.onclick = (ev) => {
+    const key = row.dataset.key;
+    if (ev.target.closest(".tog")) { D.expanded.has(key) ? D.expanded.delete(key) : D.expanded.add(key); }
+    else D.sel = key;
+    drawDetail(); $("#trace")?.focus({ preventScroll: true });
+  }));
+  tr.onkeydown = (ev) => {
+    const i = rows.findIndex((r) => r.n.key === D.sel), cur = rows[i]?.n;
+    if (ev.key === "ArrowDown" && i < rows.length - 1) D.sel = rows[i + 1].n.key;
+    else if (ev.key === "ArrowUp" && i > 0) D.sel = rows[i - 1].n.key;
+    else if (ev.key === "ArrowRight" && cur?.children.length) D.expanded.add(cur.key);
+    else if (ev.key === "ArrowLeft" && cur && D.expanded.has(cur.key)) D.expanded.delete(cur.key);
+    else return;
+    ev.preventDefault(); drawDetail();
+    const t = $("#trace"); t.focus({ preventScroll: true }); t.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  };
+  wireInspector();
+  $("[data-act=resume]", main).onclick = doResume;
+  $("[data-act=interrupt]", main).onclick = openInterrupt;
+  const g = $("#gutter"), split = $(".split", main);
+  g.onpointerdown = (ev) => {
+    g.setPointerCapture(ev.pointerId); g.classList.add("drag");
+    const x0 = split.getBoundingClientRect().left;
+    g.onpointermove = (e) => { D.left = Math.min(Math.max(e.clientX - x0, 360), split.clientWidth - 320); split.style.setProperty("--left", D.left + "px"); };
+    g.onpointerup = () => { g.classList.remove("drag"); g.onpointermove = null; };
+  };
+}
+function tabsFor(n) {
+  if (n.type === "exec") return ["Overview", "Payload", "Result", `Compensations`];
+  if (n.type === "child") return n.child ? ["Overview", "Payload", "Result"] : ["Overview"];
+  if (n.type === "act" || n.type === "att") { const a = n.a || n.atts[n.atts.length - 1]; return ["Overview", a.exit?._tag === "Failure" ? "Error" : "Output"]; }
+  if (n.type === "def") return n.w.status === "done" ? ["Overview", "Schema", "Value"] : ["Overview", "Schema"];
+  if (n.type === "comp") return ["Overview", "Output"];
+  return ["Overview"];
+}
+const props = (pairs) => `<dl class="props">${pairs.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+const timeVal = (iso) => (iso ? `<span title="${esc(iso)}">${abs(iso)} <span class="mute">· ${rel(iso)}</span></span>` : '<span class="mute">—</span>');
+const exLink = (id) => `<a class="lnk mono" href="#/executions/${id}">${short(id)}</a>`;
+function inspectorHTML(n) {
+  const tabs = tabsFor(n);
+  if (!tabs.includes(D.tab)) D.tab = "Overview";
+  const ex = n.ex;
+  const sub = { exec: `Execution · ${ex.id}`, act: `Activity · ${n.atts?.length} attempt${n.atts?.length > 1 ? "s" : ""}`, att: `Activity attempt · ${n.a?.name}`,
+    def: "DurableDeferred", clock: "DurableClock", child: `Child execution · ${n.call?.execution}`, comp: `Compensation for ${n.comp?.activity}` }[n.type];
+  const comps = ex.compensations;
+  let body = "";
+  const t = D.tab;
+  if (n.type === "exec" || (n.type === "child" && n.child)) {
+    const e = n.type === "exec" ? ex : n.child;
+    if (t === "Overview") body = props([
+      ["Status", pill(e.status) + (e.suspendedReason ? ` <span class="mute">on ${esc(e.suspendedReason)}</span>` : "")],
+      ["Execution ID", `<span class="idc always"><span class="mono">${e.id}</span>${copyBtn(e.id)}</span>`],
+      ["Workflow", `<a class="lnk" href="#/executions?workflow=${encodeURIComponent(e.workflow)}">${esc(e.workflow)}</a>`],
+      ["Idempotency key", `<span class="mono">${esc(e.idempotencyKey)}</span>`],
+      n.type === "child" && ["Called as", `<span class="mono">${esc(n.call.name)}</span>`],
+      e.parent && ["Parent", exLink(e.parent)],
+      e.children.length && ["Children", e.children.map(exLink).join(" ")],
+      ["Started", timeVal(e.startedAt)], ["Ended", timeVal(e.endedAt)],
+      ["Duration", `<span class="mono">${fmtDur(execEnd(e) - T(e.startedAt))}</span>${e.endedAt ? "" : ' <span class="mute">so far</span>'}`],
+      ["Journal", `${plural(e.activities.length, "attempt")} · ${plural(new Set(e.activities.map((a) => a.name)).size, "activity", "activities")} · ${plural(e.waits.length, "wait")} · ${plural(e.childCalls.length, "child", "children")}`],
+      e.interruptedBy && ["Interrupted by", `<span class="mono">${esc(e.interruptedBy)}</span>`],
+    ]) + (n.type === "child" ? `<div style="margin-top:16px"><a class="btn sm" href="#/executions/${e.id}">Open child execution →</a></div>` : "");
+    else if (t === "Payload") body = codeBlock(e.payload);
+    else if (t === "Result") body = resultHTML(e);
+    else if (t === "Compensations") body = comps.length ? `<div class="mute" style="font-size:12px;margin-bottom:6px">Registered with <span class="mono">Workflow.withCompensation</span>. On interrupt or failure they run in reverse order:</div>` +
+      [...comps].reverse().map((c, i) => `<div class="comp"><span class="n">${i + 1}</span><span class="ic s-comp" style="display:inline-flex">${I.comp}</span><div style="flex:1"><div><b class="mono">${esc(c.name)}</b> <span class="mute">compensates</span> <span class="mono">${esc(c.activity)}</span></div>
+        <div class="mute" style="font-size:12px;margin-top:2px">${c.ran ? `Ran ${abs(c.at)}` : "Registered · not run"}</div>${c.ran && c.exit ? `<div style="margin-top:8px">${exitHTML(c.exit)}</div>` : ""}</div>${c.ran ? pill("succeeded") : `<span class="pill s-comp">pending</span>`}</div>`).join("")
+      : `<div class="note">No compensations registered. Interrupting this execution stops it without rollback.</div>`;
+  } else if (n.type === "child") {
+    body = props([["Called as", esc(n.call.name)], ["Execution", exLink(n.call.execution)], ["Started", timeVal(n.call.startedAt)]]) + `<div class="note">Child execution could not be loaded.</div>`;
+  } else if (n.type === "act" || n.type === "att") {
+    const a = n.a || n.atts[n.atts.length - 1];
+    if (t === "Overview") {
+      body = props([
+        ["Status", pill(n.status)], ["Activity", `<span class="mono">${esc(a.name)}</span>`],
+        ["Attempt", `${a.attempt} <span class="mute">of ${n.atts.length}</span>`],
+        ["Execution", `${exLink(ex.id)} <span class="mute">${esc(ex.workflow)}</span>`],
+        ["Started", timeVal(a.startedAt)], ["Ended", timeVal(a.endedAt)],
+        ["Duration", `<span class="mono">${fmtDur(n.end - n.start)}</span>`],
+      ]);
+      if (n.atts.length > 1) body += `<div class="sec">Attempts</div><table class="atts">${n.atts.map((x) => `<tr data-goto="${esc(`${ex.id}/a/${x.name}/${x.attempt}`)}"><td>${sIcon(actStatus(x, ex))}</td><td>Attempt ${x.attempt}</td><td class="mono fg2">${esc(x.exit?._tag === "Failure" ? x.exit.cause?.error?._tag || x.exit.cause?._tag : x.status === "running" ? "running" : "Success")}</td><td class="mono mute" style="text-align:right">${fmtDur((T(x.endedAt) ?? NOW) - T(x.startedAt))}</td></tr>`).join("")}</table>`;
+      body += `<div class="note">The journal stores each attempt's <span class="mono">Exit</span>; activity inputs are captured by closure and not persisted.</div>`;
+    } else body = exitHTML(a.exit);
+  } else if (n.type === "def") {
+    const w = n.w;
+    if (t === "Overview") body = props([["Status", pill(n.status)], ["Type", "DurableDeferred"], ["Name", `<span class="mono">${esc(w.name)}</span>`],
+      ["Waiting since", timeVal(w.since)], w.doneAt && ["Completed", timeVal(w.doneAt)], ["Waited", `<span class="mono">${fmtDur(n.end - n.start)}</span>${w.status === "waiting" ? ' <span class="mute">so far</span>' : ""}`]]) +
+      `<div class="note">Completed from outside the workflow with <span class="mono">DurableDeferred.done(token, exit)</span>; the execution resumes when it is. kymo shows the wait but does not complete it.</div>`;
+    else if (t === "Schema") body = `<div class="mute" style="font-size:12px;margin-bottom:6px">Expected success value</div><pre class="code">${esc(w.schema || "unknown")}</pre>`;
+    else body = exitHTML(w.exit);
+  } else if (n.type === "clock") {
+    const w = n.w;
+    body = props([["Status", pill(n.status)], ["Type", "DurableClock"], ["Name", `<span class="mono">${esc(w.name)}</span>`],
+      ["Sleeping since", timeVal(w.since)], ["Wakes at", timeVal(w.wakeAt)], ["Duration", `<span class="mono">${fmtDur(T(w.wakeAt) - T(w.since))}</span>`],
+      w.status === "waiting" && ["Remaining", `<span class="mono">${fmtDur(T(w.wakeAt) - NOW)}</span>`]]) +
+      (w.status === "waiting" ? `<div class="note">The engine wakes this execution at the scheduled time. Resume re-runs it from the journal now; the clock suspends it again if the time hasn't passed.</div>` : "");
+  } else if (n.type === "comp") {
+    const c = n.comp;
+    body = t === "Overview" ? props([["Status", pill(n.status)], ["Compensation", `<span class="mono">${esc(c.name)}</span>`], ["Compensates", `<span class="mono">${esc(c.activity)}</span>`], ["Ran at", timeVal(c.at)]]) : exitHTML(c.exit);
+  }
+  return `<div class="ih"><div class="t1">${n.type === "exec" ? I.root : ""}<span>${esc(n.name)}</span>${pill(n.status)}</div><div class="t2 mono">${esc(sub)}</div>
+    <div class="tabs" role="tablist">${tabs.map((x) => `<button role="tab" data-tab="${x}" aria-selected="${x === D.tab}">${x === "Compensations" ? `Compensations <span class="mute mono">${comps.length}</span>` : x}</button>`).join("")}</div></div><div class="ib">${body}</div>`;
+}
+function wireInspector() {
+  const insp = $("#insp");
+  insp.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { D.tab = b.dataset.tab; drawInspectorOnly(); }));
+  insp.querySelectorAll("[data-goto]").forEach((r) => (r.onclick = () => { const k = r.dataset.goto; D.expanded.add(k.split("/").slice(0, 3).join("/")); D.sel = k; drawDetail(); }));
+}
+function drawInspectorOnly() {
+  const root = rootNode(), all = []; (function w(n) { all.push(n); n.children.forEach(w); })(root);
+  $("#insp").innerHTML = inspectorHTML(all.find((n) => n.key === D.sel) || root);
+  wireInspector();
+}
+async function doResume(ev) {
+  const b = ev.currentTarget, id = D.id;
+  b.disabled = true; b.innerHTML = `${I.spin}Resuming…`;
+  try {
+    await call("resume", id);
+    toast(`Resumed <span class="mono">${short(id)}</span> · now running`);
+    if (cache.list) cache.list = await call("listExecutions", {}).catch(() => cache.list);
+    await route();
+  } catch (err) { toast(esc(err.message || err), "fail"); await route(); }
+}
+function openInterrupt() {
+  const ex = D.cache[D.id], dlg = $("#dlg");
+  const pend = ex.compensations.filter((c) => c.registered && !c.ran).reverse();
+  const kids = ex.children.map((c) => D.cache[c]).filter((c) => c && ["running", "suspended"].includes(c.status));
+  dlg.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Interrupt ${esc(ex.workflow)} <span class="mono fg2">${short(ex.id)}</span>?</h3>
+    <p>Interrupt is terminal — the execution cannot be resumed afterwards.</p>
+    <div class="sec" style="margin-top:4px">Compensations that will run · reverse order</div>
+    ${pend.length ? `<ol class="cl">${pend.map((c, i) => `<li><span class="mono mute">${i + 1}</span><span class="ic s-comp" style="display:inline-flex">${I.comp}</span><b class="mono">${esc(c.name)}</b><span class="mute">undoes</span><span class="mono">${esc(c.activity)}</span></li>`).join("")}</ol>`
+      : `<div class="note" style="margin-top:0">No compensations registered — nothing will be rolled back.</div>`}
+    ${kids.length ? `<div class="sec">Child executions also interrupted</div><ol class="cl">${kids.map((k) => `<li>${pill(k.status)}<span>${esc(k.workflow)}</span><span class="mono fg2">${short(k.id)}</span></li>`).join("")}</ol>` : ""}
+    <div id="dlgerr"></div></div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate autofocus>Cancel</button><button class="btn danger solid" value="ok" id="dlgok">${I.stop}Interrupt execution</button></div></form>`;
+  dlg.showModal();
+  $("#dlgok").onclick = async (ev) => {
+    ev.preventDefault();
+    const b = ev.currentTarget; b.disabled = true; b.innerHTML = `${I.spin}Interrupting…`;
+    try {
+      await call("interrupt", ex.id);
+      alignToNow(ex); ex.children.forEach((c) => D.cache[c] && alignToNow(D.cache[c]));
+      dlg.close();
+      toast(`Interrupted <span class="mono">${short(ex.id)}</span>${pend.length ? ` · ${pend.length} compensation${pend.length > 1 ? "s" : ""} ran` : ""}`);
+      D.sel = ex.id; D.tab = pend.length ? "Compensations" : "Result";
+      if (cache.list) cache.list = await call("listExecutions", {}).catch(() => cache.list);
+      await route();
+    } catch (err) {
+      b.disabled = false; b.innerHTML = `${I.stop}Interrupt execution`;
+      $("#dlgerr").innerHTML = `<div class="notice err" style="margin:12px 0 0">${I.x}<div><h4>Interrupt failed</h4><p class="mono">${esc(err.message)}</p></div></div>`;
+    }
+  };
+}
+
+/* ---------- workflows ---------- */
+async function viewWorkflows(tok) {
+  const main = $("#main");
+  main.innerHTML = topbar(`<b>Workflows</b>`) + `<div class="page"><div class="loading">${I.spin}Loading…</div></div>`;
+  const all = await call("listExecutions", {});
+  if (tok !== navToken) return;
+  cache.list = all.slice(); renderShell(parseHash());
+  $(".page", main).innerHTML = `<div class="ph"><h1>Workflows</h1><span class="mute">${S.workflows.length} registered on ${esc(S.server.app)}</span></div>
+  <div class="tw"><table class="t wfs"><thead><tr><th>Workflow</th><th>Idempotency key</th><th>Annotations</th><th>Executions</th><th></th></tr></thead><tbody>
+  ${S.workflows.map((w) => {
+    const cn = counts(all.filter((e) => e.workflow === w.name));
+    return `<tr data-wf="${esc(w.name)}"><td><div class="wfname">${esc(w.name)}</div><div class="wfdesc">${esc(w.description)}</div></td>
+      <td class="mono fg2">${esc(w.idempotencyKey)}</td>
+      <td>${w.annotations.length ? w.annotations.map((a) => `<span class="ann">${esc(a)}</span>`).join(" ") : '<span class="mute">—</span>'}</td>
+      <td><div class="counts">${STATUSES.filter((s) => cn[s]).map((s) => `<a class="pill s-${ST[s][1]}" href="#/executions?workflow=${encodeURIComponent(w.name)}&status=${s}" title="${ST[s][0]}">${I[ST[s][2]]}${cn[s]}</a>`).join("") || '<span class="mute">none</span>'}</div></td>
+      <td class="r"><a class="btn sm" href="#/workflows/${encodeURIComponent(w.name)}/execute">${I.play}Execute</a></td></tr>`;
+  }).join("")}</tbody></table></div>`;
+  main.querySelectorAll("tr[data-wf]").forEach((tr) => (tr.onclick = (ev) => { if (!ev.target.closest("a")) location.hash = `#/executions?workflow=${encodeURIComponent(tr.dataset.wf)}`; }));
+}
+
+/* ---------- execute ---------- */
+let F = null;
+const keyFields = (w) => w.idempotencyKey.split("+").map((s) => s.trim().replace(/^payload\./, ""));
+function computeKey(w, p) { const fs = keyFields(w); return fs.every((f) => p[f] != null && p[f] !== "") ? fs.map((f) => p[f]).join(":") : null; }
+function validate(w, p) {
+  const errs = {}, props = w.payload.properties;
+  for (const r of w.payload.required || []) if (p[r] == null || p[r] === "") errs[r] = "Required";
+  for (const [k, v] of Object.entries(p)) {
+    const s = props[k]; if (!s) { errs[k] = "Not in schema"; continue; }
+    if (s.type === "integer" && !Number.isInteger(v)) errs[k] = "Must be an integer";
+    else if (s.type === "string" && typeof v !== "string") errs[k] = "Must be a string";
+    else if (s.enum && !s.enum.includes(v)) errs[k] = `One of ${s.enum.join(", ")}`;
+    else if (s.pattern && !new RegExp(s.pattern).test(v)) errs[k] = `Doesn't match ${s.pattern}`;
+    else if (s.minimum != null && v < s.minimum) errs[k] = `Must be ≥ ${s.minimum}`;
+    else if (s.maxLength && v.length > s.maxLength) errs[k] = `Max ${s.maxLength} characters`;
+    else if (s.format === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) errs[k] = "Must be an email";
+    else if (s.format === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(v)) errs[k] = "Must be YYYY-MM-DD";
+  }
+  return errs;
+}
+function formPayload(w) {
+  const p = {};
+  for (const [k, s] of Object.entries(w.payload.properties)) {
+    const v = F.values[k]; if (v === "" || v == null) continue;
+    p[k] = s.type === "integer" || s.type === "number" ? (v === "" || isNaN(Number(v)) ? v : Number(v)) : v;
+  }
+  return p;
+}
+function currentPayload(w) {
+  if (F.mode === "json") { try { return { p: JSON.parse(F.json || "{}") }; } catch (e) { return { err: e.message }; } }
+  return { p: formPayload(w) };
+}
+async function viewExecute(name, q, tok) {
+  const main = $("#main"), w = S.workflows.find((x) => x.name === name);
+  if (!w) { main.innerHTML = topbar(`<a href="#/workflows">Workflows</a>`) + `<div class="empty"><h3>No workflow ${esc(name)}</h3></div>`; return; }
+  if (!F || F.wf !== name) F = { wf: name, values: {}, mode: "form", json: "{}", discard: false, errs: {}, tried: false, notice: null };
+  main.innerHTML = topbar(`<a href="#/workflows">Workflows</a><span class="sep">/</span><b>${esc(name)}</b>`) + `<div class="page"><div class="loading">${I.spin}Loading…</div></div>`;
+  const recent = (await call("listExecutions", { workflow: name })).slice().sort((a, b) => T(b.startedAt) - T(a.startedAt));
+  if (tok !== navToken) return;
+  F.recent = recent;
+  const from = q.get("from") && recent.find((e) => e.id === q.get("from"));
+  if (from && !F.prefilled) { F.prefilled = true; prefill(from.payload); }
+  drawExecute(w);
+}
+function prefill(p) {
+  F.values = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, String(v)]));
+  F.json = JSON.stringify(p, null, 2); F.errs = {}; F.notice = null;
+}
+function fieldHTML(k, s, req) {
+  const v = F.values[k] ?? "", err = F.errs[k], bad = err ? "bad" : "";
+  const common = `class="input ${bad}" id="f_${k}" data-f="${k}" ${req ? "required" : ""}`;
+  let input, hint = s.type;
+  if (s.enum) { input = `<select ${common}><option value="">Select…</option>${s.enum.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`; hint = "enum"; }
+  else if (s.type === "integer" || s.type === "number") { input = `<input type="number" ${common} step="${s.type === "integer" ? 1 : "any"}" ${s.minimum != null ? `min="${s.minimum}"` : ""} value="${esc(v)}" inputmode="numeric">`; hint = `${s.type}${s.minimum != null ? ` ≥ ${s.minimum}` : ""}`; }
+  else if (s.format === "email") { input = `<input type="email" ${common} value="${esc(v)}" placeholder="name@example.com" autocomplete="off">`; hint = "string · email"; }
+  else if (s.format === "date") { input = `<input type="date" ${common} value="${esc(v)}">`; hint = "string · date"; }
+  else if (s.maxLength > 100) { input = `<textarea ${common} rows="3" maxlength="${s.maxLength}">${esc(v)}</textarea>`; hint = `string · ≤ ${s.maxLength}`; }
+  else input = `<input type="text" ${common} value="${esc(v)}" placeholder="${esc(s.examples?.[0] || "")}" autocomplete="off" spellcheck="false">`;
+  const isKey = keyFields(S.workflows.find((x) => x.name === F.wf)).includes(k);
+  return `<div class="field"><label for="f_${k}">${esc(k)}${req ? '<span class="req">*</span>' : ""}${isKey ? '<span class="ann" style="font-size:10px">idempotency</span>' : ""}<span class="hint">${esc(hint)}</span></label>${input}
+    <div data-msg="${k}">${fieldMsg(k, s, v)}</div></div>`;
+}
+function fieldMsg(k, s, v) {
+  const err = F.errs[k];
+  return err ? `<div class="err">${esc(err)}</div>` : s.pattern ? `<div class="help">pattern <span class="mono">${esc(s.pattern)}</span></div>` : s.maxLength ? `<div class="help">${String(v ?? "").length} / ${s.maxLength}</div>` : "";
+}
+function keyPreviewHTML(w) {
+  const { p } = currentPayload(w); const key = p ? computeKey(w, p) : null;
+  if (!key) return `<span class="mute">idempotencyKey <span class="mono">${esc(w.idempotencyKey)}</span></span>`;
+  const hit = F.recent?.find((e) => e.idempotencyKey === key);
+  return `idempotencyKey → <b>${esc(key)}</b>${hit ? ` <span class="warn">· matches ${short(hit.id)} (${hit.status}); Execute returns it</span>` : ""}`;
+}
+function drawExecute(w) {
+  const main = $("#main"), props = w.payload.properties, req = new Set(w.payload.required || []);
+  const n = F.notice;
+  const noticeHTML = !n ? "" : n.kind === "dedup"
+    ? `<div class="notice" role="status"><span class="ic s-sus" style="display:inline-flex">${I.info}</span><div style="flex:1"><h4>Existing execution returned (same idempotencyKey)</h4>
+       <p>${esc(w.name)} with idempotencyKey <span class="mono">${esc(n.key)}</span> already exists ${n.ex ? `and is ${pill(n.ex.status)}` : ""}. The executionId is derived from the key, so no new execution was started.</p>
+       <p style="margin-top:8px"><a class="lnk" href="#/executions/${n.id}">Open execution <span class="mono">${short(n.id)}</span> →</a></p></div></div>`
+    : `<div class="notice err" role="alert"><span class="ic s-fail" style="display:inline-flex">${I.x}</span><div><h4>${esc(n.title)}</h4><p class="mono">${esc(n.message)}</p></div></div>`;
+  const formBody = F.mode === "form"
+    ? Object.entries(props).map(([k, s]) => fieldHTML(k, s, req.has(k))).join("")
+    : `<textarea class="input ${F.jsonErr ? "bad" : ""}" id="fjson" rows="12" style="width:100%;font:12px/1.55 var(--mono)" spellcheck="false">${esc(F.json)}</textarea>
+       ${F.jsonErr ? `<div class="field"><div class="err">${esc(F.jsonErr)}</div></div>` : ""}${Object.keys(F.errs).length ? `<div class="field"><div class="err">${Object.entries(F.errs).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join("<br>")}</div></div>` : ""}`;
+  $(".page", main).innerHTML = `<div class="ph"><h1>Execute</h1>
+    <select class="input" id="pickwf" aria-label="Workflow">${S.workflows.map((x) => `<option ${x.name === w.name ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
+  <div class="exgrid"><div>${noticeHTML}
+    <form class="card" id="exform" novalidate><header>Payload<div class="seg" style="margin-left:auto"><button type="button" class="chip" data-mode="form" aria-pressed="${F.mode === "form"}">Form</button><button type="button" class="chip" data-mode="json" aria-pressed="${F.mode === "json"}">JSON</button></div></header>
+      <div class="cb">${formBody}</div>
+      <div class="exfoot"><label class="check"><input type="checkbox" id="fdiscard" ${F.discard ? "checked" : ""}>Discard <span class="mute">— return immediately, don't wait for the result</span></label>
+        <span class="keyprev" id="keyprev" style="flex-basis:100%;order:3">${keyPreviewHTML(w)}</span>
+        <button class="btn primary" id="exbtn" style="margin-left:auto">${I.play}Execute <kbd>⌘↵</kbd></button></div></form></div>
+    <div>
+      <div class="card recent"><header>Recent payloads <span class="mute" style="font-weight:400">${F.recent.length}</span></header>
+        ${F.recent.length ? F.recent.slice(0, 6).map((e) => `<button type="button" data-pre="${e.id}"><div class="r1">${sIcon(e.status)}<span class="mono">${short(e.id)}</span><span class="mute" style="margin-left:auto">${rel(e.startedAt)}</span></div><div class="r2">${esc(JSON.stringify(e.payload))}</div></button>`).join("")
+          : `<div class="cb mute">No executions yet.</div>`}</div>
+      <div class="card" style="margin-top:12px"><header>${esc(w.name)}</header><div class="cb">${props_(w)}</div></div>
+    </div></div>`;
+  wireExecute(w);
+}
+const props_ = (w) => `<div class="mute" style="font-size:12px;margin-bottom:10px">${esc(w.description)}</div>` + props([
+  ["Idempotency", `<span class="mono">${esc(w.idempotencyKey)}</span>`], ["Success", `<span class="mono">${esc(w.success)}</span>`],
+  ["Error", `<span class="mono">${esc(w.error)}</span>`], ["Annotations", w.annotations.map((a) => `<span class="ann">${esc(a)}</span>`).join(" ") || '<span class="mute">—</span>']]);
+function wireExecute(w) {
+  const main = $("#main");
+  $("#pickwf").onchange = (e) => (location.hash = `#/workflows/${encodeURIComponent(e.target.value)}/execute`);
+  main.querySelectorAll("[data-f]").forEach((el) => (el.oninput = el.onchange = () => {
+    F.values[el.dataset.f] = el.value;
+    const k = el.dataset.f, s = w.payload.properties[k];
+    if (F.tried) { F.errs = validate(w, formPayload(w)); el.classList.toggle("bad", !!F.errs[k]); }
+    main.querySelector(`[data-msg="${k}"]`).innerHTML = fieldMsg(k, s, el.value);
+    $("#keyprev").innerHTML = keyPreviewHTML(w);
+  }));
+  const fj = $("#fjson"); if (fj) fj.oninput = () => { F.json = fj.value; $("#keyprev").innerHTML = keyPreviewHTML(w); };
+  main.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => {
+    if (b.dataset.mode === F.mode) return;
+    if (b.dataset.mode === "json") { F.json = JSON.stringify(formPayload(w), null, 2); F.mode = "json"; F.jsonErr = null; }
+    else { try { prefill(JSON.parse(F.json || "{}")); F.mode = "form"; F.jsonErr = null; } catch (e) { F.jsonErr = "Invalid JSON: " + e.message; } }
+    drawExecute(w);
+  }));
+  $("#fdiscard").onchange = (e) => (F.discard = e.target.checked);
+  main.querySelectorAll("[data-pre]").forEach((b) => (b.onclick = () => { prefill(F.recent.find((e) => e.id === b.dataset.pre).payload); drawExecute(w); }));
+  const form = $("#exform");
+  form.onsubmit = (e) => { e.preventDefault(); submitExecute(w); };
+  form.onkeydown = (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitExecute(w); } };
+}
+async function submitExecute(w) {
+  F.tried = true;
+  const { p, err } = currentPayload(w);
+  if (err) { F.jsonErr = "Invalid JSON: " + err; drawExecute(w); return; }
+  F.jsonErr = null; F.errs = validate(w, p);
+  if (Object.keys(F.errs).length) { drawExecute(w); $(".bad")?.focus(); return; }
+  const b = $("#exbtn"); b.disabled = true; b.innerHTML = `${I.spin}Executing…`;
+  try {
+    const r = await call("execute", w.name, p, { discard: F.discard });
+    if (r.deduplicated) {
+      const ex = await call("getExecution", r.executionId).catch(() => null);
+      F.notice = { kind: "dedup", id: r.executionId, key: computeKey(w, p), ex };
+      drawExecute(w);
+    } else {
+      F.notice = null; F.tried = false;
+      // The UI treats KYMO.NOW as "now"; align the new execution's start with it so relative times stay sane.
+      const created = S.executions.find((e) => e.id === r.executionId);
+      if (created) created.startedAt = K.NOW;
+      cache.list = null;
+      toast(`Started ${esc(w.name)} <span class="mono">${short(r.executionId)}</span>${r.discard ? " · discarded (not awaiting result)" : ""}`);
+      location.hash = `#/executions/${r.executionId}`;
+    }
+  } catch (e) {
+    F.notice = { kind: "err", title: e.error === "server_unreachable" ? `Can't reach ${S.server.app}` : "Execute failed", message: `${e.error}: ${e.message}` };
+    drawExecute(w);
+  }
+}
+
+/* ---------- global wiring ---------- */
+document.addEventListener("click", async (ev) => {
+  const cp = ev.target.closest("[data-copy]");
+  if (cp) { ev.stopPropagation(); ev.preventDefault(); try { await navigator.clipboard.writeText(cp.dataset.copy); } catch {} toast(`Copied <span class="mono">${esc(cp.dataset.copy.slice(0, 40))}</span>`); return; }
+  if (ev.target.closest("[data-act=retry]")) {
+    const n = $("#retrynote"); if (n) n.textContent = "Retrying…";
+    await route();
+    const m = $("#retrynote"); if (m) m.textContent = `Still unreachable · tried ${new Date().toLocaleTimeString()}`;
+  }
+}, true);
+
+(async () => {
+  try { cache.list = await call("listExecutions", {}); } catch {}
+  if (!location.hash) history.replaceState(null, "", "#/executions");
+  route();
+})();
+</script>
+</body>
+</html>
