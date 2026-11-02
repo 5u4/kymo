@@ -1,6 +1,6 @@
 # demo
 
-A kymo plugin with five fake workflows for a SaaS business. It exercises activities, retries,
+A kymo workflow source with five fake workflows for a SaaS business. It exercises activities, retries,
 compensation, child workflows, `DurableDeferred` and `DurableClock`. Each activity sleeps for at
 most 2 seconds and returns made-up values instead of calling a real service.
 

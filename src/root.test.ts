@@ -24,21 +24,24 @@ describe("Root", () => {
     }),
   );
 
-  it("RootConfig accepts a port and plugin paths", () => {
+  it("RootConfig accepts a port and workflow sources", () => {
     const decoded = Schema.decodeExit(Root.RootConfig)({
       port: 4100,
-      plugins: ["./plugins/demo"],
+      workflows: ["kymo/gh-cli", "~/x/kymo.ts"],
     });
-    assert.deepStrictEqual(decoded, Exit.succeed({ port: 4100, plugins: ["./plugins/demo"] }));
+    assert.deepStrictEqual(
+      decoded,
+      Exit.succeed({ port: 4100, workflows: ["kymo/gh-cli", "~/x/kymo.ts"] }),
+    );
   });
 
   it("RootConfig rejects port 0", () => {
-    const decoded = Schema.decodeExit(Root.RootConfig)({ port: 0, plugins: [] });
+    const decoded = Schema.decodeExit(Root.RootConfig)({ port: 0, workflows: [] });
     assert.isTrue(Exit.isFailure(decoded));
   });
 
-  it("RootConfig rejects an empty plugin path", () => {
-    const decoded = Schema.decodeExit(Root.RootConfig)({ port: 4100, plugins: [""] });
+  it("RootConfig rejects an empty workflow source", () => {
+    const decoded = Schema.decodeExit(Root.RootConfig)({ port: 4100, workflows: [""] });
     assert.isTrue(Exit.isFailure(decoded));
   });
 });

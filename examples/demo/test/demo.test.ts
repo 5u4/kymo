@@ -15,7 +15,7 @@ import * as NightlyExport from "../src/nightly-export.ts";
 import * as ProvisionWorkspace from "../src/provision-workspace.ts";
 import * as RefundRequest from "../src/refund-request.ts";
 
-const engine = demo.layer.pipe(Layer.provideMerge(WorkflowEngine.layerMemory));
+const engine = demo.pipe(Layer.provideMerge(WorkflowEngine.layerMemory));
 
 const settle = Effect.fnUntraced(function* <A, E, R, Tag extends "Complete" | "Suspended">(
   poll: Effect.Effect<Option.Option<Workflow.Result<A, E>>, never, R>,
@@ -31,14 +31,7 @@ const settle = Effect.fnUntraced(function* <A, E, R, Tag extends "Complete" | "S
   return yield* Effect.die(`execution never reached ${tag}`);
 });
 
-describe("demo plugin", () => {
-  it("registers the five demo workflows", () => {
-    assert.deepStrictEqual(
-      demo.workflows.map((workflow) => workflow._tag),
-      ["ProvisionWorkspace", "ChargeInvoice", "RefundRequest", "NightlyExport", "DunningSequence"],
-    );
-  });
-
+describe("demo workflows", () => {
   it.effect("ChargeInvoice captures the payment", () =>
     Effect.gen(function* () {
       const executionId = yield* ChargeInvoice.ChargeInvoice.execute(

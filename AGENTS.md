@@ -10,12 +10,17 @@ and delete the old path in the same change, with no compatibility shims.
 ## Layout
 
 - The repo root is the package `kymo`. It exports `src/*.ts` as `kymo/<module>` (`kymo/root`,
-  `kymo/plugin`); `effect` is a peer dependency.
+  `kymo/workflows`); `effect` is a peer dependency.
 - `apps/*` are the only workspaces; each depends on `"kymo": "workspace:*"`. Import shared modules
   as `kymo/<module>`, not by relative path into `src/`. The CLI talks to the daemon over HTTP only.
-- `examples/*` are plain directories inside the root package. A plugin default-exports
-  `Plugin.make({ name, workflows, layer })` from `kymo/plugin`; the layer may require only
-  `WorkflowEngine`. `examples/demo` is the reference plugin.
+- `examples/*` are plain directories inside the root package. `examples/demo` is the reference
+  workflow source.
+- A workflow source is a module that default-exports a Layer `satisfies Workflows` (from
+  `kymo/workflows`). `RootConfig.workflows` (the `workflows` array of `kymo.json`) lists the
+  sources; no daemon entry point reads it yet. `apps/daemon/src/workflow-sources.ts` imports and
+  builds them, providing `WorkflowEngine`, `ChildProcessSpawner`, `FileSystem` and `Path`. Once that
+  module is loaded, any `effect` or `kymo` file the process loads from a `node_modules` directory
+  other than the daemon's own is replaced by the daemon's copy.
 - File names are kebab-case; `bun run lint` enforces it.
 - Nothing outside `design/` imports from `design/`.
 
