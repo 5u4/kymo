@@ -20,7 +20,7 @@
         "vitest": "catalog:",
       },
       "peerDependencies": {
-        "effect": "catalog:",
+        "effect": "4.1.2",
       },
     },
     "apps/cli": {
