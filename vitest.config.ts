@@ -15,6 +15,8 @@ export default defineConfig({
           name: "integration",
           include: ["{examples,plugins,apps}/*/test/**/*.test.{ts,tsx}"],
           testTimeout: 30_000,
+          // Vitest inlines .ts files under node_modules, which hides them from Bun.plugin onLoad.
+          server: { deps: { external: [/\/node_modules\/kymo\//] } },
         },
       },
     ],

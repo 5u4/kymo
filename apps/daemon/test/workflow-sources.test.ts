@@ -12,6 +12,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
+import { RootConfig } from "kymo/root";
 import { Awaits } from "../src/awaits.ts";
 import * as WorkflowSources from "../src/workflow-sources.ts";
 import { Double } from "./fixtures/double.ts";
@@ -60,6 +61,21 @@ const mergedGh = Effect.gen(function* () {
   );
 }).pipe(Effect.provide(BunFileSystem.layer));
 
+const installOwnCopy = (project: string, name: string, entries: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const own = Bun.resolveSync(`${name}/package.json`, import.meta.dirname).replace(
+      /package\.json$/,
+      "",
+    );
+    const copy = `${project}/node_modules/${name}`;
+    yield* fs.makeDirectory(copy, { recursive: true });
+    yield* fs.copyFile(`${own}package.json`, `${copy}/package.json`);
+    for (const entry of entries) {
+      yield* fs.copy(`${own}${entry}`, `${copy}/${entry}`);
+    }
+  });
+
 describe("workflow sources", () => {
   it.live("loads relative and ~/ sources, and a parent runs a child from another source", () =>
     Effect.gen(function* () {
@@ -72,18 +88,29 @@ describe("workflow sources", () => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const project = yield* fs.makeTempDirectoryScoped();
-      const effect = Bun.resolveSync("effect/package.json", import.meta.dirname).replace(
-        /package\.json$/,
-        "",
-      );
-      yield* fs.makeDirectory(`${project}/node_modules/effect`, { recursive: true });
-      yield* fs.copyFile(`${effect}package.json`, `${project}/node_modules/effect/package.json`);
-      yield* fs.copy(`${effect}dist`, `${project}/node_modules/effect/dist`);
+      yield* installOwnCopy(project, "effect", ["dist"]);
       yield* fs.copyFile(`${fixtures}/double.ts`, `${project}/kymo.ts`);
       const result = yield* Double.execute({ n: 21 }).pipe(
         Effect.provide(daemon(["./kymo.ts"], project)),
       );
       assert.strictEqual(result, 42);
+    }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
+  );
+
+  it.live("gives a source the daemon's kymo when its project installs its own copy", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const project = yield* fs.makeTempDirectoryScoped();
+      yield* installOwnCopy(project, "effect", ["dist"]);
+      yield* installOwnCopy(project, "kymo", ["src"]);
+      yield* fs.writeFileString(
+        `${project}/kymo.ts`,
+        `${yield* fs.readFileString(`${fixtures}/double.ts`)}export { RootConfig } from "kymo/root";\n`,
+      );
+      const source = yield* Effect.promise(
+        (): Promise<{ readonly RootConfig: unknown }> => import(`${project}/kymo.ts`),
+      ).pipe(Effect.provide(daemon(["./kymo.ts"], project)));
+      assert.strictEqual(source.RootConfig, RootConfig);
     }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
   );
 
