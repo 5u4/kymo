@@ -15,6 +15,9 @@ and delete the old path in the same change, with no compatibility shims.
     web UI.
   - `apps/daemon` (`@kymo/daemon`), `apps/cli` (`@kymo/cli`) and `apps/web` (`@kymo/web`) each
     depend on `@kymo/contract`. The CLI talks to the daemon over HTTP only.
+  - Each `plugins/*` workspace depends on `@kymo/contract` and `effect` only, and default-exports
+    `Plugin.make({ name, workflows, layer })` from `@kymo/contract/Plugin`. The layer may require
+    only `WorkflowEngine`. `plugins/demo` (`@kymo/plugin-demo`) is the reference plugin.
 - Nothing under `packages/`, `apps/`, or `plugins/` imports from `design/`.
 
 ## Reference

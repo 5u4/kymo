@@ -25,7 +25,15 @@
         "namespaceImportPackages": ["effect"],
         "ignoreEffectErrorsInTscExitCode": false,
         "ignoreEffectWarningsInTscExitCode": false,
-        "allowedUnstableApis": ["@effect/vitest"],
+        "allowedUnstableApis": [
+          "@effect/vitest",
+          "@effect/platform-bun",
+          "@effect/platform-node-shared/NodeCrypto",
+          "@effect/sql-sqlite-bun",
+          "effect/FileSystem",
+          "effect/cluster",
+          "effect/workflow"
+        ],
         "diagnosticSeverity": {
           "preferNamespaceImport": "error",
           "leakingRequirements": "error",

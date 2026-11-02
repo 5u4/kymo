@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./Plugin": "./src/Plugin.ts",
     "./Root": "./src/Root.ts"
   },
   "dependencies": {
