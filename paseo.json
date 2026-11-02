@@ -1,0 +1,11 @@
+{
+  "worktree": {
+    "setup": ["bun install --frozen-lockfile", "bun run vendor:effect"]
+  },
+  "scripts": {
+    "prototype": {
+      "type": "service",
+      "command": "cd design/prototype && python3 -m http.server $PASEO_PORT"
+    }
+  }
+}

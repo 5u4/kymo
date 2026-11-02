@@ -1,0 +1,147 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import"],
+  "jsPlugins": ["eslint-plugin-better-tailwindcss"],
+  "ignorePatterns": ["design/**", "repos/**", "**/dist/**", "apps/web/src/routeTree.gen.ts"],
+  "options": {
+    "typeAware": true
+  },
+  "settings": {
+    "better-tailwindcss": {
+      "cwd": "apps/web",
+      "entryPoint": "src/styles.css"
+    }
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "eslint/no-console": [
+      "error",
+      {
+        "allow": ["error", "warn"]
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "eslint/no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "effect",
+            "message": "Import one namespace per module (effect/Effect, effect/Schema, ...), not the effect barrel."
+          },
+          {
+            "name": "react",
+            "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+            "message": "Derive during render, use an event handler, or useMountEffect."
+          }
+        ],
+        "patterns": [
+          {
+            "regex": "^effect/[a-z][a-z-]*$",
+            "message": "Import one namespace per module (effect/sql/SqlClient), not an area barrel such as effect/sql."
+          }
+        ]
+      }
+    ],
+    "eslint/no-restricted-properties": [
+      "error",
+      {
+        "object": "React",
+        "property": "useEffect",
+        "message": "Derive during render, use an event handler, or useMountEffect."
+      },
+      {
+        "object": "React",
+        "property": "useLayoutEffect",
+        "message": "Derive during render, use an event handler, or useMountEffect."
+      },
+      {
+        "object": "React",
+        "property": "useInsertionEffect",
+        "message": "Derive during render, use an event handler, or useMountEffect."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["apps/web/**"],
+      "plugins": ["react", "jsx-a11y"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error",
+        "react/exhaustive-effect-dependencies": "warn",
+        "react/no-deriving-state-in-effects": "error",
+        "react/hooks": "warn",
+        "react/capitalized-calls": "warn",
+        "react/memo-dependencies": "warn",
+        "react/no-unstable-nested-components": "error",
+        "react/jsx-no-script-url": "error",
+        "react/jsx-no-constructed-context-values": "warn",
+        "react/no-array-index-key": "warn",
+        "react/jsx-no-target-blank": "error",
+        "react/jsx-no-useless-fragment": "warn",
+        "react/button-has-type": "warn",
+        "react/no-danger": "warn",
+        "react/only-export-components": [
+          "warn",
+          {
+            "allowConstantExport": true
+          }
+        ],
+        "react/self-closing-comp": "warn",
+        "react/jsx-boolean-value": "warn",
+        "react/jsx-curly-brace-presence": "warn",
+        "react/jsx-fragments": "warn",
+        "react/jsx-pascal-case": "warn",
+        "better-tailwindcss/no-unknown-classes": "error",
+        "better-tailwindcss/no-conflicting-classes": "error",
+        "better-tailwindcss/no-duplicate-classes": "error",
+        "better-tailwindcss/no-deprecated-classes": "error",
+        "better-tailwindcss/no-unnecessary-whitespace": "warn",
+        "better-tailwindcss/enforce-canonical-classes": "warn",
+        "better-tailwindcss/enforce-shorthand-classes": "warn"
+      }
+    },
+    {
+      "files": ["apps/web/src/routes/**"],
+      "plugins": ["react"],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/useMountEffect.ts"],
+      "plugins": ["react"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "message": "Import one namespace per module (effect/Effect, effect/Schema, ...), not the effect barrel."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "^effect/[a-z][a-z-]*$",
+                "message": "Import one namespace per module (effect/sql/SqlClient), not an area barrel such as effect/sql."
+              }
+            ]
+          }
+        ],
+        "eslint/no-restricted-properties": "off",
+        "react/exhaustive-deps": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "eslint/no-console": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "kymo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "apps/*",
+      "plugins/*"
+    ],
+    "catalog": {
+      "@effect/platform-bun": "4.1.2",
+      "@effect/sql-sqlite-bun": "4.1.2",
+      "@effect/tsgo": "0.63.0",
+      "@effect/vitest": "4.1.2",
+      "@tailwindcss/vite": "4.3.3",
+      "@tanstack/react-router": "1.170.46",
+      "@tanstack/router-plugin": "1.168.48",
+      "@toon-format/toon": "4.4.0",
+      "@types/bun": "1.4.4",
+      "@types/react": "19.3.0",
+      "@types/react-dom": "19.3.0",
+      "@vitejs/plugin-react": "6.2.1",
+      "effect": "4.1.2",
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "tailwindcss": "4.3.3",
+      "typescript": "7.0.2",
+      "vite": "8.3.5",
+      "vitest": "5.0.5"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "prepare": "lefthook install && effect-tsgo patch --typescript",
+    "typecheck": "effect-tsgo tsc --build --noEmit tsconfig.json",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "test": "bun --bun run vitest run",
+    "vendor:effect": "bun scripts/vendor-effect.ts",
+    "build:web": "bun run --cwd apps/web build"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "eslint-plugin-better-tailwindcss": "4.10.0",
+    "lefthook": "2.2.2",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

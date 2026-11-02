@@ -1,0 +1,9 @@
+pre-commit:
+  jobs:
+    - name: oxfmt
+      glob: "*.{ts,tsx,js,jsx,json,jsonc,css,html,md,yml,yaml}"
+      run: bunx oxfmt --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    - name: oxlint
+      glob: "*.{ts,tsx,js,jsx}"
+      run: bunx oxlint --no-error-on-unmatched-pattern {staged_files}

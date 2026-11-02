@@ -1,0 +1,15 @@
+{
+  "name": "@kymo/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@kymo/contract": "workspace:*",
+    "@toon-format/toon": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:"
+  }
+}
