@@ -108,12 +108,18 @@ export class Awaits extends Context.Service<
         register: (workflow, execute) =>
           engine.register(workflow, (payload, executionId) =>
             Effect.flatMap(WorkflowEngine.WorkflowInstance, (instance) => {
+              // Replay skips a race it already settled, so its losers stay in the earlier run's map.
+              const adoptWaits = Ref.update(ref, (byExecution) =>
+                HashMap.modify(byExecution, executionId, (waits) =>
+                  HashMap.map(waits, ({ wait }) => ({ wait, awaited: instance.awaitedDeferreds })),
+                ),
+              );
               const forgetUnlessAbandoned = Effect.suspend(() =>
                 instance.abandoned ? Effect.void : Ref.update(ref, HashMap.remove(executionId)),
               );
-              return Effect.andThen(
-                Scope.addFinalizer(instance.scope, forgetUnlessAbandoned),
-                execute(payload, executionId),
+              return adoptWaits.pipe(
+                Effect.andThen(Scope.addFinalizer(instance.scope, forgetUnlessAbandoned)),
+                Effect.andThen(execute(payload, executionId)),
               );
             }),
           ),
