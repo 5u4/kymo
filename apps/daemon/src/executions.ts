@@ -131,7 +131,7 @@ const failure = (cause: ReadonlyArray<CauseReason>) => {
 type Ended = Extract<ExecutionStatus, { readonly _tag: "Failed" | "Interrupted" }>;
 
 const ended = (cause: ReadonlyArray<CauseReason>): Ended =>
-  cause.some((reason) => reason._tag === "Interrupt")
+  cause.length > 0 && cause.every((reason) => reason._tag === "Interrupt")
     ? { _tag: "Interrupted" }
     : { _tag: "Failed", ...failure(cause) };
 
@@ -256,6 +256,9 @@ const statuses = Effect.gen(function* () {
     ]),
   );
   const awaits = yield* Effect.flatMap(Awaits, (service) => service.list);
+  const waitsByExecution = Map.groupBy(awaits, (wait) =>
+    entityKey(wait.workflowName, wait.executionId),
+  );
   const childrenByParent = Map.groupBy(
     runs.filter((run) => run.parent_id !== null),
     (run) => entityKey(run.parent_workflow ?? "", run.parent_id ?? ""),
@@ -263,9 +266,7 @@ const statuses = Effect.gen(function* () {
   return runs.map((run) => {
     const key = entityKey(run.workflow, run.id);
     const children = childrenByParent.get(key) ?? [];
-    const waits = awaits.filter(
-      (wait) => wait.executionId === run.id && wait.workflowName === run.workflow,
-    );
+    const waits = waitsByExecution.get(key) ?? [];
     const openChild = children.find(
       (child) =>
         child.detached !== 1 &&

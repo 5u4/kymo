@@ -111,12 +111,12 @@ export const executions: Command = {
       const { executions, total } = yield* Effect.flatMap(client(daemon), (api) =>
         api.executions.list({ query: { ...filters, limit } }),
       );
-      const filtered = filters.status !== undefined || filters.workflow !== undefined;
+      const filterFlags = Object.entries(filters).flatMap(([name, value]) => [`--${name}`, value]);
       if (total === 0) {
         return {
           body: { executions: [], total },
           help: [
-            filtered
+            filterFlags.length > 0
               ? `No executions match; run \`${kymo("executions")}\` to list every execution`
               : "No executions yet; they appear once a workflow starts",
           ],
@@ -137,7 +137,9 @@ export const executions: Command = {
         help: [
           `Run \`${kymo("execution <id>")}\` to see one execution; a unique id prefix works`,
           ...(executions.length < total
-            ? [`Run \`${kymo(`executions --limit ${total}`)}\` to see all ${total}`]
+            ? [
+                `Run \`${kymo(["executions", ...filterFlags, "--limit", total].join(" "))}\` to see all ${total}`,
+              ]
             : []),
           ...(fields.length === 0
             ? [`Add \`--fields ${ExtraField.literals.join(",")}\` for more columns`]

@@ -12,7 +12,7 @@ import * as Scope from "effect/Scope";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
 import { Awaits } from "../src/awaits.ts";
-import { Executions } from "../src/executions.ts";
+import { Executions, executionStatus } from "../src/executions.ts";
 import * as Runtime from "../src/runtime.ts";
 import { Double } from "./fixtures/double.ts";
 import {
@@ -63,7 +63,29 @@ const deferredGate: ExecutionStatus = {
   reason: { _tag: "Deferred", name: Option.some("Gate") },
 };
 
+const noWaits = { clock: Option.none(), openChild: Option.none(), deferred: Option.none() };
+
 describe("executions", () => {
+  it("reports the failure in a cause that also holds an interrupt", () => {
+    assert.deepStrictEqual(
+      executionStatus({
+        ...noWaits,
+        reply: Option.some({
+          _tag: "Failure",
+          cause: [{ _tag: "Interrupt" }, { _tag: "Fail", error: { _tag: "Boom", message: "x" } }],
+        }),
+      }),
+      { _tag: "Failed", kind: "Fail", message: "Boom: x" },
+    );
+    assert.deepStrictEqual(
+      executionStatus({
+        ...noWaits,
+        reply: Option.some({ _tag: "Failure", cause: [{ _tag: "Interrupt" }] }),
+      }),
+      { _tag: "Interrupted" },
+    );
+  });
+
   it.live(
     "derives every status, looks executions up by prefix and filters the list",
     () =>

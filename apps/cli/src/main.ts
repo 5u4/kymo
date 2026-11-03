@@ -149,7 +149,7 @@ const parse = (args: ReadonlyArray<string>) =>
         const inline = equals === -1 ? undefined : arg.slice(equals + 1);
         if (flagName === "root") {
           root = inline ?? args[++index];
-          if (root === undefined) {
+          if (root === undefined || (inline === undefined && root.startsWith("-"))) {
             return yield* new UsageError({ reason: "--root needs a directory" });
           }
           continue;
@@ -165,7 +165,7 @@ const parse = (args: ReadonlyArray<string>) =>
           flags[flagName] = true;
         } else {
           const value = inline ?? args[++index];
-          if (value === undefined) {
+          if (value === undefined || (inline === undefined && value.startsWith("-"))) {
             return yield* new UsageError({ reason: `--${flagName} needs ${flag.value}` });
           }
           flags[flagName] = value;

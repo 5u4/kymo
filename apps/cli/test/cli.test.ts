@@ -402,6 +402,25 @@ describe.concurrent("kymo executions and execution", () => {
       assert.strictEqual(page.total, 21);
       assert.include(page.help.join("\n"), "--limit 21");
 
+      const quick = yield* kymo(
+        root,
+        "executions",
+        "--status",
+        "succeeded",
+        "--workflow",
+        "Quick",
+        "--limit",
+        "5",
+      );
+      assert.strictEqual(quick.code, 0, quick.stdout);
+      const quickPage = listIn(quick.output);
+      assert.strictEqual(quickPage.shown, 5);
+      assert.strictEqual(quickPage.total, 17);
+      assert.include(
+        quickPage.help,
+        `Run \`kymo executions --status succeeded --workflow Quick --limit 17 --root ${root.root}\` to see all 17`,
+      );
+
       const wide = yield* kymo(root, "executions", "--fields", "started,parent", "--limit", "1");
       assert.strictEqual(wide.code, 0, wide.stdout);
       const [row] = listIn(wide.output).executions;
@@ -429,6 +448,21 @@ describe.concurrent("kymo executions and execution", () => {
       assert.strictEqual(badField.code, 2, badField.stdout);
       const unknownFlag = yield* kymo(root, "executions", "--full");
       assert.strictEqual(unknownFlag.code, 2, unknownFlag.stdout);
+      const swallowed = yield* kymo(root, "executions", "--workflow", "--full");
+      assert.strictEqual(swallowed.code, 2, swallowed.stdout);
+      assert.deepStrictEqual(swallowed.output, {
+        error: "--workflow needs <name>",
+        help: ["Run `kymo --help`"],
+      });
+      const dashedRoot = yield* kymo(root, "executions", "--root", "--full");
+      assert.strictEqual(dashedRoot.code, 2, dashedRoot.stdout);
+      assert.deepStrictEqual(dashedRoot.output, {
+        error: "--root needs a directory",
+        help: ["Run `kymo --help`"],
+      });
+      const inline = yield* kymo(root, "executions", "--workflow=-x");
+      assert.strictEqual(inline.code, 0, inline.stdout);
+      assert.strictEqual(listIn(inline.output).total, 0);
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
