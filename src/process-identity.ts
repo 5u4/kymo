@@ -15,16 +15,17 @@ export const ProcessIdentityJson = Schema.fromJsonString(ProcessIdentity);
 export const identify = (pid: number) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const started = yield* spawner.string(
-      ChildProcess.make("ps", ["-o", "lstart=", "-p", String(pid)], {
+    const row = yield* spawner.string(
+      ChildProcess.make("ps", ["-o", "stat=,lstart=", "-p", String(pid)], {
         env: { LC_ALL: "C", TZ: "UTC" },
         extendEnv: true,
       }),
     );
-    const trimmed = started.trim();
-    return trimmed.length === 0
+    const fields = row.trim();
+    const gap = fields.search(/\s/);
+    return gap === -1 || fields.startsWith("Z")
       ? Option.none<ProcessIdentity>()
-      : Option.some<ProcessIdentity>({ pid, started: trimmed });
+      : Option.some<ProcessIdentity>({ pid, started: fields.slice(gap).trim() });
   });
 
 export const isAlive = (identity: ProcessIdentity) =>
