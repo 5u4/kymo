@@ -120,6 +120,37 @@ export const ExecutionDetail = Schema.Struct({
 });
 export type ExecutionDetail = typeof ExecutionDetail.Type;
 
+export const LogLevel = Schema.Literals(["Fatal", "Error", "Warn", "Info", "Debug", "Trace"]);
+export type LogLevel = typeof LogLevel.Type;
+
+export const LogSource = Schema.Union([
+  Schema.TaggedStruct("Body", {}),
+  Schema.TaggedStruct("Activity", { name: Schema.String, attempt: Schema.Int }),
+]);
+export type LogSource = typeof LogSource.Type;
+
+export const LogEntry = Schema.Struct({
+  seq: Schema.Int,
+  pass: Schema.Int,
+  at: Schema.DateTimeUtc,
+  level: LogLevel,
+  message: Schema.String,
+  cause: Schema.OptionFromNullOr(Schema.String),
+  source: LogSource,
+});
+export type LogEntry = typeof LogEntry.Type;
+
+export const LogsQuery = Schema.Struct({
+  limit: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+});
+export type LogsQuery = typeof LogsQuery.Type;
+
+export const ExecutionLogs = Schema.Struct({
+  total: Schema.Int,
+  logs: Schema.Array(LogEntry),
+});
+export type ExecutionLogs = typeof ExecutionLogs.Type;
+
 export const ExecutionQuery = Schema.Struct({
   workflow: Schema.optional(Schema.String),
   status: Schema.optional(StatusName),
@@ -240,6 +271,14 @@ export class Api extends HttpApi.make("kymo")
         HttpApiEndpoint.get("get", "/api/executions/:id", {
           params: { id: Schema.String },
           success: ExecutionDetail,
+          error: [ExecutionNotFound, AmbiguousExecutionId],
+        }),
+      )
+      .add(
+        HttpApiEndpoint.get("logs", "/api/executions/:id/logs", {
+          params: { id: Schema.String },
+          query: LogsQuery.fields,
+          success: ExecutionLogs,
           error: [ExecutionNotFound, AmbiguousExecutionId],
         }),
       )

@@ -6,6 +6,7 @@ import * as Layer from "effect/Layer";
 import { Awaits } from "./awaits.ts";
 import { Executions, resumeWaiting } from "./executions.ts";
 import * as Migrations from "./migrations.ts";
+import * as WorkflowLogs from "./workflow-logs.ts";
 import * as WorkflowSources from "./workflow-sources.ts";
 
 export const layer = (options: {
@@ -14,13 +15,16 @@ export const layer = (options: {
   readonly db: string;
 }) =>
   Layer.mergeAll(Executions.layer, resumeWaiting).pipe(
-    Layer.provide(Migrations.layer),
     Layer.provideMerge(
       WorkflowSources.layer({ root: options.root, workflows: options.workflows }).pipe(
         Layer.provideMerge(Awaits.layer),
+        Layer.provide(WorkflowLogs.attribution),
         Layer.provide(ClusterWorkflowEngine.layer),
         Layer.provide(SingleRunner.layer({ runnerStorage: "memory" })),
-        Layer.provideMerge(SqliteClient.layer({ filename: options.db })),
+        Layer.provide(WorkflowLogs.logger),
+        Layer.provideMerge(
+          Migrations.layer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: options.db }))),
+        ),
         Layer.provide(BunCrypto.layerDigest),
       ),
     ),

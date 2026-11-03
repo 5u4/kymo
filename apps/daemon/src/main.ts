@@ -109,6 +109,7 @@ const daemon = (
       handlers
         .handle("list", ({ query }) => service.list(query))
         .handle("get", ({ params }) => service.get(params.id))
+        .handle("logs", ({ params, query }) => service.logs(params.id, query))
         .handle("execute", ({ payload }) => service.execute(payload))
         .handle("complete", ({ params, payload }) => service.complete(params.id, payload))
         .handle("resume", ({ params }) => service.resume(params.id))
