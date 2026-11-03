@@ -19,9 +19,9 @@ and delete the old path in the same change, with no compatibility shims.
   `src/`.
 - The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
-  The daemon answers 403 to any request whose `Origin` header is present and is not
-  `http://127.0.0.1:<port>` or `http://localhost:<port>` (the bound port), so a page from another
-  origin cannot start or change executions.
+  The daemon answers 403 to any request whose `Origin` header is present and is not the origin of
+  `http://127.0.0.1:<port>` or `http://localhost:<port>` (the bound port, omitted when it is 80), so
+  a page from another origin cannot start or change executions.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
   `Daemon` (bare `kymo`, `executions`, `execution`, `execute`, `complete`, `resume`, `interrupt`);
   add every new command as `Daemon`, which fails with the same "not running" error while no daemon

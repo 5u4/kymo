@@ -81,10 +81,9 @@ const sameOrigin = HttpRouter.middleware(
     if (address._tag === "UnixPathAddress") {
       return yield* Effect.die(`the daemon is listening on the unix socket ${address.path}`);
     }
-    const allowed = new Set([
-      `http://127.0.0.1:${address.port}`,
-      `http://localhost:${address.port}`,
-    ]);
+    const allowed = new Set(
+      ["127.0.0.1", "localhost"].map((host) => new URL(`http://${host}:${address.port}`).origin),
+    );
     return (httpEffect) =>
       Effect.gen(function* () {
         const origin = (yield* HttpServerRequest.HttpServerRequest).headers["origin"];
