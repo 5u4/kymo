@@ -56,16 +56,19 @@ export const logger = Logger.layer([
     const stored = yield* Logger.batched(Logger.make(row), {
       window: "100 millis",
       flush: (rows) =>
-        Arr.isArrayNonEmpty(rows)
-          ? sql`INSERT INTO kymo_logs ${sql.insert(rows)}`.pipe(
+        Effect.forEach(
+          Arr.chunksOf(rows, 500),
+          (chunk) =>
+            sql`INSERT INTO kymo_logs ${sql.insert(chunk)}`.pipe(
               Effect.asVoid,
               Effect.catchCause((cause) =>
                 Effect.logError("could not store workflow logs", cause).pipe(
                   Effect.provideService(Logger.CurrentLoggers, new Set([Logger.defaultLogger])),
                 ),
               ),
-            )
-          : Effect.void,
+            ),
+          { discard: true },
+        ),
     });
     return Logger.make((options) =>
       Context.getOrUndefined(options.fiber.context, WorkflowEngine.WorkflowInstance) === undefined
