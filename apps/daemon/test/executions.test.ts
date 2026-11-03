@@ -23,6 +23,7 @@ import {
   bodyRuns,
   ChildThenGate,
   Defect,
+  FailOnce,
   FailTyped,
   Gate,
   Interruptible,
@@ -32,6 +33,7 @@ import {
   Succeed,
   SuspendOnBoom,
 } from "./fixtures/statuses.ts";
+import { AwaitApproval, observed } from "./fixtures/service-schema.ts";
 
 const fixtures = `${import.meta.dirname}/fixtures`;
 
@@ -402,6 +404,82 @@ describe("executions", () => {
           yield* eventually(statusOf(ids.awaitChild), (status) => status._tag === "Succeeded");
         }).pipe(Effect.provide(runtime(db)), Effect.scoped);
       }).pipe(Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "complete continues a waiting execution, resume reruns a failed suspend, interrupt ends a wait",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const ids = {
+          gate: yield* AwaitGate.execute({ id: "complete" }, { discard: true }),
+          nap: yield* Nap.execute({ id: "nap" }, { discard: true }),
+          failOnce: yield* FailOnce.execute({ id: "resume" }, { discard: true }),
+          interrupted: yield* AwaitGate.execute({ id: "interrupt" }, { discard: true }),
+        };
+        yield* eventually(list({}), ({ executions }) =>
+          executions.every(({ status }) => status._tag === "Suspended"),
+        );
+
+        const notGate = yield* Effect.flip(
+          executions.complete(ids.gate, { name: "Other", value: "x" }),
+        );
+        assert.deepInclude(notGate, { _tag: "NotWaiting", waiting: ["Gate"] });
+        const clock = yield* Effect.flip(
+          executions.complete(ids.nap, { name: "nap", value: null }),
+        );
+        assert.deepInclude(clock, { _tag: "NotWaiting", waiting: [] });
+        const invalid = yield* Effect.flip(
+          executions.complete(ids.gate, { name: "Gate", value: 1 }),
+        );
+        assert.strictEqual(invalid._tag, "InvalidValue");
+        const resumeWaiting = yield* Effect.flip(executions.resume(ids.gate));
+        assert.deepInclude(resumeWaiting, { _tag: "ActionNotAllowed", action: "resume" });
+
+        const completed = yield* executions.complete(ids.gate.slice(0, 12), {
+          name: "Gate",
+          value: "open",
+        });
+        assert.strictEqual(completed.id, ids.gate);
+        yield* eventually(statusOf(ids.gate), (status) => status._tag === "Succeeded");
+        const again = yield* Effect.flip(
+          executions.complete(ids.gate, { name: "Gate", value: "again" }),
+        );
+        assert.deepInclude(again, { _tag: "NotWaiting", waiting: [] });
+
+        yield* executions.resume(ids.failOnce);
+        yield* eventually(statusOf(ids.failOnce), (status) => status._tag === "Succeeded");
+
+        yield* executions.interrupt(ids.interrupted);
+        yield* eventually(statusOf(ids.interrupted), (status) => status._tag === "Interrupted");
+        const ended = yield* Effect.flip(executions.interrupt(ids.interrupted));
+        assert.deepInclude(ended, {
+          _tag: "ActionNotAllowed",
+          action: "interrupt",
+          status: { _tag: "Interrupted" },
+        });
+      }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "complete decodes a value whose schema needs a service only the workflow source provides",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const id = yield* AwaitApproval.execute({ id: "approval" }, { discard: true });
+        yield* eventually(statusOf(id), (status) => status._tag === "Suspended");
+
+        yield* executions.complete(id, { name: "Approval", value: "yes" });
+        yield* eventually(statusOf(id), (status) => status._tag === "Succeeded");
+        assert.strictEqual(observed.get("approval"), "svc:yes");
+      }).pipe(
+        Effect.provide(
+          Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./service-schema.ts"]))),
+        ),
+        Effect.scoped,
+      ),
     60_000,
   );
 });

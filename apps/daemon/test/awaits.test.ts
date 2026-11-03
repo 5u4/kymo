@@ -134,9 +134,6 @@ describe("Awaits", () => {
       assert.deepStrictEqual(pending.map(summary), [
         { _tag: "Deferred", executionId, workflowName: "Approval", name: "ManagerApproval" },
       ]);
-      const [entry] = pending;
-      assert.strictEqual(entry?._tag === "Deferred" && entry.deferred.name, "ManagerApproval");
-
       yield* DurableDeferred.succeed(ManagerApproval, {
         token: DurableDeferred.tokenFromExecutionId(ManagerApproval, {
           workflow: Approval,

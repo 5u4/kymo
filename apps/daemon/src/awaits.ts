@@ -5,8 +5,8 @@ import * as HashMap from "effect/HashMap";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
-import type * as Schema from "effect/Schema";
-import type * as DurableDeferred from "effect/workflow/DurableDeferred";
+import * as Schema from "effect/Schema";
+import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as Scope from "effect/Scope";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 
@@ -17,7 +17,9 @@ export type Await =
       readonly workflowName: string;
       readonly name: string;
       readonly since: DateTime.Utc;
-      readonly deferred: DurableDeferred.DurableDeferred<Schema.Constraint, Schema.Constraint>;
+      readonly complete: (
+        value: Schema.Json,
+      ) => Effect.Effect<void, Schema.SchemaError, WorkflowEngine.WorkflowEngine>;
     }
   | {
       readonly _tag: "Clock";
@@ -54,7 +56,7 @@ export class Awaits extends Context.Service<
         instance: WorkflowEngine.WorkflowInstance["Service"],
         deferred: DurableDeferred.DurableDeferred<Schema.Constraint, Schema.Constraint>,
       ) =>
-        Effect.flatMap(DateTime.now, (since) =>
+        Effect.flatMap(Effect.zip(DateTime.now, Effect.context<never>()), ([since, body]) =>
           Ref.update(ref, (byExecution) => {
             const waits = Option.getOrElse(HashMap.get(byExecution, instance.executionId), () =>
               HashMap.empty<string, Recorded>(),
@@ -69,7 +71,34 @@ export class Awaits extends Context.Service<
                 };
                 return deferred.name.startsWith(clockPrefix)
                   ? { _tag: "Clock", ...base, name: deferred.name.slice(clockPrefix.length) }
-                  : { _tag: "Deferred", ...base, name: deferred.name, deferred };
+                  : {
+                      _tag: "Deferred",
+                      ...base,
+                      name: deferred.name,
+                      // deferredResult erases the schemas' services; the body context below holds them.
+                      complete: (value) =>
+                        (
+                          Schema.decodeEffect(Schema.toCodecJson(deferred.successSchema))(
+                            value,
+                          ).pipe(
+                            Effect.flatMap((value) =>
+                              DurableDeferred.succeed(deferred, {
+                                token: DurableDeferred.tokenFromExecutionId(deferred, instance),
+                                value,
+                              }),
+                            ),
+                          ) as Effect.Effect<
+                            void,
+                            Schema.SchemaError,
+                            WorkflowEngine.WorkflowEngine
+                          >
+                        ).pipe(
+                          Effect.updateContext(
+                            (daemon: Context.Context<WorkflowEngine.WorkflowEngine>) =>
+                              Context.merge(body, daemon),
+                          ),
+                        ),
+                    };
               },
             );
             return HashMap.set(

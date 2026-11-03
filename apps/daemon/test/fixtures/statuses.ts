@@ -29,6 +29,7 @@ export const AwaitChild = make("AwaitChild");
 export const ChildThenGate = make("ChildThenGate");
 export const Stuck = make("Stuck");
 export const Quick = make("Quick");
+export const FailOnce = make("FailOnce").annotate(Workflow.SuspendOnFailure, true);
 
 export const bodyRuns = new Map<string, number>();
 
@@ -36,6 +37,8 @@ const body = (name: string) =>
   Effect.sync(() => {
     bodyRuns.set(name, (bodyRuns.get(name) ?? 0) + 1);
   });
+
+const failOnceRuns = new Map<string, number>();
 
 const step = (name: string) => Activity.make({ name, execute: Effect.void });
 
@@ -83,4 +86,11 @@ export default Layer.mergeAll(
     ),
   ),
   Quick.toLayer(() => body("Quick")),
+  FailOnce.toLayer(({ id }) =>
+    Effect.suspend(() => {
+      const runs = (failOnceRuns.get(id) ?? 0) + 1;
+      failOnceRuns.set(id, runs);
+      return runs === 1 ? Effect.fail(new Boom({ reason: "first run" })) : Effect.void;
+    }),
+  ),
 ) satisfies Workflows;
