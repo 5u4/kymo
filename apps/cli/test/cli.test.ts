@@ -582,7 +582,7 @@ describe.concurrent("kymo executions and execution", () => {
       assert.strictEqual(usage.code, 0, usage.stdout);
       assert.strictEqual(
         Schema.decodeUnknownSync(Schema.Struct({ usage: Schema.String }))(usage.output).usage,
-        "kymo execution <id> [--full] [--root <dir>]",
+        "kymo execution <id> [--full] [--logs] [--root <dir>]",
       );
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
@@ -737,6 +737,70 @@ describe.concurrent("kymo execute", () => {
       );
       assert.strictEqual(Number(code), 0, stdout);
       assert.isTrue(executedIn(decode(stdout)).created);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+});
+
+const LogsOutput = Schema.Struct({
+  execution: Schema.Struct({ id: Schema.String }),
+  logs: Schema.Array(
+    Schema.Struct({
+      pass: Schema.Int,
+      at: Schema.String,
+      level: Schema.String,
+      source: Schema.String,
+      message: Schema.String,
+    }),
+  ),
+  help: Schema.Array(Schema.String),
+});
+
+describe.concurrent("kymo execution --logs", () => {
+  it.live("shows an execution's workflow logs, which never reach daemon.log", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* running([`${fixtures}/logs.ts`]);
+      const { id } = executedIn(
+        (yield* kymo(root, "execute", "Chatty", '{"id":"cli"}')).output,
+      ).execution;
+
+      const plain = yield* kymo(root, "execution", id);
+      assert.strictEqual(plain.code, 0, plain.stdout);
+      assert.include(
+        Schema.decodeUnknownSync(Schema.Struct({ help: Schema.Array(Schema.String) }))(plain.output)
+          .help,
+        `Run \`kymo --root ${root.root} execution ${id} --logs\` to see its logs`,
+      );
+
+      const shown = yield* settled(
+        Effect.map(kymo(root, "execution", id.slice(0, 12), "--logs"), (result) =>
+          Schema.decodeUnknownSync(LogsOutput)(result.output),
+        ),
+        ({ logs }) => logs.length >= 4,
+      );
+      assert.strictEqual(shown.execution.id, id);
+      assert.deepStrictEqual(
+        shown.logs.map(({ at: _at, ...line }) => line),
+        [
+          { pass: 1, level: "info", source: "body", message: "body start" },
+          { pass: 1, level: "info", source: "Chatty.flaky#1", message: "flaky attempt 1" },
+          { pass: 1, level: "info", source: "Chatty.flaky#2", message: "flaky attempt 2" },
+          { pass: 1, level: "warn", source: "body", message: "waiting for approval" },
+        ],
+      );
+      assert.notInclude(shown.help.join("\n"), "--logs`", "no --logs hint once logs are shown");
+
+      const daemonLog = yield* fs.readFileString(root.log);
+      for (const message of ["body start", "flaky attempt", "waiting for approval"]) {
+        assert.notInclude(daemonLog, message);
+      }
+
+      const unknown = yield* kymo(root, "execution", "nope", "--logs");
+      assert.strictEqual(unknown.code, 1, unknown.stdout);
+      assert.deepStrictEqual(unknown.output, {
+        error: "no execution matches nope",
+        help: [`Run \`kymo --root ${root.root} executions\` to list executions`],
+      });
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 });

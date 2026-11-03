@@ -20,6 +20,7 @@ import type { Running } from "./daemon-state.ts";
 const defaultLimit = 20;
 const textLimit = 120;
 const activityLimit = 10;
+const logLimit = 50;
 
 const ExtraField = Schema.Literals(["started", "updated", "parent"]);
 type ExtraField = typeof ExtraField.Type;
@@ -42,6 +43,7 @@ const Id = Schema.String.check(Schema.isNonEmpty());
 const DetailInput = Schema.Struct({
   id: Id,
   full: Schema.optional(Schema.Literal(true)),
+  logs: Schema.optional(Schema.Literal(true)),
 });
 
 const ControlInput = Schema.Struct({ id: Id });
@@ -195,13 +197,21 @@ export const execution: Command = {
   _tag: "Daemon",
   summary: "Show one execution by id or unique id prefix",
   positionals: [{ name: "id", summary: "Execution id or a unique prefix of it" }],
-  flags: [{ name: "full", summary: `Show every activity and untruncated text` }],
+  flags: [
+    { name: "full", summary: `Show every activity and log line and untruncated text` },
+    { name: "logs", summary: `Show the execution's logs, the last ${logLimit} unless --full` },
+  ],
   run: (daemon, { input, kymo }) =>
     Effect.gen(function* () {
-      const { id, full = false } = yield* decodeInput(DetailInput)(input);
-      const detail = yield* Effect.flatMap(client(daemon), (api) =>
-        api.executions.get({ params: { id } }),
-      );
+      const { id, full = false, logs: showLogs = false } = yield* decodeInput(DetailInput)(input);
+      const api = yield* client(daemon);
+      const detail = yield* api.executions.get({ params: { id } });
+      const logs = showLogs
+        ? yield* api.executions.logs({
+            params: { id: detail.id },
+            query: full ? {} : { limit: logLimit },
+          })
+        : undefined;
       const activities = full ? detail.activities : detail.activities.slice(-activityLimit);
       const parent = Option.getOrNull(detail.parentId);
       return {
@@ -232,6 +242,23 @@ export const execution: Command = {
             name: wait.name,
             since: DateTime.formatIso(wait.since),
           })),
+          ...(logs === undefined
+            ? {}
+            : {
+                logs: logs.logs.map((log) => ({
+                  pass: log.pass,
+                  at: DateTime.formatIso(log.at),
+                  level: log.level.toLowerCase(),
+                  source:
+                    log.source._tag === "Body"
+                      ? "body"
+                      : `${log.source.name}#${log.source.attempt}`,
+                  message: truncate(log.message, full),
+                })),
+                ...(logs.logs.length < logs.total
+                  ? { logsShown: `${logs.logs.length} of ${logs.total}` }
+                  : {}),
+              }),
         },
         help: [
           ...(activities.length < detail.activities.length
@@ -239,6 +266,15 @@ export const execution: Command = {
                 `Run \`${kymo(`execution ${detail.id} --full`)}\` to see all ${detail.activities.length} activities`,
               ]
             : []),
+          ...(logs === undefined
+            ? [`Run \`${kymo(`execution ${detail.id} --logs`)}\` to see its logs`]
+            : logs.total === 0
+              ? ["No logs yet; they appear once the workflow logs with Effect.log"]
+              : logs.logs.length < logs.total
+                ? [
+                    `Run \`${kymo(`execution ${detail.id} --logs --full`)}\` to see all ${logs.total} log lines`,
+                  ]
+                : []),
           ...(parent === null ? [] : [`Run \`${kymo(`execution ${parent}`)}\` to see its parent`]),
           ...(detail.children.length > 0
             ? [`Run \`${kymo("execution <child id>")}\` to see a child`]

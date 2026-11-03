@@ -37,6 +37,7 @@ export const ChargeInvoice = Workflow.make("ChargeInvoice", {
 export const layer = ChargeInvoice.toLayer(
   Effect.fnUntraced(function* ({ invoiceId }) {
     const suffix = invoiceId.slice("inv_".length);
+    yield* Effect.log(`charging ${invoiceId}`);
     yield* Activity.make({
       name: "AuthorizeCard",
       success: Schema.Struct({ authorizationId: Schema.String, last4: Schema.String }),
@@ -53,7 +54,9 @@ export const layer = ChargeInvoice.toLayer(
       name: "CapturePayment",
       success: Charge,
       error: GatewayUnavailable,
-      execute: Effect.sleep("500 millis").pipe(
+      execute: Activity.CurrentAttempt.pipe(
+        Effect.flatMap((attempt) => Effect.log(`capturing ${invoiceId}, attempt ${attempt}`)),
+        Effect.andThen(Effect.sleep("500 millis")),
         Effect.andThen(
           invoiceId === gatewayDownInvoiceId
             ? Effect.fail(new GatewayUnavailable({ status: 503 }))

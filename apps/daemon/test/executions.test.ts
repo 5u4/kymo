@@ -12,11 +12,12 @@ import * as Scheduler from "effect/Scheduler";
 import * as Scope from "effect/Scope";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as SqlClient from "effect/sql/SqlClient";
-import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
+import { type ExecutionQuery, ExecutionStatus, type LogsQuery } from "kymo/api";
 import { Awaits } from "../src/awaits.ts";
 import { Executions, executionStatus } from "../src/executions.ts";
 import * as Runtime from "../src/runtime.ts";
 import { Double } from "./fixtures/double.ts";
+import { Chatty } from "./fixtures/logs.ts";
 import {
   AwaitChild,
   AwaitGate,
@@ -34,6 +35,7 @@ import {
   SuspendOnBoom,
 } from "./fixtures/statuses.ts";
 import { AwaitApproval, observed } from "./fixtures/service-schema.ts";
+import { Ticker } from "./fixtures/ticker.ts";
 
 const fixtures = `${import.meta.dirname}/fixtures`;
 
@@ -478,6 +480,125 @@ describe("executions", () => {
         Effect.provide(
           Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./service-schema.ts"]))),
         ),
+        Effect.scoped,
+      ),
+    60_000,
+  );
+
+  it.live(
+    "stores body and activity logs per pass, numbering passes on across a restart",
+    () =>
+      Effect.gen(function* () {
+        const db = yield* tempDb;
+        const logsOf = (id: string, query: LogsQuery = {}) =>
+          Effect.map(
+            Effect.flatMap(Executions, (service) => service.logs(id, query)),
+            ({ total, logs }) => ({
+              total,
+              seqs: logs.map(({ seq }) => seq),
+              causes: logs.map(({ cause }) => cause),
+              lines: logs.map(({ pass, level, message, source }) => ({
+                pass,
+                level,
+                message,
+                source: source._tag === "Body" ? "body" : `${source.name}#${source.attempt}`,
+              })),
+            }),
+          );
+        const firstPass = [
+          { pass: 1, level: "Info", message: "body start", source: "body" },
+          { pass: 1, level: "Info", message: "flaky attempt 1", source: "Chatty.flaky#1" },
+          { pass: 1, level: "Info", message: "flaky attempt 2", source: "Chatty.flaky#2" },
+          { pass: 1, level: "Warn", message: "waiting for approval", source: "body" },
+        ];
+
+        const first = yield* Scope.make();
+        const restarted = yield* Effect.gen(function* () {
+          const executions = yield* Executions;
+          const completed = yield* Chatty.execute({ id: "completed" }, { discard: true });
+          const restarted = yield* Chatty.execute({ id: "restarted" }, { discard: true });
+          for (const id of [completed, restarted]) {
+            const waiting = yield* eventually(logsOf(id), ({ total }) => total >= 4);
+            assert.deepStrictEqual(waiting.lines, firstPass, id);
+          }
+
+          yield* executions.complete(completed, { name: "Approval", value: "ann" });
+          yield* eventually(statusOf(completed), (status) => status._tag === "Succeeded");
+          const done = yield* eventually(logsOf(completed), ({ total }) => total >= 7);
+          assert.deepStrictEqual(done.lines, [
+            ...firstPass,
+            { pass: 2, level: "Info", message: "body start", source: "body" },
+            { pass: 2, level: "Warn", message: "waiting for approval", source: "body" },
+            { pass: 2, level: "Error", message: "approved by ann", source: "body" },
+          ]);
+          assert.deepStrictEqual(
+            done.seqs,
+            done.seqs.toSorted((a, b) => a - b),
+          );
+          assert.match(
+            Option.getOrElse(done.causes[6] ?? Option.none(), () => ""),
+            /audit/,
+          );
+          assert.deepStrictEqual(done.causes.slice(0, 6), Array(6).fill(Option.none()));
+
+          const last = yield* logsOf(completed.slice(0, 10), { limit: 2 });
+          assert.strictEqual(last.total, 7);
+          assert.deepStrictEqual(last.lines, done.lines.slice(-2));
+          const missing = yield* Effect.flip(
+            Effect.flatMap(Executions, (service) => service.logs("not-an-id", {})),
+          );
+          assert.strictEqual(missing._tag, "ExecutionNotFound");
+          return restarted;
+        }).pipe(Effect.provide(runtime(db, ["./logs.ts"])), Scope.provide(first));
+        yield* Scope.close(first, Exit.void);
+
+        yield* Effect.gen(function* () {
+          const executions = yield* Executions;
+          const replayed = yield* eventually(logsOf(restarted), ({ total }) => total >= 6);
+          assert.deepStrictEqual(replayed.lines.slice(4), [
+            { pass: 2, level: "Info", message: "body start", source: "body" },
+            { pass: 2, level: "Warn", message: "waiting for approval", source: "body" },
+          ]);
+          yield* executions.complete(restarted, { name: "Approval", value: "bob" });
+          const done = yield* eventually(logsOf(restarted), ({ total }) => total >= 9);
+          assert.deepStrictEqual(done.lines.slice(6), [
+            { pass: 3, level: "Info", message: "body start", source: "body" },
+            { pass: 3, level: "Warn", message: "waiting for approval", source: "body" },
+            { pass: 3, level: "Error", message: "approved by bob", source: "body" },
+          ]);
+        }).pipe(Effect.provide(runtime(db, ["./logs.ts"])), Effect.scoped);
+      }).pipe(Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "reports a log total that matches the lines it returns while the execution keeps logging",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const id = yield* Ticker.executionId({ id: "ticker" });
+        let ticking = true;
+        yield* Ticker.execute({ id: "ticker" }).pipe(
+          Effect.ensuring(Effect.sync(() => (ticking = false))),
+          Effect.forkChild,
+        );
+        const mismatches: Array<string> = [];
+        yield* Effect.forEach(
+          Array.from({ length: 16 }, (_, reader) => reader),
+          () =>
+            Effect.gen(function* () {
+              while (ticking) {
+                const { total, logs } = yield* executions.logs(id, {});
+                if (logs.length !== total) {
+                  mismatches.push(`${logs.length} lines, total ${total}`);
+                }
+              }
+            }),
+          { concurrency: "unbounded", discard: true },
+        ).pipe(Effect.provideService(Scheduler.MaxOpsBeforeYield, 8));
+        assert.deepStrictEqual(mismatches, []);
+      }).pipe(
+        Effect.provide(Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./ticker.ts"])))),
         Effect.scoped,
       ),
     60_000,

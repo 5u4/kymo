@@ -21,10 +21,14 @@ import {
   type ExecutionAction,
   type ExecutionDetail,
   type ExecutionList,
+  type ExecutionLogs,
   ExecutionNotFound,
   type ExecutionQuery,
   type ExecutionStatus,
   type ExecutionSummary,
+  type LogEntry,
+  LogLevel,
+  type LogsQuery,
   InvalidPayload,
   InvalidValue,
   NotWaiting,
@@ -108,6 +112,19 @@ const ActivityRow = Schema.Struct({
   replied: Schema.NullOr(SnowflakeTime),
   reply: Schema.NullOr(Schema.fromJsonString(Reply)),
 });
+
+const LogRow = Schema.Struct({
+  seq: Schema.Int,
+  pass: Schema.Int,
+  at: Schema.DateTimeUtcFromMillis,
+  level: LogLevel,
+  message: Schema.String,
+  cause: Schema.NullOr(Schema.String),
+  activity: Schema.NullOr(Schema.String),
+  attempt: Schema.NullOr(Schema.Int),
+});
+
+const LogCount = Schema.Tuple([Schema.Struct({ total: Schema.Int })]);
 
 const JsonText = Schema.fromJsonString(Schema.Json);
 
@@ -339,6 +356,10 @@ export class Executions extends Context.Service<
     >;
     readonly resume: Control;
     readonly interrupt: Control;
+    readonly logs: (
+      id: string,
+      query: LogsQuery,
+    ) => Effect.Effect<ExecutionLogs, ExecutionNotFound | AmbiguousExecutionId>;
   }
 >()("@kymo/daemon/Executions") {
   static readonly layer: Layer.Layer<
@@ -399,6 +420,34 @@ export class Executions extends Context.Service<
             kind: wait._tag,
             name: wait.name,
             since: wait.since,
+          })),
+        };
+      }, Effect.provideContext(context));
+
+      const logs = Effect.fn("Executions.logs")(function* (id: string, query: LogsQuery) {
+        const { run } = yield* resolve(id);
+        const [[{ total }], rows] = yield* Effect.all([
+          sql`SELECT count(*) AS total FROM kymo_logs WHERE execution_id = ${run.id}`.pipe(
+            Effect.flatMap(Schema.decodeUnknownEffect(LogCount)),
+          ),
+          sql`
+            SELECT * FROM (
+              SELECT seq, pass, at, level, message, cause, activity, attempt FROM kymo_logs
+              WHERE execution_id = ${run.id}
+              ORDER BY seq DESC
+              LIMIT ${query.limit ?? -1}
+            ) ORDER BY seq
+          `.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(LogRow)))),
+        ]).pipe(sql.withTransaction, Effect.orDie);
+        return {
+          total,
+          logs: rows.map(({ activity, attempt, cause, ...row }): LogEntry => ({
+            ...row,
+            cause: Option.fromNullOr(cause),
+            source:
+              activity === null || attempt === null
+                ? { _tag: "Body" }
+                : { _tag: "Activity", name: activity, attempt },
           })),
         };
       }, Effect.provideContext(context));
@@ -505,6 +554,7 @@ export class Executions extends Context.Service<
       return Executions.of({
         list,
         get,
+        logs,
         execute,
         complete,
         resume: control("resume"),
