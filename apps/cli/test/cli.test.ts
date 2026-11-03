@@ -320,6 +320,272 @@ describe.concurrent("kymo start, stop and home", () => {
   );
 });
 
+const ExecutionsOutput = Schema.Struct({
+  executions: Schema.Array(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
+  total: Schema.Int,
+  shown: Schema.optional(Schema.Int),
+  help: Schema.Array(Schema.String),
+});
+
+const listIn = (output: unknown) => Schema.decodeUnknownSync(ExecutionsOutput)(output);
+
+const DetailOutput = Schema.Struct({
+  execution: Schema.Struct({
+    id: Schema.String,
+    workflow: Schema.String,
+    label: Schema.String,
+    status: Schema.String,
+    payload: Schema.Struct({ id: Schema.String }),
+  }),
+  activities: Schema.Array(
+    Schema.Struct({ name: Schema.String, attempt: Schema.Int, status: Schema.String }),
+  ),
+  children: Schema.Array(Schema.String),
+  waits: Schema.Array(Schema.Struct({ kind: Schema.String, name: Schema.String })),
+});
+
+const AmbiguousOutput = Schema.Struct({
+  error: Schema.String,
+  candidates: Schema.Array(Schema.String),
+  help: Schema.Array(Schema.String),
+});
+
+const seeded = Effect.gen(function* () {
+  const root = yield* tempRoot([`${fixtures}/seeded.ts`]);
+  const started = yield* kymo(root, "start");
+  assert.strictEqual(started.code, 0, started.stdout);
+  const listed = yield* settled(
+    Effect.map(kymo(root, "executions", "--limit", "50"), (result) => listIn(result.output)),
+    ({ executions, total }) =>
+      total === 21 &&
+      executions.some((row) => row["status"] === "suspended (deferred Gate)") &&
+      executions.every((row) => row["status"] !== "running"),
+  );
+  return {
+    root,
+    ids: listed.executions.map((row) => row["id"] ?? ""),
+    gate: listed.executions.find((row) => row["label"] === "g")?.["id"] ?? "",
+  };
+});
+
+describe.concurrent("kymo executions and execution", () => {
+  it.live("lists executions with default and extra fields, a limit and a status filter", () =>
+    Effect.gen(function* () {
+      const { root } = yield* seeded;
+
+      const all = yield* kymo(root, "executions", "--limit", "50");
+      assert.strictEqual(all.code, 0, all.stdout);
+      const listed = listIn(all.output);
+      assert.strictEqual(listed.total, 21);
+      for (const row of listed.executions) {
+        assert.deepStrictEqual(Object.keys(row).toSorted(), ["id", "label", "status", "workflow"]);
+      }
+      const byLabel = new Map(listed.executions.map((row) => [row["label"], row]));
+      assert.deepInclude(byLabel.get("s"), { workflow: "Succeed", status: "succeeded" });
+      assert.deepInclude(byLabel.get("f"), {
+        workflow: "FailTyped",
+        status: 'failed (Fail: Boom {"reason":"typed"})',
+      });
+      assert.deepInclude(byLabel.get("g"), {
+        workflow: "AwaitGate",
+        status: "suspended (deferred Gate)",
+      });
+      assert.match(
+        byLabel.get("n")?.["status"] ?? "",
+        /^suspended \(clock nap until \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\)$/,
+      );
+
+      const limited = yield* kymo(root, "executions");
+      assert.strictEqual(limited.code, 0, limited.stdout);
+      const page = listIn(limited.output);
+      assert.strictEqual(page.shown, 20);
+      assert.strictEqual(page.total, 21);
+      assert.include(page.help.join("\n"), "--limit 21");
+
+      const quick = yield* kymo(
+        root,
+        "executions",
+        "--status",
+        "succeeded",
+        "--workflow",
+        "Quick",
+        "--limit",
+        "5",
+      );
+      assert.strictEqual(quick.code, 0, quick.stdout);
+      const quickPage = listIn(quick.output);
+      assert.strictEqual(quickPage.shown, 5);
+      assert.strictEqual(quickPage.total, 17);
+      assert.include(
+        quickPage.help,
+        `Run \`kymo executions --status succeeded --workflow Quick --limit 17 --root ${root.root}\` to see all 17`,
+      );
+
+      const wide = yield* kymo(root, "executions", "--fields", "started,parent", "--limit", "1");
+      assert.strictEqual(wide.code, 0, wide.stdout);
+      const [row] = listIn(wide.output).executions;
+      assert.deepStrictEqual(Object.keys(row ?? {}).toSorted(), [
+        "id",
+        "label",
+        "parent",
+        "started",
+        "status",
+        "workflow",
+      ]);
+      assert.match(row?.["started"] ?? "", /^\d{4}-\d\d-\d\dT/);
+      assert.isNull(row?.["parent"]);
+
+      const failed = yield* kymo(root, "executions", "--status", "failed");
+      assert.strictEqual(failed.code, 0, failed.stdout);
+      assert.deepStrictEqual(
+        listIn(failed.output).executions.map((row) => row["label"]),
+        ["f"],
+      );
+
+      const badStatus = yield* kymo(root, "executions", "--status", "bogus");
+      assert.strictEqual(badStatus.code, 2, badStatus.stdout);
+      const badField = yield* kymo(root, "executions", "--fields", "payload");
+      assert.strictEqual(badField.code, 2, badField.stdout);
+      const unknownFlag = yield* kymo(root, "executions", "--full");
+      assert.strictEqual(unknownFlag.code, 2, unknownFlag.stdout);
+      const swallowed = yield* kymo(root, "executions", "--workflow", "--full");
+      assert.strictEqual(swallowed.code, 2, swallowed.stdout);
+      assert.deepStrictEqual(swallowed.output, {
+        error: "--workflow needs <name>",
+        help: ["Run `kymo --help`"],
+      });
+      const dashedRoot = yield* kymo(root, "executions", "--root", "--full");
+      assert.strictEqual(dashedRoot.code, 2, dashedRoot.stdout);
+      assert.deepStrictEqual(dashedRoot.output, {
+        error: "--root needs a directory",
+        help: ["Run `kymo --help`"],
+      });
+      const inline = yield* kymo(root, "executions", "--workflow=-x");
+      assert.strictEqual(inline.code, 0, inline.stdout);
+      assert.strictEqual(listIn(inline.output).total, 0);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("prints a --limit hint that a shell runs with the same filters", () =>
+    Effect.gen(function* () {
+      const root = yield* tempRoot([`${fixtures}/odd-name.ts`]);
+      const started = yield* kymo(root, "start");
+      assert.strictEqual(started.code, 0, started.stdout);
+      const page = yield* settled(
+        Effect.map(kymo(root, "executions", "--workflow=-odd name", "--limit", "1"), (result) =>
+          listIn(result.output),
+        ),
+        ({ total }) => total === 2,
+      );
+      const hint = page.help
+        .map((line) => /^Run `(kymo executions .*)` to see all 2$/.exec(line)?.[1])
+        .find((command) => command !== undefined);
+      assert.isDefined(hint, page.help.join("\n"));
+
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const handle = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-c", `kymo() { '${process.execPath}' '${cli}' "$@"; }; ${hint}`]),
+      );
+      const stdout = yield* handle.stdout.pipe(Stream.decodeText(), Stream.mkString);
+      const followed = listIn(decode(stdout));
+      assert.strictEqual(followed.total, 2, stdout);
+      assert.strictEqual(followed.shown, 2, stdout);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("shows one execution by full id or unique prefix and rejects other ids", () =>
+    Effect.gen(function* () {
+      const { root, ids, gate } = yield* seeded;
+
+      const full = yield* kymo(root, "execution", gate);
+      assert.strictEqual(full.code, 0, full.stdout);
+      assert.deepStrictEqual(Schema.decodeUnknownSync(DetailOutput)(full.output), {
+        execution: {
+          id: gate,
+          workflow: "AwaitGate",
+          label: "g",
+          status: "suspended (deferred Gate)",
+          payload: { id: "g" },
+        },
+        activities: [{ name: "AwaitGate.step", attempt: 1, status: "succeeded" }],
+        children: [],
+        waits: [{ kind: "Deferred", name: "Gate" }],
+      });
+
+      const prefix = Array.from({ length: gate.length }, (_, index) =>
+        gate.slice(0, index + 1),
+      ).find((candidate) => ids.filter((id) => id.startsWith(candidate)).length === 1);
+      assert.isBelow(prefix?.length ?? Infinity, gate.length);
+      const byPrefix = yield* kymo(root, "execution", prefix ?? "");
+      assert.strictEqual(byPrefix.code, 0, byPrefix.stdout);
+      assert.strictEqual(
+        Schema.decodeUnknownSync(DetailOutput)(byPrefix.output).execution.id,
+        gate,
+      );
+
+      const shared = "0123456789abcdef"
+        .split("")
+        .find((digit) => ids.filter((id) => id.startsWith(digit)).length > 1);
+      assert.isDefined(shared, "21 hex ids share a first digit");
+      const ambiguous = yield* kymo(root, "execution", shared ?? "");
+      assert.strictEqual(ambiguous.code, 1, ambiguous.stdout);
+      const candidates = ids.filter((id) => id.startsWith(shared ?? ""));
+      const reported = Schema.decodeUnknownSync(AmbiguousOutput)(ambiguous.output);
+      assert.deepStrictEqual(
+        { ...reported, candidates: reported.candidates.toSorted() },
+        {
+          error: `${shared} matches ${candidates.length} executions`,
+          candidates: candidates.toSorted(),
+          help: [`Run \`kymo execution <id> --root ${root.root}\` with a longer prefix`],
+        },
+      );
+
+      const unknown = yield* kymo(root, "execution", "nope");
+      assert.strictEqual(unknown.code, 1, unknown.stdout);
+      assert.deepStrictEqual(unknown.output, {
+        error: "no execution matches nope",
+        help: [`Run \`kymo executions --root ${root.root}\` to list executions`],
+      });
+
+      const missing = yield* kymo(root, "execution");
+      assert.strictEqual(missing.code, 2, missing.stdout);
+      assert.deepStrictEqual(missing.output, {
+        error: "kymo execution needs <id>",
+        help: ["Run `kymo --help`"],
+      });
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("reports a stopped daemon, then an explicit empty list once it runs", () =>
+    Effect.gen(function* () {
+      const root = yield* tempRoot([]);
+      const stopped = yield* kymo(root, "executions");
+      assert.strictEqual(stopped.code, 1, stopped.stdout);
+      assert.deepStrictEqual(stopped.output, {
+        error: "the kymo daemon is not running",
+        root: root.root,
+        help: [`Run \`kymo start --root ${root.root}\` to start it`],
+      });
+
+      yield* kymo(root, "start");
+      const empty = yield* kymo(root, "executions");
+      assert.strictEqual(empty.code, 0, empty.stdout);
+      assert.deepStrictEqual(empty.output, {
+        executions: [],
+        total: 0,
+        help: ["No executions yet; they appear once a workflow starts"],
+      });
+
+      const usage = yield* kymo(root, "execution", "--help");
+      assert.strictEqual(usage.code, 0, usage.stdout);
+      assert.strictEqual(
+        Schema.decodeUnknownSync(Schema.Struct({ usage: Schema.String }))(usage.output).usage,
+        "kymo execution <id> [--full] [--root <dir>]",
+      );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+});
+
 describe.concurrent("version handshake", () => {
   const project = Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
