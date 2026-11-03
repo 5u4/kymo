@@ -9,7 +9,6 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
-import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import {
   ActionNotAllowed,
@@ -469,7 +468,7 @@ export class Executions extends Context.Service<
         request: CompleteRequest,
       ) {
         const entry = yield* resolve(id);
-        const workflow = yield* registered(entry.run.workflow);
+        yield* registered(entry.run.workflow);
         const deferreds = entry.waits.filter((wait) => wait._tag === "Deferred");
         const wait = deferreds.find((wait) => wait.name === request.name);
         if (wait === undefined) {
@@ -479,9 +478,7 @@ export class Executions extends Context.Service<
             waiting: deferreds.map((wait) => wait.name),
           });
         }
-        const value = yield* Schema.decodeEffect(Schema.toCodecJson(wait.deferred.successSchema))(
-          request.value,
-        ).pipe(
+        yield* wait.complete(request.value).pipe(
           Effect.mapError(
             (error) =>
               new InvalidValue({
@@ -489,14 +486,8 @@ export class Executions extends Context.Service<
                 issue: error.message.replace(/\n\s*/g, " "),
               }),
           ),
+          Effect.provideService(WorkflowEngine.WorkflowEngine, engine),
         );
-        yield* DurableDeferred.succeed(wait.deferred, {
-          token: DurableDeferred.tokenFromExecutionId(wait.deferred, {
-            workflow,
-            executionId: entry.run.id,
-          }),
-          value,
-        }).pipe(Effect.provideService(WorkflowEngine.WorkflowEngine, engine));
         return yield* summarize(entry);
       }, Effect.provideContext(context));
 

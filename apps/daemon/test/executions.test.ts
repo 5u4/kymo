@@ -33,6 +33,7 @@ import {
   Succeed,
   SuspendOnBoom,
 } from "./fixtures/statuses.ts";
+import { AwaitApproval, observed } from "./fixtures/service-schema.ts";
 
 const fixtures = `${import.meta.dirname}/fixtures`;
 
@@ -459,6 +460,26 @@ describe("executions", () => {
           status: { _tag: "Interrupted" },
         });
       }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "complete decodes a value whose schema needs a service only the workflow source provides",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const id = yield* AwaitApproval.execute({ id: "approval" }, { discard: true });
+        yield* eventually(statusOf(id), (status) => status._tag === "Suspended");
+
+        yield* executions.complete(id, { name: "Approval", value: "yes" });
+        yield* eventually(statusOf(id), (status) => status._tag === "Succeeded");
+        assert.strictEqual(observed.get("approval"), "svc:yes");
+      }).pipe(
+        Effect.provide(
+          Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./service-schema.ts"]))),
+        ),
+        Effect.scoped,
+      ),
     60_000,
   );
 });
