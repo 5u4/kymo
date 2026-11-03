@@ -35,6 +35,7 @@ import {
   SuspendOnBoom,
 } from "./fixtures/statuses.ts";
 import { AwaitApproval, observed } from "./fixtures/service-schema.ts";
+import { Ticker } from "./fixtures/ticker.ts";
 
 const fixtures = `${import.meta.dirname}/fixtures`;
 
@@ -567,6 +568,39 @@ describe("executions", () => {
           ]);
         }).pipe(Effect.provide(runtime(db, ["./logs.ts"])), Effect.scoped);
       }).pipe(Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "reports a log total that matches the lines it returns while the execution keeps logging",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const id = yield* Ticker.executionId({ id: "ticker" });
+        let ticking = true;
+        yield* Ticker.execute({ id: "ticker" }).pipe(
+          Effect.ensuring(Effect.sync(() => (ticking = false))),
+          Effect.forkChild,
+        );
+        const mismatches: Array<string> = [];
+        yield* Effect.forEach(
+          Array.from({ length: 16 }, (_, reader) => reader),
+          () =>
+            Effect.gen(function* () {
+              while (ticking) {
+                const { total, logs } = yield* executions.logs(id, {});
+                if (logs.length !== total) {
+                  mismatches.push(`${logs.length} lines, total ${total}`);
+                }
+              }
+            }),
+          { concurrency: "unbounded", discard: true },
+        ).pipe(Effect.provideService(Scheduler.MaxOpsBeforeYield, 8));
+        assert.deepStrictEqual(mismatches, []);
+      }).pipe(
+        Effect.provide(Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./ticker.ts"])))),
+        Effect.scoped,
+      ),
     60_000,
   );
 });

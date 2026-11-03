@@ -438,7 +438,7 @@ export class Executions extends Context.Service<
               LIMIT ${query.limit ?? -1}
             ) ORDER BY seq
           `.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(LogRow)))),
-        ]).pipe(Effect.orDie);
+        ]).pipe(sql.withTransaction, Effect.orDie);
         return {
           total,
           logs: rows.map(({ activity, attempt, cause, ...row }): LogEntry => ({
