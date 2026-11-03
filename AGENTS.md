@@ -20,10 +20,10 @@ and delete the old path in the same change, with no compatibility shims.
 - The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
-  `Daemon` (bare `kymo`, `executions`, `execution`, `execute`); add every new command as `Daemon`,
-  which fails with the same "not running" error while no daemon answers. A command declares its
-  positionals and flags (`apps/cli/src/command.ts`); the parser rejects undeclared ones with exit
-  2, and the command decodes them with `Schema`.
+  `Daemon` (bare `kymo`, `executions`, `execution`, `execute`, `complete`, `resume`, `interrupt`);
+  add every new command as `Daemon`, which fails with the same "not running" error while no daemon
+  answers. A command declares its positionals and flags (`apps/cli/src/command.ts`); the parser
+  rejects undeclared ones with exit 2, and the command decodes them with `Schema`.
 - A root (`--root`, default `~/.kymo`) holds `kymo.json`, `kymo.db`, `daemon.log` (the daemon's
   stdout and stderr when the CLI starts it), `owner/` and `daemon.json`. A daemon claims the root
   with a symlink in `owner/` (`kymo/ownership`) before it opens `kymo.db`, so two daemons never
