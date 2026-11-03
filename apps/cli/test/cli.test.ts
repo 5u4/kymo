@@ -466,6 +466,33 @@ describe.concurrent("kymo executions and execution", () => {
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
+  it.live("prints a --limit hint that a shell runs with the same filters", () =>
+    Effect.gen(function* () {
+      const root = yield* tempRoot([`${fixtures}/odd-name.ts`]);
+      const started = yield* kymo(root, "start");
+      assert.strictEqual(started.code, 0, started.stdout);
+      const page = yield* settled(
+        Effect.map(kymo(root, "executions", "--workflow=-odd name", "--limit", "1"), (result) =>
+          listIn(result.output),
+        ),
+        ({ total }) => total === 2,
+      );
+      const hint = page.help
+        .map((line) => /^Run `(kymo executions .*)` to see all 2$/.exec(line)?.[1])
+        .find((command) => command !== undefined);
+      assert.isDefined(hint, page.help.join("\n"));
+
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const handle = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-c", `kymo() { '${process.execPath}' '${cli}' "$@"; }; ${hint}`]),
+      );
+      const stdout = yield* handle.stdout.pipe(Stream.decodeText(), Stream.mkString);
+      const followed = listIn(decode(stdout));
+      assert.strictEqual(followed.total, 2, stdout);
+      assert.strictEqual(followed.shown, 2, stdout);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
   it.live("shows one execution by full id or unique prefix and rejects other ids", () =>
     Effect.gen(function* () {
       const { root, ids, gate } = yield* seeded;

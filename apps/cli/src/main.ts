@@ -19,6 +19,7 @@ import {
   NotRunning,
   type Output,
   type Run,
+  shellArg,
   UsageError,
 } from "./command.ts";
 import { derive, type Running } from "./daemon-state.ts";
@@ -217,7 +218,7 @@ Effect.gen(function* () {
     root,
     input,
     kymo: (command) =>
-      ["kymo", command, rootFlag === undefined ? "" : `--root ${root.root}`]
+      ["kymo", command, rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`]
         .filter((part) => part.length > 0)
         .join(" "),
   };

@@ -12,7 +12,7 @@ import {
   statusName,
   url,
 } from "kymo/api";
-import { type Command, UsageError } from "./command.ts";
+import { type Command, shellArg, UsageError } from "./command.ts";
 import type { Running } from "./daemon-state.ts";
 
 const defaultLimit = 20;
@@ -111,7 +111,13 @@ export const executions: Command = {
       const { executions, total } = yield* Effect.flatMap(client(daemon), (api) =>
         api.executions.list({ query: { ...filters, limit } }),
       );
-      const filterFlags = Object.entries(filters).flatMap(([name, value]) => [`--${name}`, value]);
+      const filterFlags = Object.entries(filters).flatMap(([name, value]) =>
+        value === undefined
+          ? []
+          : value.startsWith("-")
+            ? [shellArg(`--${name}=${value}`)]
+            : [`--${name} ${shellArg(value)}`],
+      );
       if (total === 0) {
         return {
           body: { executions: [], total },
