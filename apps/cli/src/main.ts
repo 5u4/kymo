@@ -23,7 +23,7 @@ import {
   UsageError,
 } from "./command.ts";
 import { derive, type Running } from "./daemon-state.ts";
-import { execution, executions } from "./executions.ts";
+import { execute, execution, executions } from "./executions.ts";
 import { start, type Started, stop } from "./lifecycle.ts";
 
 const description = "kymo runs durable Effect workflows in a local daemon";
@@ -52,6 +52,7 @@ const home: Command = {
       },
       help: [
         `Run \`${kymo("executions")}\` to list executions`,
+        `Run \`${kymo("execute <workflow> <payload>")}\` to start a workflow`,
         `Run \`${kymo("stop")}\` to stop the daemon`,
         `Run \`${kymo("restart")}\` to reload kymo.json`,
       ],
@@ -90,6 +91,7 @@ const commands: Record<string, Command> = {
   },
   executions,
   execution,
+  execute,
 };
 
 const run = (command: Command, invocation: Invocation): Run =>
@@ -258,6 +260,19 @@ Effect.gen(function* () {
           [`Run \`${invocation.kymo("execution <id>")}\` with a longer prefix`],
           1,
         ),
+      WorkflowNotFound: (error) =>
+        failure(
+          { error: error.message, registered: error.registered },
+          error.registered[0] === undefined
+            ? [
+                `No workflows are registered; add a source to "workflows" in ${root.config}, then run \`${invocation.kymo("restart")}\``,
+              ]
+            : [
+                `Run \`${invocation.kymo(`execute ${shellArg(error.registered[0])} <payload>`)}\` to start a registered workflow`,
+              ],
+          1,
+        ),
+      InvalidPayload: (error) => failure({ error: error.message }, [], 1),
     }),
   );
 }).pipe(

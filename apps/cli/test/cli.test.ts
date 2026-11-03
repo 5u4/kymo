@@ -586,6 +586,116 @@ describe.concurrent("kymo executions and execution", () => {
   );
 });
 
+const ExecutedOutput = Schema.Struct({
+  execution: Schema.Struct({
+    id: Schema.String,
+    workflow: Schema.String,
+    label: Schema.NullOr(Schema.String),
+    status: Schema.String,
+  }),
+  created: Schema.Boolean,
+  help: Schema.Array(Schema.String),
+});
+
+const executedIn = (output: unknown) => Schema.decodeUnknownSync(ExecutedOutput)(output);
+
+const running = (sources: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const root = yield* tempRoot(sources);
+    const started = yield* kymo(root, "start");
+    assert.strictEqual(started.code, 0, started.stdout);
+    return root;
+  });
+
+describe.concurrent("kymo execute", () => {
+  it.live("starts a workflow with a label that executions and execution show", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/statuses.ts`]);
+
+      const labeled = yield* kymo(
+        root,
+        "execute",
+        "AwaitGate",
+        '{"id":"k1"}',
+        "--label",
+        "nightly",
+      );
+      assert.strictEqual(labeled.code, 0, labeled.stdout);
+      const first = executedIn(labeled.output);
+      assert.deepInclude(first.execution, { workflow: "AwaitGate", label: "nightly (k1)" });
+      assert.isTrue(first.created);
+      assert.deepStrictEqual(first.help, [
+        `Run \`kymo execution ${first.execution.id} --root ${root.root}\` to see it`,
+      ]);
+
+      const bare = yield* kymo(root, "execute", "AwaitGate", '{"id":"k2"}');
+      assert.strictEqual(bare.code, 0, bare.stdout);
+      const second = executedIn(bare.output);
+      assert.strictEqual(second.execution.label, "k2");
+      assert.isTrue(second.created);
+
+      const listed = listIn((yield* kymo(root, "executions")).output);
+      assert.deepStrictEqual(
+        Object.fromEntries(listed.executions.map((row) => [row["id"], row["label"]])),
+        { [first.execution.id]: "nightly (k1)", [second.execution.id]: "k2" },
+      );
+      const detail = yield* kymo(root, "execution", first.execution.id);
+      assert.strictEqual(detail.code, 0, detail.stdout);
+      assert.strictEqual(
+        Schema.decodeUnknownSync(DetailOutput)(detail.output).execution.label,
+        "nightly (k1)",
+      );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("repeating an idempotency key returns the existing execution and keeps its label", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/statuses.ts`]);
+      const first = executedIn(
+        (yield* kymo(root, "execute", "AwaitGate", '{"id":"same"}', "--label", "first")).output,
+      );
+
+      const again = yield* kymo(root, "execute", "AwaitGate", '{"id":"same"}', "--label", "second");
+      assert.strictEqual(again.code, 0, again.stdout);
+      const repeated = executedIn(again.output);
+      assert.isFalse(repeated.created);
+      assert.strictEqual(repeated.execution.id, first.execution.id);
+      assert.strictEqual(repeated.execution.label, "first (same)");
+      assert.include(repeated.help, "The execution already existed; its label was not changed");
+      assert.strictEqual(listIn((yield* kymo(root, "executions")).output).total, 1);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("rejects an unknown workflow, a payload the workflow refuses, and malformed JSON", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/double.ts`, `${fixtures}/child.ts`]);
+
+      const unknown = yield* kymo(root, "execute", "Triple", '{"n":1}');
+      assert.strictEqual(unknown.code, 1, unknown.stdout);
+      assert.deepStrictEqual(unknown.output, {
+        error: "no workflow named Triple",
+        registered: ["Child", "Double"],
+        help: [
+          `Run \`kymo execute Child <payload> --root ${root.root}\` to start a registered workflow`,
+        ],
+      });
+
+      const refused = yield* kymo(root, "execute", "Double", '{"n":"one"}');
+      assert.strictEqual(refused.code, 1, refused.stdout);
+      assert.deepStrictEqual(refused.output, {
+        error: 'invalid payload for Double: Expected number at ["n"]',
+        help: [],
+      });
+
+      const malformed = yield* kymo(root, "execute", "Double", "{n:1}");
+      assert.strictEqual(malformed.code, 2, malformed.stdout);
+      const emptyLabel = yield* kymo(root, "execute", "Double", '{"n":1}', "--label=");
+      assert.strictEqual(emptyLabel.code, 2, emptyLabel.stdout);
+      assert.strictEqual(listIn((yield* kymo(root, "executions")).output).total, 0);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+});
+
 describe.concurrent("version handshake", () => {
   const project = Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

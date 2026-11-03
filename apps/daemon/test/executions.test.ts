@@ -160,8 +160,8 @@ describe("executions", () => {
         }
 
         const byId = new Map(settled.executions.map((execution) => [execution.id, execution]));
-        assert.deepStrictEqual(byId.get(ids.succeed)?.label, Option.some("s"));
-        assert.deepStrictEqual(byId.get(waitingChild)?.label, Option.some("child-a"));
+        assert.deepStrictEqual(byId.get(ids.succeed)?.idempotencyKey, Option.some("s"));
+        assert.deepStrictEqual(byId.get(waitingChild)?.idempotencyKey, Option.some("child-a"));
         assert.deepStrictEqual(byId.get(waitingChild)?.parentId, Option.some(ids.awaitChild));
         assert.deepStrictEqual(byId.get(ids.awaitChild)?.parentId, Option.none());
         assert.deepStrictEqual(byId.get(ids.stuck)?.updatedAt, Option.none());
@@ -334,7 +334,7 @@ describe("executions", () => {
             assert.deepStrictEqual(byId.get(id)?.updatedAt, updatedBefore.get(id), id);
           }
           assert.deepStrictEqual(byId.get(ids.double)?.status, { _tag: "Succeeded" });
-          assert.deepStrictEqual(byId.get(ids.double)?.label, Option.none());
+          assert.deepStrictEqual(byId.get(ids.double)?.idempotencyKey, Option.none());
           assert.deepStrictEqual(byId.get(ids.awaitChild)?.status, {
             _tag: "Suspended",
             reason: { _tag: "Child", executionId: waitingChild },
