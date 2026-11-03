@@ -38,6 +38,7 @@
           "effect/http",
           "effect/http-api",
           "effect/process",
+          "effect/sql",
           "effect/workflow"
         ],
         "diagnosticSeverity": {

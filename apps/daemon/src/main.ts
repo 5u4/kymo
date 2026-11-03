@@ -1,11 +1,7 @@
-import * as BunCrypto from "@effect/platform-bun/BunCrypto";
 import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
-import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient";
 import * as Cause from "effect/Cause";
-import * as ClusterWorkflowEngine from "effect/cluster/ClusterWorkflowEngine";
-import * as SingleRunner from "effect/cluster/SingleRunner";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -19,8 +15,8 @@ import { Api, hostname } from "kymo/api";
 import * as Ownership from "kymo/ownership";
 import * as ProcessIdentity from "kymo/process-identity";
 import * as Root from "kymo/root";
-import { Awaits } from "./awaits.ts";
-import * as WorkflowSources from "./workflow-sources.ts";
+import { Executions } from "./executions.ts";
+import * as Runtime from "./runtime.ts";
 
 class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
   args: Schema.Array(Schema.String),
@@ -82,19 +78,21 @@ const daemon = (
   config: Root.RootConfig,
   self: ProcessIdentity.ProcessIdentity,
 ) => {
-  const engine = WorkflowSources.layer({ root: root.root, workflows: config.workflows }).pipe(
-    Layer.provideMerge(Awaits.layer),
-    Layer.provide(ClusterWorkflowEngine.layer),
-    Layer.provide(SingleRunner.layer({ runnerStorage: "memory" })),
-    Layer.provide(SqliteClient.layer({ filename: root.db })),
-    Layer.provide(BunCrypto.layerDigest),
-  );
+  const engine = Runtime.layer({ root: root.root, workflows: config.workflows, db: root.db });
   const health = HttpApiBuilder.group(Api, "daemon", (handlers) =>
     handlers.handle("health", () => Effect.succeed({ pid: process.pid, root: root.root })),
   );
-  const served = HttpRouter.serve(HttpApiBuilder.layer(Api).pipe(Layer.provide(health)), {
-    disableLogger: true,
-  }).pipe(
+  const executions = HttpApiBuilder.group(Api, "executions", (handlers) =>
+    Effect.map(Executions, (service) =>
+      handlers
+        .handle("list", ({ query }) => service.list(query))
+        .handle("get", ({ params }) => service.get(params.id)),
+    ),
+  );
+  const served = HttpRouter.serve(
+    HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])),
+    { disableLogger: true },
+  ).pipe(
     Layer.provideMerge(
       BunHttpServer.layer({ hostname, port: config.port, gracefulShutdownTimeout: "1 second" }),
     ),
