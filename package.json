@@ -2,6 +2,9 @@
   "name": "kymo",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "kymo": "./apps/cli/src/main.ts"
+  },
   "workspaces": {
     "packages": [
       "apps/web"

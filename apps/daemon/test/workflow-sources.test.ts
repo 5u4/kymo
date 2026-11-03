@@ -102,7 +102,7 @@ describe("workflow sources", () => {
       const fs = yield* FileSystem.FileSystem;
       const project = yield* fs.makeTempDirectoryScoped();
       yield* installOwnCopy(project, "effect", ["dist"]);
-      yield* installOwnCopy(project, "kymo", ["src"]);
+      yield* installOwnCopy(project, "kymo", ["src", "plugins"]);
       yield* fs.writeFileString(
         `${project}/kymo.ts`,
         `${yield* fs.readFileString(`${fixtures}/double.ts`)}export { RootConfig } from "kymo/root";\n`,
@@ -111,6 +111,23 @@ describe("workflow sources", () => {
         (): Promise<{ readonly RootConfig: unknown }> => import(`${project}/kymo.ts`),
       ).pipe(Effect.provide(daemon(["./kymo.ts"], project)));
       assert.strictEqual(source.RootConfig, RootConfig);
+    }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
+  );
+
+  it.live("checks the project a symlinked source points into, not the symlink's directory", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const project = yield* fs.makeTempDirectoryScoped();
+      yield* fs.makeDirectory(`${project}/node_modules/effect`, { recursive: true });
+      yield* fs.writeFileString(
+        `${project}/node_modules/effect/package.json`,
+        '{ "name": "effect", "version": "4.0.0" }\n',
+      );
+      yield* fs.copyFile(`${fixtures}/double.ts`, `${project}/kymo.ts`);
+      const elsewhere = yield* fs.makeTempDirectoryScoped();
+      yield* fs.symlink(`${project}/kymo.ts`, `${elsewhere}/kymo.ts`);
+      const error = yield* startupError([`${elsewhere}/kymo.ts`]);
+      assert.instanceOf(error, WorkflowSources.EffectVersionMismatch);
     }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
   );
 

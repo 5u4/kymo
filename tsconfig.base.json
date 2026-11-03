@@ -32,7 +32,11 @@
           "@effect/sql-sqlite-bun",
           "effect/FileSystem",
           "effect/Path",
+          "effect/PlatformError",
           "effect/cluster",
+          "effect/crypto",
+          "effect/http",
+          "effect/http-api",
           "effect/process",
           "effect/workflow"
         ],
