@@ -23,7 +23,16 @@ import {
   UsageError,
 } from "./command.ts";
 import { derive, type Running } from "./daemon-state.ts";
-import { execute, execution, executions } from "./executions.ts";
+import {
+  complete,
+  completeCommand,
+  execute,
+  execution,
+  executions,
+  interrupt,
+  resume,
+  statusText,
+} from "./executions.ts";
 import { start, type Started, stop } from "./lifecycle.ts";
 
 const description = "kymo runs durable Effect workflows in a local daemon";
@@ -53,6 +62,9 @@ const home: Command = {
       help: [
         `Run \`${kymo("executions")}\` to list executions`,
         `Run \`${kymo("execute <workflow> <payload>")}\` to start a workflow`,
+        `Run \`${kymo("complete <id> <name> <json>")}\` to complete a deferred an execution waits on`,
+        `Run \`${kymo("resume <id>")}\` to run an execution suspended by a failure again`,
+        `Run \`${kymo("interrupt <id>")}\` to interrupt an execution`,
         `Run \`${kymo("stop")}\` to stop the daemon`,
         `Run \`${kymo("restart")}\` to reload kymo.json`,
       ],
@@ -92,6 +104,9 @@ const commands: Record<string, Command> = {
   executions,
   execution,
   execute,
+  complete,
+  resume,
+  interrupt,
 };
 
 const run = (command: Command, invocation: Invocation): Run =>
@@ -277,6 +292,39 @@ Effect.gen(function* () {
           1,
         ),
       InvalidPayload: (error) => failure({ error: error.message }, [], 1),
+      InvalidValue: (error) => failure({ error: error.message }, [], 1),
+      NotWaiting: (error) =>
+        failure(
+          { error: error.message, waiting: error.waiting },
+          error.waiting.length === 0
+            ? [
+                `It waits on no deferred; run \`${invocation.kymo(`execution ${error.id}`)}\` to see it`,
+              ]
+            : error.waiting.map(
+                (name) =>
+                  `Run \`${invocation.kymo(completeCommand(error.id, name))}\` to complete ${name}`,
+              ),
+          1,
+        ),
+      ActionNotAllowed: (error) => {
+        const deferred =
+          error.action === "resume" &&
+          error.status._tag === "Suspended" &&
+          error.status.reason._tag === "Deferred"
+            ? error.status.reason.name
+            : Option.none();
+        return failure(
+          { error: error.message, status: statusText(error.status) },
+          [
+            Option.match(deferred, {
+              onNone: () => `Run \`${invocation.kymo(`execution ${error.id}`)}\` to see it`,
+              onSome: (name) =>
+                `It waits on ${name}; run \`${invocation.kymo(completeCommand(error.id, name))}\` to continue it`,
+            }),
+          ],
+          1,
+        );
+      },
     }),
   );
 }).pipe(

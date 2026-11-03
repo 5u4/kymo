@@ -4,15 +4,17 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
+  actionsFor,
   type ActivityStatus,
   Api,
+  type ExecutionAction,
   type ExecutionStatus,
   type ExecutionSummary,
   StatusName,
   statusName,
   url,
 } from "kymo/api";
-import { type Command, shellArg, UsageError } from "./command.ts";
+import { type Command, type Invocation, type Output, shellArg, UsageError } from "./command.ts";
 import type { Running } from "./daemon-state.ts";
 
 const defaultLimit = 20;
@@ -35,9 +37,19 @@ const ListInput = Schema.Struct({
   fields: Schema.optional(Schema.String),
 });
 
+const Id = Schema.String.check(Schema.isNonEmpty());
+
 const DetailInput = Schema.Struct({
-  id: Schema.String.check(Schema.isNonEmpty()),
+  id: Id,
   full: Schema.optional(Schema.Literal(true)),
+});
+
+const ControlInput = Schema.Struct({ id: Id });
+
+const CompleteInput = Schema.Struct({
+  id: Id,
+  name: Schema.String.check(Schema.isNonEmpty()),
+  value: Schema.fromJsonString(Schema.Json),
 });
 
 const ExecuteInput = Schema.Struct({
@@ -73,7 +85,7 @@ const labelText = ({ label, idempotencyKey }: ExecutionSummary): string | null =
       }),
   });
 
-const statusText = (status: ExecutionStatus | ActivityStatus): string => {
+export const statusText = (status: ExecutionStatus | ActivityStatus): string => {
   if (status._tag === "Failed") {
     return `failed (${status.kind}: ${status.message})`;
   }
@@ -94,6 +106,14 @@ const statusText = (status: ExecutionStatus | ActivityStatus): string => {
         onSome: (name) => `suspended (deferred ${name})`,
       });
   }
+};
+
+export const completeCommand = (id: string, deferred: string) =>
+  `complete ${deferred.startsWith("-") ? "-- " : ""}${id} ${shellArg(deferred)} <json>`;
+
+const actionHelp: Record<ExecutionAction, string> = {
+  resume: "to run it again",
+  interrupt: "to stop it",
 };
 
 export const executions: Command = {
@@ -223,6 +243,15 @@ export const execution: Command = {
           ...(detail.children.length > 0
             ? [`Run \`${kymo("execution <child id>")}\` to see a child`]
             : []),
+          ...detail.waits
+            .filter((wait) => wait.kind === "Deferred")
+            .map(
+              (wait) =>
+                `Run \`${kymo(completeCommand(detail.id, wait.name))}\` to complete ${wait.name}`,
+            ),
+          ...actionsFor(detail.status).map(
+            (action) => `Run \`${kymo(`${action} ${detail.id}`)}\` ${actionHelp[action]}`,
+          ),
           `Run \`${kymo("executions")}\` to list executions`,
         ],
       };
@@ -262,3 +291,52 @@ export const execute: Command = {
       };
     }),
 };
+
+const requested = (
+  action: ExecutionAction | "complete",
+  execution: ExecutionSummary,
+  { kymo }: Invocation,
+): Output => ({
+  body: {
+    execution: { id: execution.id, workflow: execution.workflow, label: labelText(execution) },
+    requested: action,
+  },
+  help: [`Run \`${kymo(`execution ${execution.id}`)}\` to follow it`],
+});
+
+const idArgument = { name: "id", summary: "Execution id or a unique prefix of it" };
+
+export const complete: Command = {
+  _tag: "Daemon",
+  summary: "Complete a deferred an execution waits on, so it continues",
+  positionals: [
+    idArgument,
+    { name: "name", summary: "Name of the deferred it waits on" },
+    { name: "value", summary: "The deferred's value as JSON" },
+  ],
+  run: (daemon, invocation) =>
+    Effect.gen(function* () {
+      const { id, name, value } = yield* decodeInput(CompleteInput)(invocation.input);
+      const execution = yield* Effect.flatMap(client(daemon), (api) =>
+        api.executions.complete({ params: { id }, payload: { name, value } }),
+      );
+      return requested("complete", execution, invocation);
+    }),
+};
+
+const control = (action: ExecutionAction, summary: string): Command => ({
+  _tag: "Daemon",
+  summary,
+  positionals: [idArgument],
+  run: (daemon, invocation) =>
+    Effect.gen(function* () {
+      const { id } = yield* decodeInput(ControlInput)(invocation.input);
+      const execution = yield* Effect.flatMap(client(daemon), (api) =>
+        api.executions[action]({ params: { id } }),
+      );
+      return requested(action, execution, invocation);
+    }),
+});
+
+export const resume = control("resume", "Run an execution suspended by a failure again");
+export const interrupt = control("interrupt", "Interrupt a running or suspended execution");

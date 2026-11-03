@@ -739,6 +739,166 @@ describe.concurrent("kymo execute", () => {
   );
 });
 
+const Requested = Schema.Struct({
+  execution: Schema.Struct({ id: Schema.String, workflow: Schema.String }),
+  requested: Schema.String,
+  help: Schema.Array(Schema.String),
+});
+
+const Failure = Schema.Struct({
+  error: Schema.String,
+  waiting: Schema.optional(Schema.Array(Schema.String)),
+  help: Schema.Array(Schema.String),
+});
+
+const statusOf = (root: Root.KymoRoot, id: string) =>
+  Effect.map(kymo(root, "execution", id), (result) =>
+    Schema.decodeUnknownSync(
+      Schema.Struct({
+        execution: Schema.Struct({ status: Schema.String }),
+        help: Schema.Array(Schema.String),
+      }),
+    )(result.output),
+  );
+
+const refund = (root: Root.KymoRoot, orderId: string) =>
+  Effect.gen(function* () {
+    const payload = `{"orderId":"${orderId}","amountCents":500,"reason":"damaged"}`;
+    const { id } = executedIn(
+      (yield* kymo(root, "execute", "RefundRequest", payload)).output,
+    ).execution;
+    const waiting = yield* settled(
+      statusOf(root, id),
+      ({ execution }) => execution.status === "suspended (deferred ManagerApproval)",
+    );
+    assert.strictEqual(waiting.execution.status, "suspended (deferred ManagerApproval)");
+    return { id, help: waiting.help };
+  });
+
+describe.concurrent("kymo complete, resume and interrupt", () => {
+  it.live("complete continues a waiting execution and rejects a value it cannot take", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${repo}/examples/demo/src/index.ts`]);
+      const { id, help } = yield* refund(root, "ord_00001");
+      const kymoHint = `kymo --root ${root.root}`;
+      assert.isTrue(
+        help.some((line) => line.includes(`\`${kymoHint} complete ${id} ManagerApproval <json>\``)),
+        help.join("\n"),
+      );
+      assert.isTrue(
+        help.some((line) => line.includes(`\`${kymoHint} interrupt ${id}\``)),
+        help.join("\n"),
+      );
+      assert.isFalse(
+        help.some((line) => line.includes(" resume ")),
+        help.join("\n"),
+      );
+
+      const malformed = yield* kymo(root, "complete", id, "ManagerApproval", "{approved");
+      assert.strictEqual(malformed.code, 2, malformed.stdout);
+
+      const invalid = yield* kymo(root, "complete", id, "ManagerApproval", '{"approved":"yes"}');
+      assert.strictEqual(invalid.code, 1, invalid.stdout);
+      assert.match(
+        Schema.decodeUnknownSync(Failure)(invalid.output).error,
+        /^invalid value for ManagerApproval: /,
+      );
+
+      const other = yield* kymo(root, "complete", id, "Other", "{}");
+      assert.strictEqual(other.code, 1, other.stdout);
+      assert.deepStrictEqual(Schema.decodeUnknownSync(Failure)(other.output).waiting, [
+        "ManagerApproval",
+      ]);
+
+      const resumed = yield* kymo(root, "resume", id);
+      assert.strictEqual(resumed.code, 1, resumed.stdout);
+      assert.isTrue(
+        Schema.decodeUnknownSync(Failure)(resumed.output).help.some((line) =>
+          line.includes(`\`${kymoHint} complete ${id} ManagerApproval <json>\``),
+        ),
+        resumed.stdout,
+      );
+
+      const completed = yield* kymo(
+        root,
+        "complete",
+        id.slice(0, 12),
+        "ManagerApproval",
+        '{"approved":true,"approver":"alice"}',
+      );
+      assert.strictEqual(completed.code, 0, completed.stdout);
+      const requested = Schema.decodeUnknownSync(Requested)(completed.output);
+      assert.deepStrictEqual(
+        { id: requested.execution.id, requested: requested.requested },
+        { id, requested: "complete" },
+      );
+      const done = yield* settled(
+        statusOf(root, id),
+        ({ execution }) => execution.status === "succeeded",
+      );
+      assert.strictEqual(done.execution.status, "succeeded");
+
+      const again = yield* kymo(
+        root,
+        "complete",
+        id,
+        "ManagerApproval",
+        '{"approved":true,"approver":"eve"}',
+      );
+      assert.strictEqual(again.code, 1, again.stdout);
+      assert.deepStrictEqual(Schema.decodeUnknownSync(Failure)(again.output).waiting, []);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("interrupt ends a waiting execution; an ended one refuses resume and interrupt", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${repo}/examples/demo/src/index.ts`]);
+      const { id } = yield* refund(root, "ord_00002");
+
+      const interrupted = yield* kymo(root, "interrupt", id);
+      assert.strictEqual(interrupted.code, 0, interrupted.stdout);
+      assert.strictEqual(
+        Schema.decodeUnknownSync(Requested)(interrupted.output).requested,
+        "interrupt",
+      );
+      const ended = yield* settled(
+        statusOf(root, id),
+        ({ execution }) => execution.status === "interrupted",
+      );
+      assert.strictEqual(ended.execution.status, "interrupted");
+
+      for (const action of ["interrupt", "resume"]) {
+        const refused = yield* kymo(root, action, id);
+        assert.strictEqual(refused.code, 1, refused.stdout);
+      }
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("resume runs a failure-suspended execution again", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/statuses.ts`]);
+      const { id } = executedIn(
+        (yield* kymo(root, "execute", "FailOnce", '{"id":"r"}')).output,
+      ).execution;
+      const failed = yield* settled(statusOf(root, id), ({ execution }) =>
+        execution.status.startsWith("suspended (failed"),
+      );
+      assert.isTrue(
+        failed.help.some((line) => line.includes(`kymo --root ${root.root} resume ${id}\``)),
+        failed.help.join("\n"),
+      );
+
+      const resumed = yield* kymo(root, "resume", id);
+      assert.strictEqual(resumed.code, 0, resumed.stdout);
+      const done = yield* settled(
+        statusOf(root, id),
+        ({ execution }) => execution.status === "succeeded",
+      );
+      assert.strictEqual(done.execution.status, "succeeded");
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+});
+
 describe.concurrent("version handshake", () => {
   const project = Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

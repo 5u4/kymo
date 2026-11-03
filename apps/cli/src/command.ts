@@ -7,9 +7,12 @@ import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import type {
+  ActionNotAllowed,
   AmbiguousExecutionId,
   ExecutionNotFound,
   InvalidPayload,
+  InvalidValue,
+  NotWaiting,
   WorkflowNotFound,
 } from "kymo/api";
 import type * as Root from "kymo/root";
@@ -54,6 +57,9 @@ export type Run = Effect.Effect<
   | AmbiguousExecutionId
   | WorkflowNotFound
   | InvalidPayload
+  | NotWaiting
+  | InvalidValue
+  | ActionNotAllowed
   | PlatformError.PlatformError
   | HttpClientError.HttpClientError
   | Schema.SchemaError,
