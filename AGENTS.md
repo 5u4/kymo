@@ -20,10 +20,10 @@ and delete the old path in the same change, with no compatibility shims.
 - The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
-  `Daemon` (bare `kymo`, `executions`, `execution`); add every new command as `Daemon`, which fails
-  with the same "not running" error while no daemon answers. A command declares its positionals
-  and flags (`apps/cli/src/command.ts`); the parser rejects undeclared ones with exit 2, and the
-  command decodes them with `Schema`.
+  `Daemon` (bare `kymo`, `executions`, `execution`, `execute`); add every new command as `Daemon`,
+  which fails with the same "not running" error while no daemon answers. A command declares its
+  positionals and flags (`apps/cli/src/command.ts`); the parser rejects undeclared ones with exit
+  2, and the command decodes them with `Schema`.
 - A root (`--root`, default `~/.kymo`) holds `kymo.json`, `kymo.db`, `daemon.log` (the daemon's
   stdout and stderr when the CLI starts it), `owner/` and `daemon.json`. A daemon claims the root
   with a symlink in `owner/` (`kymo/ownership`) before it opens `kymo.db`, so two daemons never
@@ -44,10 +44,13 @@ and delete the old path in the same change, with no compatibility shims.
   own is replaced by the daemon's copy. Before it imports a path source, it fails startup if the
   source's directory resolves a `kymo` whose exported `.ts` files differ in content from the
   daemon's, or an `effect` with another version.
-- Executions have no kymo table. `apps/daemon/src/executions.ts` reads Effect's
-  `cluster_messages` and `cluster_replies` in `kymo.db` and derives each execution's status in one
-  function, `executionStatus`. On startup the daemon resumes every suspended execution except one
-  suspended by a failure, because resuming that one runs its body again.
+- Effect's `cluster_messages` and `cluster_replies` in `kymo.db` hold each execution's state;
+  `apps/daemon/src/executions.ts` reads them and derives each execution's status in one function,
+  `executionStatus`. kymo's own tables hold only what Effect does not: `kymo_labels` maps an
+  execution id to the label `kymo execute --label` gave it. `apps/daemon/src/migrations.ts` creates
+  them through `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
+  daemon serves. On startup the daemon resumes every suspended execution except one suspended by
+  a failure, because resuming that one runs its body again.
 - File names are kebab-case; `bun run lint` enforces it.
 - Nothing outside `design/` imports from `design/`.
 
