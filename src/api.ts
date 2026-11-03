@@ -67,6 +67,22 @@ const statusNames: Record<ExecutionStatus["_tag"], StatusName> = {
 export const statusName = (status: ExecutionStatus | ActivityStatus): StatusName =>
   statusNames[status._tag];
 
+export const ExecutionAction = Schema.Literals(["resume", "interrupt"]);
+export type ExecutionAction = typeof ExecutionAction.Type;
+
+export const actionsFor = (status: ExecutionStatus): ReadonlyArray<ExecutionAction> => {
+  switch (status._tag) {
+    case "Running":
+      return ["interrupt"];
+    case "Suspended":
+      return status.reason._tag === "Failure" ? ["resume", "interrupt"] : ["interrupt"];
+    case "Succeeded":
+    case "Failed":
+    case "Interrupted":
+      return [];
+  }
+};
+
 export const ExecutionSummary = Schema.Struct({
   id: Schema.String,
   workflow: Schema.String,
@@ -170,6 +186,42 @@ export class InvalidPayload extends Schema.TaggedError<InvalidPayload>()(
   }
 }
 
+export const CompleteRequest = Schema.Struct({
+  name: Schema.String,
+  value: Schema.Json,
+});
+export type CompleteRequest = typeof CompleteRequest.Type;
+
+export class ActionNotAllowed extends Schema.TaggedError<ActionNotAllowed>()(
+  "ActionNotAllowed",
+  { id: Schema.String, action: ExecutionAction, status: ExecutionStatus },
+  { httpApiStatus: 409 },
+) {
+  override get message() {
+    return `cannot ${this.action} ${this.id}: it is ${statusName(this.status)}`;
+  }
+}
+
+export class NotWaiting extends Schema.TaggedError<NotWaiting>()(
+  "NotWaiting",
+  { id: Schema.String, deferred: Schema.String, waiting: Schema.Array(Schema.String) },
+  { httpApiStatus: 409 },
+) {
+  override get message() {
+    return `${this.id} is not waiting on ${this.deferred}`;
+  }
+}
+
+export class InvalidValue extends Schema.TaggedError<InvalidValue>()(
+  "InvalidValue",
+  { deferred: Schema.String, issue: Schema.String },
+  { httpApiStatus: 400 },
+) {
+  override get message() {
+    return `invalid value for ${this.deferred}: ${this.issue}`;
+  }
+}
+
 export class Api extends HttpApi.make("kymo")
   .add(
     HttpApiGroup.make("daemon", { topLevel: true }).add(
@@ -196,6 +248,34 @@ export class Api extends HttpApi.make("kymo")
           payload: ExecuteRequest,
           success: Executed,
           error: [WorkflowNotFound, InvalidPayload],
+        }),
+      )
+      .add(
+        HttpApiEndpoint.post("complete", "/api/executions/:id/complete", {
+          params: { id: Schema.String },
+          payload: CompleteRequest,
+          success: ExecutionSummary,
+          error: [
+            ExecutionNotFound,
+            AmbiguousExecutionId,
+            WorkflowNotFound,
+            NotWaiting,
+            InvalidValue,
+          ],
+        }),
+      )
+      .add(
+        HttpApiEndpoint.post("resume", "/api/executions/:id/resume", {
+          params: { id: Schema.String },
+          success: ExecutionSummary,
+          error: [ExecutionNotFound, AmbiguousExecutionId, WorkflowNotFound, ActionNotAllowed],
+        }),
+      )
+      .add(
+        HttpApiEndpoint.post("interrupt", "/api/executions/:id/interrupt", {
+          params: { id: Schema.String },
+          success: ExecutionSummary,
+          error: [ExecutionNotFound, AmbiguousExecutionId, WorkflowNotFound, ActionNotAllowed],
         }),
       ),
   ) {}

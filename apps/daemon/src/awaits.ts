@@ -10,6 +10,8 @@ import type * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as Scope from "effect/Scope";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 
+type Serviceless = Schema.Codec<unknown, unknown>;
+
 export type Await =
   | {
       readonly _tag: "Deferred";
@@ -17,7 +19,7 @@ export type Await =
       readonly workflowName: string;
       readonly name: string;
       readonly since: DateTime.Utc;
-      readonly deferred: DurableDeferred.DurableDeferred<Schema.Constraint, Schema.Constraint>;
+      readonly deferred: DurableDeferred.DurableDeferred<Serviceless, Serviceless>;
     }
   | {
       readonly _tag: "Clock";
@@ -69,7 +71,16 @@ export class Awaits extends Context.Service<
                 };
                 return deferred.name.startsWith(clockPrefix)
                   ? { _tag: "Clock", ...base, name: deferred.name.slice(clockPrefix.length) }
-                  : { _tag: "Deferred", ...base, name: deferred.name, deferred };
+                  : {
+                      _tag: "Deferred",
+                      ...base,
+                      name: deferred.name,
+                      // deferredResult erases the schemas' services; a Workflows layer may require none.
+                      deferred: deferred as unknown as DurableDeferred.DurableDeferred<
+                        Serviceless,
+                        Serviceless
+                      >,
+                    };
               },
             );
             return HashMap.set(

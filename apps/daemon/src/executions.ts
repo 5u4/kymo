@@ -9,12 +9,17 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import {
+  ActionNotAllowed,
+  actionsFor,
   type ActivityRun,
   AmbiguousExecutionId,
+  type CompleteRequest,
   type ExecuteRequest,
   type Executed,
+  type ExecutionAction,
   type ExecutionDetail,
   type ExecutionList,
   ExecutionNotFound,
@@ -22,6 +27,8 @@ import {
   type ExecutionStatus,
   type ExecutionSummary,
   InvalidPayload,
+  InvalidValue,
+  NotWaiting,
   statusName,
   WorkflowNotFound,
 } from "kymo/api";
@@ -293,6 +300,27 @@ const statuses = Effect.gen(function* () {
 
 type Entry = Effect.Success<typeof statuses>[number];
 
+const resolve = Effect.fnUntraced(function* (id: string) {
+  const [entry, ...others] = (yield* statuses).filter(({ run }) => run.id.startsWith(id));
+  if (entry === undefined) {
+    return yield* new ExecutionNotFound({ id });
+  }
+  if (others.length > 0) {
+    return yield* new AmbiguousExecutionId({
+      id,
+      candidates: [entry, ...others].map(({ run }) => run.id),
+    });
+  }
+  return entry;
+});
+
+type Control = (
+  id: string,
+) => Effect.Effect<
+  ExecutionSummary,
+  ExecutionNotFound | AmbiguousExecutionId | WorkflowNotFound | ActionNotAllowed
+>;
+
 export class Executions extends Context.Service<
   Executions,
   {
@@ -303,6 +331,15 @@ export class Executions extends Context.Service<
     readonly execute: (
       request: ExecuteRequest,
     ) => Effect.Effect<Executed, WorkflowNotFound | InvalidPayload>;
+    readonly complete: (
+      id: string,
+      request: CompleteRequest,
+    ) => Effect.Effect<
+      ExecutionSummary,
+      ExecutionNotFound | AmbiguousExecutionId | WorkflowNotFound | NotWaiting | InvalidValue
+    >;
+    readonly resume: Control;
+    readonly interrupt: Control;
   }
 >()("@kymo/daemon/Executions") {
   static readonly layer: Layer.Layer<
@@ -353,16 +390,7 @@ export class Executions extends Context.Service<
       }, Effect.provideContext(context));
 
       const get = Effect.fn("Executions.get")(function* (id: string) {
-        const [entry, ...others] = (yield* statuses).filter(({ run }) => run.id.startsWith(id));
-        if (entry === undefined) {
-          return yield* new ExecutionNotFound({ id });
-        }
-        if (others.length > 0) {
-          return yield* new AmbiguousExecutionId({
-            id,
-            candidates: [entry, ...others].map(({ run }) => run.id),
-          });
-        }
+        const entry = yield* resolve(id);
         return {
           ...(yield* summarize(entry)),
           payload: entry.run.payload,
@@ -376,12 +404,15 @@ export class Executions extends Context.Service<
         };
       }, Effect.provideContext(context));
 
-      const execute = Effect.fn("Executions.execute")(function* (request: ExecuteRequest) {
-        const workflow = yield* Effect.fromOption(registry.get(request.workflow)).pipe(
+      const registered = (name: string) =>
+        Effect.fromOption(registry.get(name)).pipe(
           Effect.mapError(
-            () => new WorkflowNotFound({ workflow: request.workflow, registered: registry.names }),
+            () => new WorkflowNotFound({ workflow: name, registered: registry.names }),
           ),
         );
+
+      const execute = Effect.fn("Executions.execute")(function* (request: ExecuteRequest) {
+        const workflow = yield* registered(request.workflow);
         const payload = yield* Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(
           request.payload,
         ).pipe(
@@ -433,7 +464,61 @@ export class Executions extends Context.Service<
         return { execution: yield* summarize(entry), created };
       }, Effect.provideContext(context));
 
-      return Executions.of({ list, get, execute });
+      const complete = Effect.fn("Executions.complete")(function* (
+        id: string,
+        request: CompleteRequest,
+      ) {
+        const entry = yield* resolve(id);
+        const workflow = yield* registered(entry.run.workflow);
+        const deferreds = entry.waits.filter((wait) => wait._tag === "Deferred");
+        const wait = deferreds.find((wait) => wait.name === request.name);
+        if (wait === undefined) {
+          return yield* new NotWaiting({
+            id: entry.run.id,
+            deferred: request.name,
+            waiting: deferreds.map((wait) => wait.name),
+          });
+        }
+        const value = yield* Schema.decodeEffect(Schema.toCodecJson(wait.deferred.successSchema))(
+          request.value,
+        ).pipe(
+          Effect.mapError(
+            (error) =>
+              new InvalidValue({
+                deferred: wait.name,
+                issue: error.message.replace(/\n\s*/g, " "),
+              }),
+          ),
+        );
+        yield* DurableDeferred.succeed(wait.deferred, {
+          token: DurableDeferred.tokenFromExecutionId(wait.deferred, {
+            workflow,
+            executionId: entry.run.id,
+          }),
+          value,
+        }).pipe(Effect.provideService(WorkflowEngine.WorkflowEngine, engine));
+        return yield* summarize(entry);
+      }, Effect.provideContext(context));
+
+      const control = (action: ExecutionAction): Control =>
+        Effect.fn(`Executions.${action}`)(function* (id: string) {
+          const entry = yield* resolve(id);
+          const workflow = yield* registered(entry.run.workflow);
+          if (!actionsFor(entry.status).includes(action)) {
+            return yield* new ActionNotAllowed({ id: entry.run.id, action, status: entry.status });
+          }
+          yield* engine[action](workflow, entry.run.id);
+          return yield* summarize(entry);
+        }, Effect.provideContext(context));
+
+      return Executions.of({
+        list,
+        get,
+        execute,
+        complete,
+        resume: control("resume"),
+        interrupt: control("interrupt"),
+      });
     }),
   );
 }
