@@ -1,7 +1,7 @@
 import * as BunCrypto from "@effect/platform-bun/BunCrypto";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Config from "effect/Config";
-import type * as Context from "effect/Context";
+import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -209,11 +209,16 @@ const load = (root: string, source: string) =>
     ),
   );
 
+export class Registry extends Context.Service<
+  Registry,
+  { readonly get: (workflow: string) => Option.Option<Workflow.Any> }
+>()("@kymo/daemon/Registry") {}
+
 export const layer = (options: {
   readonly root: string;
   readonly workflows: ReadonlyArray<string>;
 }): Layer.Layer<
-  never,
+  Registry,
   | WorkflowSourceError
   | DuplicateWorkflow
   | WorkflowNotRegistered
@@ -221,7 +226,8 @@ export const layer = (options: {
   | EffectVersionMismatch,
   WorkflowEngine.WorkflowEngine
 > =>
-  Layer.effectDiscard(
+  Layer.effect(
+    Registry,
     Effect.gen(function* () {
       const engine = yield* WorkflowEngine.WorkflowEngine;
       const registered = new Map<string, Registered>();
@@ -292,5 +298,9 @@ export const layer = (options: {
       }
       startedWhileLoading = undefined;
       yield* Effect.forEach(registered.values(), ({ register }) => register, { discard: true });
+      return Registry.of({
+        get: (workflow) =>
+          Option.map(Option.fromUndefinedOr(registered.get(workflow)), (entry) => entry.workflow),
+      });
     }),
   ).pipe(Layer.provide([BunServices.layer, BunCrypto.layerDigest]));
