@@ -56,5 +56,10 @@ export const cleanStale = (root: Root.KymoRoot) =>
     }
     const file = yield* readDaemonFile(taken);
     const live = Option.isSome(file) && (yield* ProcessIdentity.isAlive(file.value));
-    yield* live ? fs.rename(taken, root.daemon) : fs.remove(taken);
+    const restore = live
+      ? fs
+          .link(taken, root.daemon)
+          .pipe(Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.void))
+      : Effect.void;
+    yield* restore.pipe(Effect.ensuring(Effect.ignore(fs.remove(taken))));
   });
