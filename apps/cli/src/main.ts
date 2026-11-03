@@ -11,6 +11,7 @@ import type * as HttpClient from "effect/http/HttpClient";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as PlatformError from "effect/PlatformError";
 import * as Predicate from "effect/Predicate";
 import * as Runtime from "effect/Runtime";
@@ -49,7 +50,10 @@ interface Output {
 type Run = Effect.Effect<
   Output,
   NotRunning | DaemonExited | DaemonSilent | PlatformError.PlatformError,
-  FileSystem.FileSystem | Path.Path | HttpClient.HttpClient
+  | FileSystem.FileSystem
+  | Path.Path
+  | HttpClient.HttpClient
+  | ChildProcessSpawner.ChildProcessSpawner
 >;
 
 type Command =
@@ -108,7 +112,7 @@ const commands: Record<string, Command> = {
         body: {
           daemon: Option.match(stopped, {
             onNone: () => ({ status: "not running", root: root.root }),
-            onSome: (pid) => ({ status: "stopped", pid, root: root.root }),
+            onSome: ({ pid }) => ({ status: "stopped", pid, root: root.root }),
           }),
         },
         help: [`Run \`${kymo("start")}\` to start it`],

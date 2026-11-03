@@ -1,5 +1,6 @@
 import * as Config from "effect/Config";
 import * as Schema from "effect/Schema";
+import { ProcessIdentity } from "kymo/process-identity";
 
 export interface KymoRoot {
   readonly root: string;
@@ -34,7 +35,7 @@ export type RootConfig = typeof RootConfig.Type;
 export const defaultConfig: RootConfig = { port: 4419, workflows: [] };
 
 export const DaemonFile = Schema.Struct({
-  pid: Schema.Int,
+  ...ProcessIdentity.fields,
   port: Port,
 });
 export type DaemonFile = typeof DaemonFile.Type;

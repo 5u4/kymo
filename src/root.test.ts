@@ -48,7 +48,11 @@ describe("Root", () => {
   });
 
   it("DaemonFile rejects port 0, because it records the port the daemon bound", () => {
-    const decoded = Schema.decodeExit(Root.DaemonFile)({ pid: 42, port: 0 });
+    const decoded = Schema.decodeExit(Root.DaemonFile)({
+      pid: 42,
+      started: "Mon Nov  2 15:12:20 2026",
+      port: 0,
+    });
     assert.isTrue(Exit.isFailure(decoded));
   });
 

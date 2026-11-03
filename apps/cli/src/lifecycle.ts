@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Ownership from "kymo/ownership";
+import * as ProcessIdentity from "kymo/process-identity";
 import type * as Root from "kymo/root";
 import { cleanStale, derive, type Running } from "./daemon-state.ts";
 
@@ -29,16 +30,15 @@ export class DaemonSilent extends Schema.TaggedError<DaemonSilent>()("DaemonSile
   }
 }
 
-const signal = (pid: number, name: "SIGTERM" | "SIGKILL") =>
-  Effect.sync(() => {
-    try {
-      process.kill(pid, name);
-    } catch {}
-  });
+const signal = (target: ProcessIdentity.ProcessIdentity, name: "SIGTERM" | "SIGKILL") =>
+  Effect.try(() => process.kill(target.pid, name)).pipe(
+    Effect.ignore,
+    Effect.when(ProcessIdentity.isAlive(target)),
+  );
 
-const awaitExit = (pid: number) =>
+const awaitExit = (target: ProcessIdentity.ProcessIdentity) =>
   Effect.gen(function* () {
-    while (yield* Ownership.isAlive(pid)) {
+    while (yield* ProcessIdentity.isAlive(target)) {
       yield* Effect.sleep(poll);
     }
   });
@@ -118,7 +118,7 @@ export const start = (root: Root.KymoRoot) =>
           Effect.gen(function* () {
             const owner = yield* Ownership.liveOwner(root);
             return yield* new DaemonSilent({
-              pid: Option.getOrElse(owner, () => child.pid),
+              pid: Option.match(owner, { onNone: () => child.pid, onSome: (live) => live.pid }),
               log: yield* logSince(root, offset),
             });
           }),
@@ -129,15 +129,15 @@ export const start = (root: Root.KymoRoot) =>
 export const stop = (root: Root.KymoRoot) =>
   Effect.gen(function* () {
     const state = yield* derive(root);
-    const target =
-      state._tag === "Running" ? Option.some(state.pid) : yield* Ownership.liveOwner(root);
+    const target: Option.Option<ProcessIdentity.ProcessIdentity> =
+      state._tag === "Running" ? Option.some(state) : yield* Ownership.liveOwner(root);
     if (Option.isSome(target)) {
-      const pid = target.value;
-      yield* signal(pid, "SIGTERM");
-      yield* awaitExit(pid).pipe(
+      yield* signal(target.value, "SIGTERM");
+      yield* awaitExit(target.value).pipe(
         Effect.timeoutOrElse({
           duration: stopTimeout,
-          orElse: () => signal(pid, "SIGKILL").pipe(Effect.andThen(awaitExit(pid))),
+          orElse: () =>
+            signal(target.value, "SIGKILL").pipe(Effect.andThen(awaitExit(target.value))),
         }),
       );
     }

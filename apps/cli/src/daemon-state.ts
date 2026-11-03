@@ -5,12 +5,12 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { Api, url } from "kymo/api";
-import * as Ownership from "kymo/ownership";
+import * as ProcessIdentity from "kymo/process-identity";
 import * as Root from "kymo/root";
 
 export type DaemonState = Data.TaggedEnum<{
   Stopped: { readonly stale: boolean };
-  Running: { readonly pid: number; readonly port: number };
+  Running: Root.DaemonFile;
 }>;
 export const DaemonState = Data.taggedEnum<DaemonState>();
 export type Running = Data.TaggedEnum.Value<DaemonState, "Running">;
@@ -28,7 +28,7 @@ export const derive = (root: Root.KymoRoot) =>
       return DaemonState.Stopped({ stale: false });
     }
     const file = yield* readDaemonFile(root.daemon);
-    if (Option.isNone(file) || !(yield* Ownership.isAlive(file.value.pid))) {
+    if (Option.isNone(file) || !(yield* ProcessIdentity.isAlive(file.value))) {
       return DaemonState.Stopped({ stale: true });
     }
     const { pid, port } = file.value;
@@ -38,7 +38,7 @@ export const derive = (root: Root.KymoRoot) =>
       Effect.option,
     );
     return Option.isSome(health) && health.value.pid === pid
-      ? DaemonState.Running({ pid, port })
+      ? DaemonState.Running(file.value)
       : DaemonState.Stopped({ stale: true });
   });
 
@@ -55,6 +55,6 @@ export const cleanStale = (root: Root.KymoRoot) =>
       return;
     }
     const file = yield* readDaemonFile(taken);
-    const live = Option.isSome(file) && (yield* Ownership.isAlive(file.value.pid));
+    const live = Option.isSome(file) && (yield* ProcessIdentity.isAlive(file.value));
     yield* live ? fs.rename(taken, root.daemon) : fs.remove(taken);
   });

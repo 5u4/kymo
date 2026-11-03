@@ -25,9 +25,12 @@ and delete the old path in the same change, with no compatibility shims.
 - A root (`--root`, default `~/.kymo`) holds `kymo.json`, `kymo.db`, `daemon.log` (the daemon's
   stdout and stderr when the CLI starts it), `owner/` and `daemon.json`. A daemon claims the root
   with a symlink in `owner/` (`kymo/ownership`) before it opens `kymo.db`, so two daemons never
-  share one database, writes `daemon.json` (its pid and bound port) once its server listens, and
-  removes its claim and `daemon.json` on SIGTERM or SIGINT. The CLI derives `Running` or `Stopped`
-  from `daemon.json`, the pid's liveness and `GET /api/health` on every run; `kymo stop` also ends
+  share one database, writes `daemon.json` (its process identity and bound port) once its server
+  listens, and removes its claim and `daemon.json` on SIGTERM or SIGINT. A process identity
+  (`kymo/process-identity`) is a pid with the start time `ps` reports, so a pid reused by another
+  process never counts as the daemon; claims and `daemon.json` record one, and the CLI signals only
+  a process whose identity still matches. The CLI derives `Running` or `Stopped` from
+  `daemon.json`, that identity's liveness and `GET /api/health` on every run; `kymo stop` also ends
   a daemon that still owns the root but does not answer.
 - `plugins/*` and `examples/*` are plain directories inside the root package. `plugins/gh-cli` is a
   workflow source that ships with kymo; `examples/demo` is the reference workflow source.

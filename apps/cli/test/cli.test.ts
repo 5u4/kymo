@@ -12,6 +12,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { Api, url } from "kymo/api";
+import * as ProcessIdentity from "kymo/process-identity";
 import * as Root from "kymo/root";
 
 const repo = `${import.meta.dirname}/../../..`;
@@ -202,6 +203,39 @@ describe.concurrent("kymo start, stop and home", () => {
       assert.deepStrictEqual(daemonIn(stopped.output), { status: "stopped", pid: hung });
       assert.isFalse(alive(hung), "the hung daemon is gone");
     }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live(
+    "stop and start leave alone an unrelated process that reuses a leftover claim's pid",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const root = yield* tempRoot([]);
+        const unrelated = yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
+        const leftover = { pid: Number(unrelated.pid), started: "Thu Jan  1 00:00:00 1970" };
+        yield* fs.makeDirectory(root.owner);
+        yield* fs.symlink(
+          yield* Schema.encodeEffect(ProcessIdentity.ProcessIdentityJson)(leftover),
+          `${root.owner}/1`,
+        );
+        yield* fs.writeFileString(
+          root.daemon,
+          yield* Schema.encodeEffect(Schema.fromJsonString(Root.DaemonFile))({
+            ...leftover,
+            port: 1,
+          }),
+        );
+
+        const stopped = yield* kymo(root, "stop");
+        assert.strictEqual(stopped.code, 0, stopped.stdout);
+        assert.isTrue(yield* unrelated.isRunning, "stop must not signal the unrelated process");
+
+        const started = yield* kymo(root, "start");
+        assert.strictEqual(started.code, 0, started.stdout);
+        assert.notStrictEqual(daemonIn(started.output).pid, leftover.pid);
+        assert.isTrue(yield* unrelated.isRunning, "start must not signal the unrelated process");
+      }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
   it.live("start fails with the daemon's error when a source cannot be imported", () =>

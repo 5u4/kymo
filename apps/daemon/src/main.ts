@@ -17,6 +17,7 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Api, hostname } from "kymo/api";
 import * as Ownership from "kymo/ownership";
+import * as ProcessIdentity from "kymo/process-identity";
 import * as Root from "kymo/root";
 import { Awaits } from "./awaits.ts";
 import * as WorkflowSources from "./workflow-sources.ts";
@@ -76,7 +77,11 @@ const readConfig = (root: Root.KymoRoot) =>
     );
   });
 
-const daemon = (root: Root.KymoRoot, config: Root.RootConfig) => {
+const daemon = (
+  root: Root.KymoRoot,
+  config: Root.RootConfig,
+  self: ProcessIdentity.ProcessIdentity,
+) => {
   const engine = WorkflowSources.layer({ root: root.root, workflows: config.workflows }).pipe(
     Layer.provideMerge(Awaits.layer),
     Layer.provide(ClusterWorkflowEngine.layer),
@@ -102,7 +107,7 @@ const daemon = (root: Root.KymoRoot, config: Root.RootConfig) => {
         return yield* Effect.die(`the daemon is listening on the unix socket ${address.path}`);
       }
       const file = yield* Schema.encodeEffect(Schema.fromJsonString(Root.DaemonFile))({
-        pid: process.pid,
+        ...self,
         port: address.port,
       });
       const temp = `${root.daemon}.${process.pid}.tmp`;
@@ -119,8 +124,12 @@ Effect.gen(function* () {
   const path = yield* Path.Path;
   const root = Root.make(path.resolve(yield* rootDir));
   const config = yield* readConfig(root);
-  yield* Ownership.acquire(root, process.pid);
-  return yield* Layer.launch(daemon(root, config));
+  const self = yield* ProcessIdentity.identify(process.pid).pipe(
+    Effect.flatMap(Effect.fromOption),
+    Effect.orDie,
+  );
+  yield* Ownership.acquire(root, self);
+  return yield* Layer.launch(daemon(root, config, self));
 }).pipe(
   Effect.scoped,
   Effect.provide(BunServices.layer),

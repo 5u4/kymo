@@ -5,6 +5,7 @@ import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import * as ProcessIdentity from "kymo/process-identity";
 import type { KymoRoot } from "kymo/root";
 
 export class RootOwned extends Schema.TaggedError<RootOwned>()("RootOwned", {
@@ -26,19 +27,8 @@ export class RootContended extends Schema.TaggedError<RootContended>()("RootCont
 
 interface Claim {
   readonly epoch: number;
-  readonly pid: number;
-  readonly alive: boolean;
+  readonly live: Option.Option<ProcessIdentity.ProcessIdentity>;
 }
-
-export const isAlive = (pid: number) =>
-  Effect.sync(() => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      return Predicate.hasProperty(error, "code") && error.code === "EPERM";
-    }
-  });
 
 const positiveInteger = /^[1-9]\d*$/;
 
@@ -52,13 +42,17 @@ const claims = (root: KymoRoot) =>
       names.filter((name) => positiveInteger.test(name)),
       (name) =>
         fs.readLink(`${root.owner}/${name}`).pipe(
-          Effect.flatMap((target) => {
-            const pid = positiveInteger.test(target) ? Number(target) : 0;
-            return Effect.map(
-              pid === 0 ? Effect.succeed(false) : isAlive(pid),
-              (alive): Option.Option<Claim> => Option.some({ epoch: Number(name), pid, alive }),
-            );
-          }),
+          Effect.flatMap((target) =>
+            Schema.decodeEffect(ProcessIdentity.ProcessIdentityJson)(target).pipe(
+              Effect.flatMap((owner) =>
+                Effect.map(ProcessIdentity.isAlive(owner), (alive) =>
+                  alive ? Option.some(owner) : Option.none(),
+                ),
+              ),
+              Effect.catchTag("SchemaError", () => Effect.succeedNone),
+            ),
+          ),
+          Effect.map((live): Option.Option<Claim> => Option.some({ epoch: Number(name), live })),
           Effect.catchReason("PlatformError", "NotFound", () => Effect.succeedNone),
         ),
     );
@@ -66,36 +60,38 @@ const claims = (root: KymoRoot) =>
   });
 
 export const liveOwner = (root: KymoRoot) =>
-  Effect.map(claims(root), (found) =>
-    Option.map(
-      Arr.findFirst(found, (claim) => claim.alive),
-      (claim) => claim.pid,
-    ),
-  );
+  Effect.map(claims(root), (found) => Arr.findFirst(found, (claim) => claim.live));
 
 class Contended extends Schema.TaggedError<Contended>()("Contended", {}) {}
 
-const claim = (root: KymoRoot, pid: number) =>
+const claim = (root: KymoRoot, self: ProcessIdentity.ProcessIdentity) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* fs.makeDirectory(root.owner, { recursive: true });
     const before = yield* claims(root);
-    const owner = before.find((other) => other.alive && other.pid !== pid);
-    if (owner !== undefined) {
-      return yield* new RootOwned({ root: root.root, pid: owner.pid });
+    const owner = Arr.findFirst(before, ({ live }) =>
+      Option.filter(live, (other) => other.pid !== self.pid),
+    );
+    if (Option.isSome(owner)) {
+      return yield* new RootOwned({ root: root.root, pid: owner.value.pid });
     }
     const epoch = Math.max(0, ...before.map((other) => other.epoch)) + 1;
     const link = `${root.owner}/${epoch}`;
     yield* fs
-      .symlink(String(pid), link)
+      .symlink(yield* Schema.encodeEffect(ProcessIdentity.ProcessIdentityJson)(self), link)
       .pipe(Effect.catchReason("PlatformError", "AlreadyExists", () => new Contended()));
     const after = yield* claims(root);
-    if (after.some((other) => other.alive && other.epoch !== epoch && other.pid !== pid)) {
+    if (
+      after.some(
+        (other) =>
+          other.epoch !== epoch && Option.exists(other.live, (live) => live.pid !== self.pid),
+      )
+    ) {
       yield* fs.remove(link);
       return yield* new Contended();
     }
     yield* Effect.forEach(
-      after.filter((other) => !other.alive),
+      after.filter((other) => Option.isNone(other.live)),
       (other) =>
         fs
           .remove(`${root.owner}/${other.epoch}`)
@@ -112,7 +108,7 @@ const claim = (root: KymoRoot, pid: number) =>
     Effect.catchTag("Contended", () => new RootContended({ root: root.root })),
   );
 
-export const acquire = (root: KymoRoot, pid: number) =>
-  Effect.acquireRelease(claim(root, pid), (link) =>
+export const acquire = (root: KymoRoot, self: ProcessIdentity.ProcessIdentity) =>
+  Effect.acquireRelease(claim(root, self), (link) =>
     FileSystem.FileSystem.use((fs) => fs.remove(link)).pipe(Effect.ignore),
   );
