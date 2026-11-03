@@ -27,6 +27,7 @@ export const RefundRequest = Workflow.make("RefundRequest", {
 export const layer = RefundRequest.toLayer(
   Effect.fnUntraced(function* ({ orderId, amountCents }) {
     const digits = orderId.slice("ord_".length);
+    yield* Effect.log(`refund of ${amountCents} cents requested for ${orderId}`);
     yield* Activity.make({
       name: "LoadOrder",
       success: Schema.Struct({
@@ -34,7 +35,8 @@ export const layer = RefundRequest.toLayer(
         customer: Schema.String,
         totalCents: Schema.Int,
       }),
-      execute: Effect.sleep("300 millis").pipe(
+      execute: Effect.log(`loading ${orderId}`).pipe(
+        Effect.andThen(Effect.sleep("300 millis")),
         Effect.as({ orderId, customer: `cus_${digits}`, totalCents: amountCents }),
       ),
     });
@@ -46,13 +48,17 @@ export const layer = RefundRequest.toLayer(
       ),
     });
     const approval = yield* DurableDeferred.await(ManagerApproval);
+    yield* Effect.log(`approval from ${approval.approver}: ${approval.approved}`);
     if (!approval.approved) {
       return yield* new RefundRejected({ approver: approval.approver });
     }
     const refund = yield* Activity.make({
       name: "IssueRefund",
       success: Schema.Struct({ refundId: Schema.String }),
-      execute: Effect.sleep("900 millis").pipe(Effect.as({ refundId: `re_${digits}` })),
+      execute: Effect.log(`issuing refund of ${amountCents} cents`).pipe(
+        Effect.andThen(Effect.sleep("900 millis")),
+        Effect.as({ refundId: `re_${digits}` }),
+      ),
     });
     yield* Activity.make({
       name: "NotifyCustomer",
