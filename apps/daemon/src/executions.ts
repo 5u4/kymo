@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import {
@@ -315,6 +316,7 @@ export class Executions extends Context.Service<
       const registry = yield* Registry;
       const engine = yield* WorkflowEngine.WorkflowEngine;
       const sql = yield* SqlClient.SqlClient;
+      const semaphore = yield* Semaphore.make(1);
 
       const summarize = ({ run, status }: Entry) =>
         Effect.map(
@@ -401,14 +403,19 @@ export class Executions extends Context.Service<
             ),
           ),
         );
-        const created = !(yield* readRuns).some((run) => run.id === executionId);
-        if (created && request.label !== undefined) {
-          yield* sql`
-            INSERT INTO kymo_labels (execution_id, label) VALUES (${executionId}, ${request.label})
-            ON CONFLICT DO NOTHING
-          `.pipe(Effect.orDie);
-        }
-        yield* Effect.orDie(engine.execute(workflow, { executionId, payload, discard: true }));
+        const created = yield* semaphore.withPermit(
+          Effect.gen(function* () {
+            const created = !(yield* readRuns).some((run) => run.id === executionId);
+            if (created && request.label !== undefined) {
+              yield* sql`
+                INSERT INTO kymo_labels (execution_id, label) VALUES (${executionId}, ${request.label})
+                ON CONFLICT DO NOTHING
+              `.pipe(Effect.orDie);
+            }
+            yield* Effect.orDie(engine.execute(workflow, { executionId, payload, discard: true }));
+            return created;
+          }),
+        );
         const entry = (yield* statuses).find(({ run }) => run.id === executionId);
         if (entry === undefined) {
           return yield* Effect.die(`${workflow._tag} ${executionId} has no run after execute`);

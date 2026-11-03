@@ -140,13 +140,17 @@ const parse = (args: ReadonlyArray<string>) =>
     let command: Command | undefined;
     let root: string | undefined;
     let help = false;
+    let terminated = false;
     const positionals: Array<string> = [];
     const flags: Record<string, string | true> = {};
     for (let index = 0; index < args.length; index++) {
       const arg = args[index] ?? "";
-      if (arg === "--help" || arg === "-h") {
+      const option = !terminated && arg.startsWith("-");
+      if (option && arg === "--") {
+        terminated = true;
+      } else if (option && (arg === "--help" || arg === "-h")) {
         help = true;
-      } else if (arg.startsWith("--")) {
+      } else if (option && arg.startsWith("--")) {
         const equals = arg.indexOf("=");
         const flagName = arg.slice(2, equals === -1 ? undefined : equals);
         const inline = equals === -1 ? undefined : arg.slice(equals + 1);
@@ -173,7 +177,7 @@ const parse = (args: ReadonlyArray<string>) =>
           }
           flags[flagName] = value;
         }
-      } else if (arg.startsWith("-")) {
+      } else if (option) {
         return yield* new UsageError({ reason: `unknown flag ${arg}` });
       } else if (command === undefined) {
         name = arg;
@@ -220,7 +224,7 @@ Effect.gen(function* () {
     root,
     input,
     kymo: (command) =>
-      ["kymo", command, rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`]
+      ["kymo", rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`, command]
         .filter((part) => part.length > 0)
         .join(" "),
   };
@@ -268,7 +272,7 @@ Effect.gen(function* () {
                 `No workflows are registered; add a source to "workflows" in ${root.config}, then run \`${invocation.kymo("restart")}\``,
               ]
             : [
-                `Run \`${invocation.kymo(`execute ${shellArg(error.registered[0])} <payload>`)}\` to start a registered workflow`,
+                `Run \`${invocation.kymo(`execute ${error.registered[0].startsWith("-") ? "-- " : ""}${shellArg(error.registered[0])} <payload>`)}\` to start a registered workflow`,
               ],
           1,
         ),

@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import * as Scheduler from "effect/Scheduler";
 import * as Scope from "effect/Scope";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
@@ -268,6 +269,27 @@ describe("executions", () => {
             .toSorted(),
           [ids.awaitGate, waitingChild].toSorted(),
         );
+      }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "concurrent executes of one idempotency key create it once with the creator's label",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const requests = [undefined, "l1", "l2", "l3", "l4"].map((label) => ({
+          workflow: "AwaitGate",
+          payload: { id: "race" },
+          label,
+        }));
+        const results = yield* Effect.forEach(requests, (request) => executions.execute(request), {
+          concurrency: "unbounded",
+        }).pipe(Effect.provideService(Scheduler.MaxOpsBeforeYield, 8));
+        const creators = requests.filter((_, index) => results[index]?.created === true);
+        assert.strictEqual(creators.length, 1, results.map(({ created }) => created).join(","));
+        const detail = yield* executions.get(yield* AwaitGate.executionId({ id: "race" }));
+        assert.deepStrictEqual(detail.label, Option.fromUndefinedOr(creators[0]?.label));
       }).pipe(Effect.provide(daemon), Effect.scoped),
     60_000,
   );
