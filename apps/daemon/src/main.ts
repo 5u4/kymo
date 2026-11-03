@@ -7,6 +7,8 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
@@ -73,6 +75,27 @@ const readConfig = (root: Root.KymoRoot) =>
     );
   });
 
+const sameOrigin = HttpRouter.middleware(
+  Effect.gen(function* () {
+    const { address } = yield* HttpServer.HttpServer;
+    if (address._tag === "UnixPathAddress") {
+      return yield* Effect.die(`the daemon is listening on the unix socket ${address.path}`);
+    }
+    const allowed = new Set([
+      `http://127.0.0.1:${address.port}`,
+      `http://localhost:${address.port}`,
+    ]);
+    return (httpEffect) =>
+      Effect.gen(function* () {
+        const origin = (yield* HttpServerRequest.HttpServerRequest).headers["origin"];
+        return origin === undefined || allowed.has(origin)
+          ? yield* httpEffect
+          : HttpServerResponse.empty({ status: 403 });
+      });
+  }),
+  { global: true },
+);
+
 const daemon = (
   root: Root.KymoRoot,
   config: Root.RootConfig,
@@ -94,7 +117,7 @@ const daemon = (
     ),
   );
   const served = HttpRouter.serve(
-    HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])),
+    Layer.merge(HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])), sameOrigin),
     { disableLogger: true },
   ).pipe(
     Layer.provideMerge(

@@ -4,6 +4,8 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
@@ -870,6 +872,45 @@ describe.concurrent("kymo complete, resume and interrupt", () => {
       for (const action of ["interrupt", "resume"]) {
         const refused = yield* kymo(root, action, id);
         assert.strictEqual(refused.code, 1, refused.stdout);
+      }
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("rejects a foreign Origin before any handler runs and accepts the daemon's own", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${repo}/examples/demo/src/index.ts`]);
+      const { port } = yield* daemonFile(root);
+      const client = yield* HttpClient.HttpClient;
+      const interrupt = (id: string, origin?: string) =>
+        client.execute(
+          HttpClientRequest.post(`${url(port)}/api/executions/${id}/interrupt`).pipe(
+            origin === undefined
+              ? (request) => request
+              : HttpClientRequest.setHeader("origin", origin),
+          ),
+        );
+
+      const foreign = yield* refund(root, "ord_00010");
+      for (const origin of ["http://evil.example", `http://evil.example:${port}`, "null"]) {
+        assert.strictEqual((yield* interrupt(foreign.id, origin)).status, 403, origin);
+      }
+      assert.strictEqual(
+        (yield* statusOf(root, foreign.id)).execution.status,
+        "suspended (deferred ManagerApproval)",
+      );
+
+      for (const [orderId, origin] of [
+        ["ord_00011", `http://127.0.0.1:${port}`],
+        ["ord_00012", `http://localhost:${port}`],
+        ["ord_00013", undefined],
+      ] as const) {
+        const { id } = yield* refund(root, orderId);
+        assert.strictEqual((yield* interrupt(id, origin)).status, 200, String(origin));
+        const ended = yield* settled(
+          statusOf(root, id),
+          ({ execution }) => execution.status === "interrupted",
+        );
+        assert.strictEqual(ended.execution.status, "interrupted");
       }
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
