@@ -8,6 +8,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import {
   type ActivityRun,
   AmbiguousExecutionId,
@@ -364,3 +365,33 @@ export class Executions extends Context.Service<
       }),
     );
 }
+
+export const resumeWaiting: Layer.Layer<
+  never,
+  never,
+  SqlClient.SqlClient | Awaits | Registry | WorkflowEngine.WorkflowEngine
+> = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const engine = yield* WorkflowEngine.WorkflowEngine;
+    const registry = yield* Registry;
+    const waiting = (yield* statuses).filter(
+      ({ status }) => status._tag === "Suspended" && status.reason._tag !== "Failure",
+    );
+    yield* Effect.forEach(
+      waiting,
+      ({ run }) =>
+        Option.match(registry.get(run.workflow), {
+          onNone: () => Effect.void,
+          onSome: (workflow) =>
+            engine
+              .resume(workflow, run.id)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning(`could not resume ${run.workflow} ${run.id}`, cause),
+                ),
+              ),
+        }),
+      { discard: true },
+    );
+  }),
+);

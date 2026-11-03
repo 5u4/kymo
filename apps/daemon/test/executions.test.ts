@@ -2,20 +2,27 @@ import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
 import { assert, describe, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
+import { Awaits } from "../src/awaits.ts";
 import { Executions } from "../src/executions.ts";
 import * as Runtime from "../src/runtime.ts";
+import { Double } from "./fixtures/double.ts";
 import {
   AwaitChild,
   AwaitGate,
+  bodyRuns,
   ChildThenGate,
   Defect,
   FailTyped,
+  Gate,
   Interruptible,
   Nap,
   Quick,
@@ -31,11 +38,10 @@ const tempDb = Effect.gen(function* () {
   return `${yield* fs.makeTempDirectoryScoped()}/kymo.db`;
 }).pipe(Effect.provide(BunFileSystem.layer));
 
-const daemon = Layer.unwrap(
-  Effect.map(tempDb, (db) =>
-    Runtime.layer({ root: fixtures, workflows: ["./statuses.ts"], db }).pipe(Layer.orDie),
-  ),
-);
+const runtime = (db: string, workflows: ReadonlyArray<string> = ["./statuses.ts"]) =>
+  Runtime.layer({ root: fixtures, workflows, db }).pipe(Layer.orDie);
+
+const daemon = Layer.unwrap(Effect.map(tempDb, (db) => runtime(db)));
 
 const eventually = <A, E, R>(effect: Effect.Effect<A, E, R>, until: (a: A) => boolean) =>
   effect.pipe(
@@ -241,6 +247,87 @@ describe("executions", () => {
           [ids.awaitGate, waitingChild].toSorted(),
         );
       }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "startup resumes waiting executions and leaves failed suspends and finished runs alone",
+    () =>
+      Effect.gen(function* () {
+        const db = yield* tempDb;
+        const first = yield* Scope.make();
+        const { ids, before } = yield* Effect.gen(function* () {
+          const ids = {
+            awaitGate: yield* AwaitGate.execute({ id: "g" }, { discard: true }),
+            nap: yield* Nap.execute({ id: "n" }, { discard: true }),
+            awaitChild: yield* AwaitChild.execute({ id: "a" }, { discard: true }),
+            suspendOnBoom: yield* SuspendOnBoom.execute({ id: "b" }, { discard: true }),
+            succeed: yield* Succeed.execute({ id: "s" }, { discard: true }),
+            double: yield* Double.execute({ n: 2 }, { discard: true }),
+          };
+          const before = yield* eventually(
+            list({}),
+            ({ executions, total }) =>
+              total === 7 && executions.every((execution) => execution.status._tag !== "Running"),
+          );
+          return { ids, before };
+        }).pipe(
+          Effect.provide(runtime(db, ["./statuses.ts", "./double.ts"])),
+          Scope.provide(first),
+        );
+        yield* Scope.close(first, Exit.void);
+        const waitingChild = yield* AwaitGate.executionId({ id: "child-a" });
+        const runsBefore = new Map(bodyRuns);
+        const updatedBefore = new Map(
+          before.executions.map((execution) => [execution.id, execution.updatedAt]),
+        );
+
+        yield* Effect.gen(function* () {
+          const waits = yield* eventually(
+            Effect.flatMap(Awaits, (awaits) => awaits.list),
+            (entries) => entries.length === 3,
+          );
+          assert.deepStrictEqual(
+            waits
+              .map(({ _tag, executionId, name }) => ({ _tag, executionId, name }))
+              .toSorted((a, b) => a.executionId.localeCompare(b.executionId)),
+            [
+              { _tag: "Deferred", executionId: ids.awaitGate, name: "Gate" },
+              { _tag: "Clock", executionId: ids.nap, name: "nap" },
+              { _tag: "Deferred", executionId: waitingChild, name: "Gate" },
+            ].toSorted((a, b) => a.executionId.localeCompare(b.executionId)),
+          );
+          assert.strictEqual(bodyRuns.get("AwaitGate"), (runsBefore.get("AwaitGate") ?? 0) + 2);
+          assert.strictEqual(bodyRuns.get("Nap"), (runsBefore.get("Nap") ?? 0) + 1);
+          assert.strictEqual(bodyRuns.get("SuspendOnBoom"), runsBefore.get("SuspendOnBoom"));
+          assert.strictEqual(bodyRuns.get("Succeed"), runsBefore.get("Succeed"));
+
+          const after = yield* list({});
+          const byId = new Map(after.executions.map((execution) => [execution.id, execution]));
+          assert.deepStrictEqual(byId.get(ids.suspendOnBoom)?.status, {
+            _tag: "Suspended",
+            reason: { _tag: "Failure", cause: "Boom" },
+          });
+          for (const id of [ids.suspendOnBoom, ids.succeed, ids.double]) {
+            assert.deepStrictEqual(byId.get(id)?.updatedAt, updatedBefore.get(id), id);
+          }
+          assert.deepStrictEqual(byId.get(ids.double)?.status, { _tag: "Succeeded" });
+          assert.deepStrictEqual(byId.get(ids.double)?.label, Option.none());
+          assert.deepStrictEqual(byId.get(ids.awaitChild)?.status, {
+            _tag: "Suspended",
+            reason: { _tag: "Child", executionId: waitingChild },
+          });
+
+          yield* DurableDeferred.succeed(Gate, {
+            token: DurableDeferred.tokenFromExecutionId(Gate, {
+              workflow: AwaitGate,
+              executionId: waitingChild,
+            }),
+            value: "open",
+          });
+          yield* eventually(statusOf(ids.awaitChild), (status) => status._tag === "Succeeded");
+        }).pipe(Effect.provide(runtime(db)), Effect.scoped);
+      }).pipe(Effect.scoped),
     60_000,
   );
 });
