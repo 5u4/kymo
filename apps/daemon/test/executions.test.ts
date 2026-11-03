@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 import * as Scheduler from "effect/Scheduler";
 import * as Scope from "effect/Scope";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
+import * as SqlClient from "effect/sql/SqlClient";
 import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
 import { Awaits } from "../src/awaits.ts";
 import { Executions, executionStatus } from "../src/executions.ts";
@@ -290,6 +291,35 @@ describe("executions", () => {
         assert.strictEqual(creators.length, 1, results.map(({ created }) => created).join(","));
         const detail = yield* executions.get(yield* AwaitGate.executionId({ id: "race" }));
         assert.deepStrictEqual(detail.label, Option.fromUndefinedOr(creators[0]?.label));
+      }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "a created execution replaces a label orphaned by an execute that never persisted its run",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const sql = yield* SqlClient.SqlClient;
+        const relabeled = yield* AwaitGate.executionId({ id: "relabeled" });
+        const unlabeled = yield* AwaitGate.executionId({ id: "unlabeled" });
+        yield* sql`
+          INSERT INTO kymo_labels (execution_id, label)
+          VALUES (${relabeled}, 'orphan'), (${unlabeled}, 'orphan')
+        `;
+        const first = yield* executions.execute({
+          workflow: "AwaitGate",
+          payload: { id: "relabeled" },
+          label: "fresh",
+        });
+        assert.strictEqual(first.created, true);
+        assert.deepStrictEqual(first.execution.label, Option.some("fresh"));
+        const second = yield* executions.execute({
+          workflow: "AwaitGate",
+          payload: { id: "unlabeled" },
+        });
+        assert.strictEqual(second.created, true);
+        assert.deepStrictEqual(second.execution.label, Option.none());
       }).pipe(Effect.provide(daemon), Effect.scoped),
     60_000,
   );

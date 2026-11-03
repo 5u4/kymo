@@ -405,12 +405,22 @@ export class Executions extends Context.Service<
         );
         const created = yield* semaphore.withPermit(
           Effect.gen(function* () {
-            const created = !(yield* readRuns).some((run) => run.id === executionId);
-            if (created && request.label !== undefined) {
-              yield* sql`
-                INSERT INTO kymo_labels (execution_id, label) VALUES (${executionId}, ${request.label})
-                ON CONFLICT DO NOTHING
-              `.pipe(Effect.orDie);
+            const existing = yield* sql`
+              SELECT 1 FROM cluster_messages
+              WHERE entity_type = ${`Workflow/${workflow._tag}`} AND entity_id = ${executionId}
+                AND kind = 0 AND tag = 'run'
+              LIMIT 1
+            `.pipe(Effect.orDie);
+            const created = existing.length === 0;
+            if (created) {
+              yield* (
+                request.label === undefined
+                  ? sql`DELETE FROM kymo_labels WHERE execution_id = ${executionId}`
+                  : sql`
+                      INSERT INTO kymo_labels (execution_id, label) VALUES (${executionId}, ${request.label})
+                      ON CONFLICT (execution_id) DO UPDATE SET label = excluded.label
+                    `
+              ).pipe(Effect.orDie);
             }
             yield* Effect.orDie(engine.execute(workflow, { executionId, payload, discard: true }));
             return created;
