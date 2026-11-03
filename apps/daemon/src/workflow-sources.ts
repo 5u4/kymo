@@ -192,8 +192,9 @@ const handshake = (source: string, file: string) =>
 
 const load = (root: string, source: string) =>
   Effect.gen(function* () {
-    const specifier = yield* resolve(root, source);
+    let specifier = yield* resolve(root, source);
     if ((yield* Path.Path).isAbsolute(specifier)) {
+      specifier = yield* FileSystem.FileSystem.use((fs) => fs.realPath(specifier));
       yield* handshake(source, specifier);
     }
     const module = yield* Effect.tryPromise((): Promise<unknown> => import(specifier));
@@ -203,7 +204,7 @@ const load = (root: string, source: string) =>
     }
     return exported as Workflows;
   }).pipe(
-    Effect.catchTag(["ConfigError", "UnknownError"], (cause) =>
+    Effect.catchTag(["ConfigError", "UnknownError", "PlatformError"], (cause) =>
       Effect.fail(new WorkflowSourceError({ source, reason: "Import", cause })),
     ),
   );

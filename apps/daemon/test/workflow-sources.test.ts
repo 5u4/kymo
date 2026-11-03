@@ -114,6 +114,23 @@ describe("workflow sources", () => {
     }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
   );
 
+  it.live("checks the project a symlinked source points into, not the symlink's directory", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const project = yield* fs.makeTempDirectoryScoped();
+      yield* fs.makeDirectory(`${project}/node_modules/effect`, { recursive: true });
+      yield* fs.writeFileString(
+        `${project}/node_modules/effect/package.json`,
+        '{ "name": "effect", "version": "4.0.0" }\n',
+      );
+      yield* fs.copyFile(`${fixtures}/double.ts`, `${project}/kymo.ts`);
+      const elsewhere = yield* fs.makeTempDirectoryScoped();
+      yield* fs.symlink(`${project}/kymo.ts`, `${elsewhere}/kymo.ts`);
+      const error = yield* startupError([`${elsewhere}/kymo.ts`]);
+      assert.instanceOf(error, WorkflowSources.EffectVersionMismatch);
+    }).pipe(Effect.provide(BunFileSystem.layer), Effect.scoped),
+  );
+
   it.live("fails startup when two sources register the same workflow", () =>
     Effect.gen(function* () {
       const error = yield* startupError(["./child.ts", "./duplicate-child.ts"]);
