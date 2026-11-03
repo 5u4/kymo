@@ -4,17 +4,14 @@
   "private": true,
   "workspaces": {
     "packages": [
-      "apps/*"
+      "apps/web"
     ],
     "catalog": {
-      "@effect/platform-bun": "4.1.2",
-      "@effect/sql-sqlite-bun": "4.1.2",
       "@effect/tsgo": "0.63.0",
       "@effect/vitest": "4.1.2",
       "@tailwindcss/vite": "4.3.3",
       "@tanstack/react-router": "1.170.46",
       "@tanstack/router-plugin": "1.168.48",
-      "@toon-format/toon": "4.4.0",
       "@types/bun": "1.4.4",
       "@types/react": "19.3.0",
       "@types/react-dom": "19.3.0",
@@ -45,8 +42,12 @@
     "vendor:effect": "bun scripts/vendor-effect.ts",
     "build:web": "bun run --cwd apps/web build"
   },
+  "dependencies": {
+    "@effect/platform-bun": "4.1.2",
+    "@effect/sql-sqlite-bun": "4.1.2",
+    "@toon-format/toon": "4.4.0"
+  },
   "devDependencies": {
-    "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/bun": "catalog:",
