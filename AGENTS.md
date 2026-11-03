@@ -50,10 +50,18 @@ and delete the old path in the same change, with no compatibility shims.
 - Effect's `cluster_messages` and `cluster_replies` in `kymo.db` hold each execution's state;
   `apps/daemon/src/executions.ts` reads them and derives each execution's status in one function,
   `executionStatus`. kymo's own tables hold only what Effect does not: `kymo_labels` maps an
-  execution id to the label `kymo execute --label` gave it. `apps/daemon/src/migrations.ts` creates
-  them through `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
-  daemon serves. On startup the daemon resumes every suspended execution except one suspended by
-  a failure, because resuming that one runs its body again.
+  execution id to the label `kymo execute --label` gave it, and `kymo_logs` holds the log lines at
+  `Info` or above written in a workflow's body and activities. `apps/daemon/src/migrations.ts`
+  creates them through `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
+  engine starts. On startup the daemon resumes every suspended execution except one suspended by a
+  failure, because resuming that one runs its body again.
+- `apps/daemon/src/workflow-logs.ts` replaces the engine's loggers: a log from a fiber that has a
+  `WorkflowInstance` goes only to `kymo_logs`; every other log goes to stdout, which the CLI appends
+  to `daemon.log`. Each line records its body pass, because a replay runs the body again and repeats
+  its log lines. Passes count from 1; after a restart they continue from the highest pass that stored
+  a line. Activity lines record the name of the activity they run in and its attempt, and a replay
+  does not repeat them because a completed activity does not run again. `kymo execution <id>
+  --logs` shows them.
 - File names are kebab-case; `bun run lint` enforces it.
 - Nothing outside `design/` imports from `design/`.
 
