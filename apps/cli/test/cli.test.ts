@@ -238,14 +238,19 @@ describe.concurrent("kymo start, stop and home", () => {
       }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
-  it.live("start fails with the daemon's error when a source cannot be imported", () =>
-    Effect.gen(function* () {
-      const root = yield* tempRoot(["./missing.ts"]);
-      const result = yield* kymo(root, "start");
-      assert.strictEqual(result.code, 1, result.stdout);
-      assert.include(result.stdout, "workflow source ./missing.ts could not be imported");
-      assert.deepStrictEqual(yield* daemonPids(root), []);
-    }).pipe(Effect.scoped, Effect.provide(services)),
+  it.live(
+    "start fails with the daemon's error when a source cannot be imported, ignoring older log",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const root = yield* tempRoot(["./missing.ts"]);
+        yield* fs.writeFileString(root.log, "an earlier run wrote this line\n".repeat(200_000));
+        const result = yield* kymo(root, "start");
+        assert.strictEqual(result.code, 1, result.stdout);
+        assert.include(result.stdout, "workflow source ./missing.ts could not be imported");
+        assert.notInclude(result.stdout, "an earlier run");
+        assert.deepStrictEqual(yield* daemonPids(root), []);
+      }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
   it.live("start fails when two sources register the same workflow", () =>

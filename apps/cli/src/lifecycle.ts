@@ -3,6 +3,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import * as Ownership from "kymo/ownership";
 import * as ProcessIdentity from "kymo/process-identity";
 import type * as Root from "kymo/root";
@@ -43,18 +44,23 @@ const awaitExit = (target: ProcessIdentity.ProcessIdentity) =>
     }
   });
 
+const logTailBytes = 64 * 1024;
+
 const logSince = (root: Root.KymoRoot, offset: number) =>
-  FileSystem.FileSystem.use((fs) => fs.readFile(root.log)).pipe(
-    Effect.map((bytes) =>
-      new TextDecoder()
-        .decode(bytes.subarray(offset))
-        .split("\n")
-        .map((line) => line.trim().replace(/\s*\{$/, ""))
-        .filter((line) => line.length > 0 && line !== "}" && !line.startsWith("at "))
-        .slice(-20),
-    ),
-    Effect.orElseSucceed((): ReadonlyArray<string> => []),
-  );
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const size = Number((yield* fs.stat(root.log)).size);
+    const from = Math.max(offset, size - logTailBytes);
+    const text = yield* fs
+      .stream(root.log, { offset: from, bytesToRead: size - from })
+      .pipe(Stream.decodeText(), Stream.mkString);
+    return text
+      .split("\n")
+      .slice(from > offset ? 1 : 0)
+      .map((line) => line.trim().replace(/\s*\{$/, ""))
+      .filter((line) => line.length > 0 && line !== "}" && !line.startsWith("at "))
+      .slice(-20);
+  }).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
 
 export interface Started {
   readonly daemon: Running;
