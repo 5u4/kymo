@@ -172,7 +172,8 @@ const parse = (args: ReadonlyArray<string>) =>
         return yield* new UsageError({ reason: `unexpected argument ${arg}` });
       }
     }
-    const command = name === undefined ? home : commands[name];
+    const command =
+      name === undefined ? home : Object.hasOwn(commands, name) ? commands[name] : undefined;
     if (command === undefined) {
       return yield* new UsageError({ reason: `unknown command ${name}` });
     }

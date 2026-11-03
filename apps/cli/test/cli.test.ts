@@ -265,6 +265,22 @@ describe.concurrent("kymo start, stop and home", () => {
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
+  it.live("names inherited from Object.prototype are unknown commands", () =>
+    Effect.gen(function* () {
+      const root = yield* tempRoot([]);
+      for (const name of ["constructor", "toString", "__proto__"]) {
+        for (const args of [[name], [name, "--help"]]) {
+          const result = yield* kymo(root, ...args);
+          assert.strictEqual(result.code, 2, result.stdout);
+          assert.deepStrictEqual(result.output, {
+            error: `unknown command ${name}`,
+            help: ["Run `kymo --help`"],
+          });
+        }
+      }
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
   it.live("kymo while stopped prints an error that points at kymo start", () =>
     Effect.gen(function* () {
       const root = yield* tempRoot([]);
