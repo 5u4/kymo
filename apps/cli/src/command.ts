@@ -6,7 +6,12 @@ import type * as Path from "effect/Path";
 import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
-import type { AmbiguousExecutionId, ExecutionNotFound } from "kymo/api";
+import type {
+  AmbiguousExecutionId,
+  ExecutionNotFound,
+  InvalidPayload,
+  WorkflowNotFound,
+} from "kymo/api";
 import type * as Root from "kymo/root";
 import type { Running } from "./daemon-state.ts";
 import type { DaemonExited, DaemonSilent } from "./lifecycle.ts";
@@ -47,6 +52,8 @@ export type Run = Effect.Effect<
   | DaemonSilent
   | ExecutionNotFound
   | AmbiguousExecutionId
+  | WorkflowNotFound
+  | InvalidPayload
   | PlatformError.PlatformError
   | HttpClientError.HttpClientError
   | Schema.SchemaError,

@@ -23,7 +23,7 @@ import {
   UsageError,
 } from "./command.ts";
 import { derive, type Running } from "./daemon-state.ts";
-import { execution, executions } from "./executions.ts";
+import { execute, execution, executions } from "./executions.ts";
 import { start, type Started, stop } from "./lifecycle.ts";
 
 const description = "kymo runs durable Effect workflows in a local daemon";
@@ -52,6 +52,7 @@ const home: Command = {
       },
       help: [
         `Run \`${kymo("executions")}\` to list executions`,
+        `Run \`${kymo("execute <workflow> <payload>")}\` to start a workflow`,
         `Run \`${kymo("stop")}\` to stop the daemon`,
         `Run \`${kymo("restart")}\` to reload kymo.json`,
       ],
@@ -90,6 +91,7 @@ const commands: Record<string, Command> = {
   },
   executions,
   execution,
+  execute,
 };
 
 const run = (command: Command, invocation: Invocation): Run =>
@@ -138,13 +140,17 @@ const parse = (args: ReadonlyArray<string>) =>
     let command: Command | undefined;
     let root: string | undefined;
     let help = false;
+    let terminated = false;
     const positionals: Array<string> = [];
     const flags: Record<string, string | true> = {};
     for (let index = 0; index < args.length; index++) {
       const arg = args[index] ?? "";
-      if (arg === "--help" || arg === "-h") {
+      const option = !terminated && arg.startsWith("-");
+      if (option && arg === "--") {
+        terminated = true;
+      } else if (option && (arg === "--help" || arg === "-h")) {
         help = true;
-      } else if (arg.startsWith("--")) {
+      } else if (option && arg.startsWith("--")) {
         const equals = arg.indexOf("=");
         const flagName = arg.slice(2, equals === -1 ? undefined : equals);
         const inline = equals === -1 ? undefined : arg.slice(equals + 1);
@@ -171,7 +177,7 @@ const parse = (args: ReadonlyArray<string>) =>
           }
           flags[flagName] = value;
         }
-      } else if (arg.startsWith("-")) {
+      } else if (option) {
         return yield* new UsageError({ reason: `unknown flag ${arg}` });
       } else if (command === undefined) {
         name = arg;
@@ -218,7 +224,7 @@ Effect.gen(function* () {
     root,
     input,
     kymo: (command) =>
-      ["kymo", command, rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`]
+      ["kymo", rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`, command]
         .filter((part) => part.length > 0)
         .join(" "),
   };
@@ -258,6 +264,19 @@ Effect.gen(function* () {
           [`Run \`${invocation.kymo("execution <id>")}\` with a longer prefix`],
           1,
         ),
+      WorkflowNotFound: (error) =>
+        failure(
+          { error: error.message, registered: error.registered },
+          error.registered[0] === undefined
+            ? [
+                `No workflows are registered; add a source to "workflows" in ${root.config}, then run \`${invocation.kymo("restart")}\``,
+              ]
+            : [
+                `Run \`${invocation.kymo(`execute ${error.registered[0].startsWith("-") ? "-- " : ""}${shellArg(error.registered[0])} <payload>`)}\` to start a registered workflow`,
+              ],
+          1,
+        ),
+      InvalidPayload: (error) => failure({ error: error.message }, [], 1),
     }),
   );
 }).pipe(

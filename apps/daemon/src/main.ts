@@ -86,7 +86,8 @@ const daemon = (
     Effect.map(Executions, (service) =>
       handlers
         .handle("list", ({ query }) => service.list(query))
-        .handle("get", ({ params }) => service.get(params.id)),
+        .handle("get", ({ params }) => service.get(params.id))
+        .handle("execute", ({ payload }) => service.execute(payload)),
     ),
   );
   const served = HttpRouter.serve(

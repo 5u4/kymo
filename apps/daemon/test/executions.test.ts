@@ -8,8 +8,10 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import * as Scheduler from "effect/Scheduler";
 import * as Scope from "effect/Scope";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
+import * as SqlClient from "effect/sql/SqlClient";
 import { type ExecutionQuery, ExecutionStatus } from "kymo/api";
 import { Awaits } from "../src/awaits.ts";
 import { Executions, executionStatus } from "../src/executions.ts";
@@ -160,8 +162,8 @@ describe("executions", () => {
         }
 
         const byId = new Map(settled.executions.map((execution) => [execution.id, execution]));
-        assert.deepStrictEqual(byId.get(ids.succeed)?.label, Option.some("s"));
-        assert.deepStrictEqual(byId.get(waitingChild)?.label, Option.some("child-a"));
+        assert.deepStrictEqual(byId.get(ids.succeed)?.idempotencyKey, Option.some("s"));
+        assert.deepStrictEqual(byId.get(waitingChild)?.idempotencyKey, Option.some("child-a"));
         assert.deepStrictEqual(byId.get(waitingChild)?.parentId, Option.some(ids.awaitChild));
         assert.deepStrictEqual(byId.get(ids.awaitChild)?.parentId, Option.none());
         assert.deepStrictEqual(byId.get(ids.stuck)?.updatedAt, Option.none());
@@ -273,6 +275,56 @@ describe("executions", () => {
   );
 
   it.live(
+    "concurrent executes of one idempotency key create it once with the creator's label",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const requests = [undefined, "l1", "l2", "l3", "l4"].map((label) => ({
+          workflow: "AwaitGate",
+          payload: { id: "race" },
+          label,
+        }));
+        const results = yield* Effect.forEach(requests, (request) => executions.execute(request), {
+          concurrency: "unbounded",
+        }).pipe(Effect.provideService(Scheduler.MaxOpsBeforeYield, 8));
+        const creators = requests.filter((_, index) => results[index]?.created === true);
+        assert.strictEqual(creators.length, 1, results.map(({ created }) => created).join(","));
+        const detail = yield* executions.get(yield* AwaitGate.executionId({ id: "race" }));
+        assert.deepStrictEqual(detail.label, Option.fromUndefinedOr(creators[0]?.label));
+      }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
+    "a created execution replaces a label orphaned by an execute that never persisted its run",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const sql = yield* SqlClient.SqlClient;
+        const relabeled = yield* AwaitGate.executionId({ id: "relabeled" });
+        const unlabeled = yield* AwaitGate.executionId({ id: "unlabeled" });
+        yield* sql`
+          INSERT INTO kymo_labels (execution_id, label)
+          VALUES (${relabeled}, 'orphan'), (${unlabeled}, 'orphan')
+        `;
+        const first = yield* executions.execute({
+          workflow: "AwaitGate",
+          payload: { id: "relabeled" },
+          label: "fresh",
+        });
+        assert.strictEqual(first.created, true);
+        assert.deepStrictEqual(first.execution.label, Option.some("fresh"));
+        const second = yield* executions.execute({
+          workflow: "AwaitGate",
+          payload: { id: "unlabeled" },
+        });
+        assert.strictEqual(second.created, true);
+        assert.deepStrictEqual(second.execution.label, Option.none());
+      }).pipe(Effect.provide(daemon), Effect.scoped),
+    60_000,
+  );
+
+  it.live(
     "startup resumes waiting executions and leaves failed suspends and finished runs alone",
     () =>
       Effect.gen(function* () {
@@ -334,7 +386,7 @@ describe("executions", () => {
             assert.deepStrictEqual(byId.get(id)?.updatedAt, updatedBefore.get(id), id);
           }
           assert.deepStrictEqual(byId.get(ids.double)?.status, { _tag: "Succeeded" });
-          assert.deepStrictEqual(byId.get(ids.double)?.label, Option.none());
+          assert.deepStrictEqual(byId.get(ids.double)?.idempotencyKey, Option.none());
           assert.deepStrictEqual(byId.get(ids.awaitChild)?.status, {
             _tag: "Suspended",
             reason: { _tag: "Child", executionId: waitingChild },

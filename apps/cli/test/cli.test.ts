@@ -34,7 +34,7 @@ const kymo = (root: Root.KymoRoot, ...args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const handle = yield* spawner.spawn(
-      ChildProcess.make(process.execPath, [cli, ...args, "--root", root.root]),
+      ChildProcess.make(process.execPath, [cli, "--root", root.root, ...args]),
     );
     const [stdout, code] = yield* Effect.all(
       [handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode],
@@ -289,7 +289,7 @@ describe.concurrent("kymo start, stop and home", () => {
       assert.deepStrictEqual(result.output, {
         error: "the kymo daemon is not running",
         root: root.root,
-        help: [`Run \`kymo start --root ${root.root}\` to start it`],
+        help: [`Run \`kymo --root ${root.root} start\` to start it`],
       });
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
@@ -418,7 +418,7 @@ describe.concurrent("kymo executions and execution", () => {
       assert.strictEqual(quickPage.total, 17);
       assert.include(
         quickPage.help,
-        `Run \`kymo executions --status succeeded --workflow Quick --limit 17 --root ${root.root}\` to see all 17`,
+        `Run \`kymo --root ${root.root} executions --status succeeded --workflow Quick --limit 17\` to see all 17`,
       );
 
       const wide = yield* kymo(root, "executions", "--fields", "started,parent", "--limit", "1");
@@ -478,7 +478,7 @@ describe.concurrent("kymo executions and execution", () => {
         ({ total }) => total === 2,
       );
       const hint = page.help
-        .map((line) => /^Run `(kymo executions .*)` to see all 2$/.exec(line)?.[1])
+        .map((line) => /^Run `(kymo --root \S+ executions .*)` to see all 2$/.exec(line)?.[1])
         .find((command) => command !== undefined);
       assert.isDefined(hint, page.help.join("\n"));
 
@@ -536,7 +536,7 @@ describe.concurrent("kymo executions and execution", () => {
         {
           error: `${shared} matches ${candidates.length} executions`,
           candidates: candidates.toSorted(),
-          help: [`Run \`kymo execution <id> --root ${root.root}\` with a longer prefix`],
+          help: [`Run \`kymo --root ${root.root} execution <id>\` with a longer prefix`],
         },
       );
 
@@ -544,7 +544,7 @@ describe.concurrent("kymo executions and execution", () => {
       assert.strictEqual(unknown.code, 1, unknown.stdout);
       assert.deepStrictEqual(unknown.output, {
         error: "no execution matches nope",
-        help: [`Run \`kymo executions --root ${root.root}\` to list executions`],
+        help: [`Run \`kymo --root ${root.root} executions\` to list executions`],
       });
 
       const missing = yield* kymo(root, "execution");
@@ -564,7 +564,7 @@ describe.concurrent("kymo executions and execution", () => {
       assert.deepStrictEqual(stopped.output, {
         error: "the kymo daemon is not running",
         root: root.root,
-        help: [`Run \`kymo start --root ${root.root}\` to start it`],
+        help: [`Run \`kymo --root ${root.root} start\` to start it`],
       });
 
       yield* kymo(root, "start");
@@ -582,6 +582,159 @@ describe.concurrent("kymo executions and execution", () => {
         Schema.decodeUnknownSync(Schema.Struct({ usage: Schema.String }))(usage.output).usage,
         "kymo execution <id> [--full] [--root <dir>]",
       );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+});
+
+const ExecutedOutput = Schema.Struct({
+  execution: Schema.Struct({
+    id: Schema.String,
+    workflow: Schema.String,
+    label: Schema.NullOr(Schema.String),
+    status: Schema.String,
+  }),
+  created: Schema.Boolean,
+  help: Schema.Array(Schema.String),
+});
+
+const executedIn = (output: unknown) => Schema.decodeUnknownSync(ExecutedOutput)(output);
+
+const running = (sources: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const root = yield* tempRoot(sources);
+    const started = yield* kymo(root, "start");
+    assert.strictEqual(started.code, 0, started.stdout);
+    return root;
+  });
+
+describe.concurrent("kymo execute", () => {
+  it.live("starts a workflow with a label that executions and execution show", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/statuses.ts`]);
+
+      const labeled = yield* kymo(
+        root,
+        "execute",
+        "AwaitGate",
+        '{"id":"k1"}',
+        "--label",
+        "nightly",
+      );
+      assert.strictEqual(labeled.code, 0, labeled.stdout);
+      const first = executedIn(labeled.output);
+      assert.deepInclude(first.execution, { workflow: "AwaitGate", label: "nightly (k1)" });
+      assert.isTrue(first.created);
+      assert.deepStrictEqual(first.help, [
+        `Run \`kymo --root ${root.root} execution ${first.execution.id}\` to see it`,
+      ]);
+
+      const bare = yield* kymo(root, "execute", "AwaitGate", '{"id":"k2"}');
+      assert.strictEqual(bare.code, 0, bare.stdout);
+      const second = executedIn(bare.output);
+      assert.strictEqual(second.execution.label, "k2");
+      assert.isTrue(second.created);
+
+      const listed = listIn((yield* kymo(root, "executions")).output);
+      assert.deepStrictEqual(
+        Object.fromEntries(listed.executions.map((row) => [row["id"], row["label"]])),
+        { [first.execution.id]: "nightly (k1)", [second.execution.id]: "k2" },
+      );
+      const detail = yield* kymo(root, "execution", first.execution.id);
+      assert.strictEqual(detail.code, 0, detail.stdout);
+      assert.strictEqual(
+        Schema.decodeUnknownSync(DetailOutput)(detail.output).execution.label,
+        "nightly (k1)",
+      );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("repeating an idempotency key returns the existing execution and keeps its label", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/statuses.ts`]);
+      const first = executedIn(
+        (yield* kymo(root, "execute", "AwaitGate", '{"id":"same"}', "--label", "first")).output,
+      );
+
+      const again = yield* kymo(root, "execute", "AwaitGate", '{"id":"same"}', "--label", "second");
+      assert.strictEqual(again.code, 0, again.stdout);
+      const repeated = executedIn(again.output);
+      assert.isFalse(repeated.created);
+      assert.strictEqual(repeated.execution.id, first.execution.id);
+      assert.strictEqual(repeated.execution.label, "first (same)");
+      assert.include(repeated.help, "The execution already existed; its label was not changed");
+      assert.strictEqual(listIn((yield* kymo(root, "executions")).output).total, 1);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("rejects an unknown workflow, a payload the workflow refuses, and malformed JSON", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/double.ts`, `${fixtures}/child.ts`]);
+
+      const unknown = yield* kymo(root, "execute", "Triple", '{"n":1}');
+      assert.strictEqual(unknown.code, 1, unknown.stdout);
+      assert.deepStrictEqual(unknown.output, {
+        error: "no workflow named Triple",
+        registered: ["Child", "Double"],
+        help: [
+          `Run \`kymo --root ${root.root} execute Child <payload>\` to start a registered workflow`,
+        ],
+      });
+
+      const refused = yield* kymo(root, "execute", "Double", '{"n":"one"}');
+      assert.strictEqual(refused.code, 1, refused.stdout);
+      assert.deepStrictEqual(refused.output, {
+        error: 'invalid payload for Double: Expected number at ["n"]',
+        help: [],
+      });
+
+      const malformed = yield* kymo(root, "execute", "Double", "{n:1}");
+      assert.strictEqual(malformed.code, 2, malformed.stdout);
+      const emptyLabel = yield* kymo(root, "execute", "Double", '{"n":1}', "--label=");
+      assert.strictEqual(emptyLabel.code, 2, emptyLabel.stdout);
+      assert.strictEqual(listIn((yield* kymo(root, "executions")).output).total, 0);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("starts a workflow whose name begins with a dash after --", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${fixtures}/odd-name.ts`]);
+
+      const bare = yield* kymo(root, "execute", "--", "-odd name", '{"id":"c"}');
+      assert.strictEqual(bare.code, 0, bare.stdout);
+      assert.deepInclude(executedIn(bare.output), { created: true });
+
+      const labeled = yield* kymo(root, "execute", "--label", "x", "--", "-odd name", '{"id":"d"}');
+      assert.strictEqual(labeled.code, 0, labeled.stdout);
+      const executed = executedIn(labeled.output);
+      assert.isTrue(executed.created);
+      assert.deepInclude(executed.execution, { workflow: "-odd name", label: "x (d)" });
+
+      const unknown = yield* kymo(root, "execute", "Triple", '{"id":"e"}');
+      assert.strictEqual(unknown.code, 1, unknown.stdout);
+      assert.deepStrictEqual(unknown.output, {
+        error: "no workflow named Triple",
+        registered: ["-odd name"],
+        help: [
+          `Run \`kymo --root ${root.root} execute -- '-odd name' <payload>\` to start a registered workflow`,
+        ],
+      });
+      const [line] = Schema.decodeUnknownSync(Schema.Struct({ help: Schema.Array(Schema.String) }))(
+        unknown.output,
+      ).help;
+      const hint = /^Run `(.*)` to start a registered workflow$/
+        .exec(line ?? "")?.[1]
+        ?.replace("<payload>", `'{"id":"e"}'`);
+      assert.isDefined(hint);
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const handle = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-c", `kymo() { '${process.execPath}' '${cli}' "$@"; }; ${hint}`]),
+      );
+      const [stdout, code] = yield* Effect.all(
+        [handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode],
+        { concurrency: "unbounded" },
+      );
+      assert.strictEqual(Number(code), 0, stdout);
+      assert.isTrue(executedIn(decode(stdout)).created);
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 });

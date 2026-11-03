@@ -7,18 +7,23 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import {
   type ActivityRun,
   AmbiguousExecutionId,
+  type ExecuteRequest,
+  type Executed,
   type ExecutionDetail,
   type ExecutionList,
   ExecutionNotFound,
   type ExecutionQuery,
   type ExecutionStatus,
   type ExecutionSummary,
+  InvalidPayload,
   statusName,
+  WorkflowNotFound,
 } from "kymo/api";
 import { Awaits } from "./awaits.ts";
 import { Registry } from "./workflow-sources.ts";
@@ -76,6 +81,7 @@ const RunRow = Schema.Struct({
   detached: Schema.NullOr(Schema.Int),
   replied: Schema.NullOr(SnowflakeTime),
   reply: Schema.NullOr(Schema.fromJsonString(Reply)),
+  label: Schema.NullOr(Schema.String),
 });
 type RunRow = typeof RunRow.Type;
 
@@ -198,11 +204,13 @@ const readRuns = Effect.gen(function* () {
       json_extract(m.payload, ${`$."${parentKey}".executionId`}) AS parent_id,
       json_extract(m.payload, ${`$."${parentKey}".detached`}) AS detached,
       CAST(r.id AS TEXT) AS replied,
-      r.payload AS reply
+      r.payload AS reply,
+      l.label AS label
     FROM cluster_messages m
     LEFT JOIN cluster_replies r ON r.id = (
       SELECT max(id) FROM cluster_replies WHERE request_id = m.request_id AND kind = 0
     )
+    LEFT JOIN kymo_labels l ON l.execution_id = m.entity_id
     WHERE m.kind = 0 AND m.tag = 'run'
       AND m.entity_type LIKE 'Workflow/%' AND m.entity_type <> 'Workflow/-/DurableClock'
     ORDER BY m.id DESC
@@ -292,79 +300,142 @@ export class Executions extends Context.Service<
     readonly get: (
       id: string,
     ) => Effect.Effect<ExecutionDetail, ExecutionNotFound | AmbiguousExecutionId>;
+    readonly execute: (
+      request: ExecuteRequest,
+    ) => Effect.Effect<Executed, WorkflowNotFound | InvalidPayload>;
   }
 >()("@kymo/daemon/Executions") {
-  static readonly layer: Layer.Layer<Executions, never, SqlClient.SqlClient | Awaits | Registry> =
-    Layer.effect(
-      Executions,
-      Effect.gen(function* () {
-        const context = yield* Effect.context<SqlClient.SqlClient | Awaits>();
-        const registry = yield* Registry;
+  static readonly layer: Layer.Layer<
+    Executions,
+    never,
+    SqlClient.SqlClient | Awaits | Registry | WorkflowEngine.WorkflowEngine
+  > = Layer.effect(
+    Executions,
+    Effect.gen(function* () {
+      const context = yield* Effect.context<SqlClient.SqlClient | Awaits>();
+      const registry = yield* Registry;
+      const engine = yield* WorkflowEngine.WorkflowEngine;
+      const sql = yield* SqlClient.SqlClient;
+      const semaphore = yield* Semaphore.make(1);
 
-        const summarize = ({ run, status }: Entry) =>
-          Effect.map(
-            Option.match(registry.get(run.workflow), {
-              onNone: () => Effect.succeedNone,
-              onSome: (workflow) =>
-                Schema.decodeUnknownEffect(
-                  Schema.toCodecJson(
-                    workflow.payloadSchema as unknown as Schema.Codec<unknown, unknown>,
-                  ),
-                )(run.payload).pipe(
-                  Effect.flatMap((payload) => Effect.try(() => workflow.idempotencyKey(payload))),
-                  Effect.option,
-                ),
-            }),
-            (label): ExecutionSummary => ({
-              id: run.id,
-              workflow: run.workflow,
-              label,
-              status,
-              startedAt: run.started,
-              updatedAt: Option.fromNullOr(run.replied),
-              parentId: Option.fromNullOr(run.parent_id),
-            }),
-          );
+      const summarize = ({ run, status }: Entry) =>
+        Effect.map(
+          Option.match(registry.get(run.workflow), {
+            onNone: () => Effect.succeedNone,
+            onSome: (workflow) =>
+              Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(run.payload).pipe(
+                Effect.flatMap((payload) => Effect.try(() => workflow.idempotencyKey(payload))),
+                Effect.option,
+              ),
+          }),
+          (idempotencyKey): ExecutionSummary => ({
+            id: run.id,
+            workflow: run.workflow,
+            label: Option.fromNullOr(run.label),
+            idempotencyKey,
+            status,
+            startedAt: run.started,
+            updatedAt: Option.fromNullOr(run.replied),
+            parentId: Option.fromNullOr(run.parent_id),
+          }),
+        );
 
-        const list = Effect.fn("Executions.list")(function* (query: ExecutionQuery) {
-          const matching = (yield* statuses).filter(
-            ({ run, status }) =>
-              (query.workflow === undefined || run.workflow === query.workflow) &&
-              (query.status === undefined || statusName(status) === query.status),
-          );
-          return {
-            executions: yield* Effect.forEach(matching.slice(0, query.limit), summarize),
-            total: matching.length,
-          };
-        }, Effect.provideContext(context));
+      const list = Effect.fn("Executions.list")(function* (query: ExecutionQuery) {
+        const matching = (yield* statuses).filter(
+          ({ run, status }) =>
+            (query.workflow === undefined || run.workflow === query.workflow) &&
+            (query.status === undefined || statusName(status) === query.status),
+        );
+        return {
+          executions: yield* Effect.forEach(matching.slice(0, query.limit), summarize),
+          total: matching.length,
+        };
+      }, Effect.provideContext(context));
 
-        const get = Effect.fn("Executions.get")(function* (id: string) {
-          const [entry, ...others] = (yield* statuses).filter(({ run }) => run.id.startsWith(id));
-          if (entry === undefined) {
-            return yield* new ExecutionNotFound({ id });
-          }
-          if (others.length > 0) {
-            return yield* new AmbiguousExecutionId({
-              id,
-              candidates: [entry, ...others].map(({ run }) => run.id),
-            });
-          }
-          return {
-            ...(yield* summarize(entry)),
-            payload: entry.run.payload,
-            activities: yield* readActivities(entry.run),
-            children: entry.children.map((child) => child.id),
-            waits: entry.waits.map((wait) => ({
-              kind: wait._tag,
-              name: wait.name,
-              since: wait.since,
-            })),
-          };
-        }, Effect.provideContext(context));
+      const get = Effect.fn("Executions.get")(function* (id: string) {
+        const [entry, ...others] = (yield* statuses).filter(({ run }) => run.id.startsWith(id));
+        if (entry === undefined) {
+          return yield* new ExecutionNotFound({ id });
+        }
+        if (others.length > 0) {
+          return yield* new AmbiguousExecutionId({
+            id,
+            candidates: [entry, ...others].map(({ run }) => run.id),
+          });
+        }
+        return {
+          ...(yield* summarize(entry)),
+          payload: entry.run.payload,
+          activities: yield* readActivities(entry.run),
+          children: entry.children.map((child) => child.id),
+          waits: entry.waits.map((wait) => ({
+            kind: wait._tag,
+            name: wait.name,
+            since: wait.since,
+          })),
+        };
+      }, Effect.provideContext(context));
 
-        return Executions.of({ list, get });
-      }),
-    );
+      const execute = Effect.fn("Executions.execute")(function* (request: ExecuteRequest) {
+        const workflow = yield* Effect.fromOption(registry.get(request.workflow)).pipe(
+          Effect.mapError(
+            () => new WorkflowNotFound({ workflow: request.workflow, registered: registry.names }),
+          ),
+        );
+        const payload = yield* Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(
+          request.payload,
+        ).pipe(
+          Effect.mapError(
+            (error) =>
+              new InvalidPayload({
+                workflow: workflow._tag,
+                issue: error.message.replace(/\n\s*/g, " "),
+              }),
+          ),
+        );
+        const executionId = yield* workflow.executionId(payload).pipe(
+          Effect.catchDefect((defect) =>
+            Effect.fail(
+              new InvalidPayload({
+                workflow: workflow._tag,
+                issue: defect instanceof Error ? defect.message : String(defect),
+              }),
+            ),
+          ),
+        );
+        const created = yield* semaphore.withPermit(
+          Effect.gen(function* () {
+            const existing = yield* sql`
+              SELECT 1 FROM cluster_messages
+              WHERE entity_type = ${`Workflow/${workflow._tag}`} AND entity_id = ${executionId}
+                AND kind = 0 AND tag = 'run'
+              LIMIT 1
+            `.pipe(Effect.orDie);
+            const created = existing.length === 0;
+            if (created) {
+              yield* (
+                request.label === undefined
+                  ? sql`DELETE FROM kymo_labels WHERE execution_id = ${executionId}`
+                  : sql`
+                      INSERT INTO kymo_labels (execution_id, label) VALUES (${executionId}, ${request.label})
+                      ON CONFLICT (execution_id) DO UPDATE SET label = excluded.label
+                    `
+              ).pipe(Effect.orDie);
+            }
+            yield* Effect.orDie(engine.execute(workflow, { executionId, payload, discard: true }));
+            return created;
+          }),
+        );
+        const entry = (yield* statuses).find(({ run }) => run.id === executionId);
+        if (entry === undefined) {
+          return yield* Effect.die(`${workflow._tag} ${executionId} has no run after execute`);
+        }
+        return { execution: yield* summarize(entry), created };
+      }, Effect.provideContext(context));
+
+      return Executions.of({ list, get, execute });
+    }),
+  );
 }
 
 export const resumeWaiting: Layer.Layer<

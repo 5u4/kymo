@@ -79,7 +79,7 @@ export class EffectVersionMismatch extends Schema.TaggedError<EffectVersionMisma
 }
 
 type Registered = {
-  readonly workflow: Workflow.Any;
+  readonly workflow: RegisteredWorkflow;
   readonly source: string;
   readonly register: Effect.Effect<void>;
 };
@@ -209,9 +209,21 @@ const load = (root: string, source: string) =>
     ),
   );
 
+type Serviceless = Schema.Codec<unknown, unknown>;
+
+export type RegisteredWorkflow = Workflow.Workflow<
+  string,
+  Workflow.AnyStructSchema & Serviceless,
+  Serviceless,
+  Serviceless
+>;
+
 export class Registry extends Context.Service<
   Registry,
-  { readonly get: (workflow: string) => Option.Option<Workflow.Any> }
+  {
+    readonly get: (workflow: string) => Option.Option<RegisteredWorkflow>;
+    readonly names: ReadonlyArray<string>;
+  }
 >()("@kymo/daemon/Registry") {}
 
 export const layer = (options: {
@@ -273,7 +285,7 @@ export const layer = (options: {
                           );
                         }
                         registered.set(workflow._tag, {
-                          workflow,
+                          workflow: workflow as unknown as RegisteredWorkflow,
                           source,
                           register: Effect.provideContext(registration, context),
                         });
@@ -301,6 +313,7 @@ export const layer = (options: {
       return Registry.of({
         get: (workflow) =>
           Option.map(Option.fromUndefinedOr(registered.get(workflow)), (entry) => entry.workflow),
+        names: [...registered.keys()].toSorted(),
       });
     }),
   ).pipe(Layer.provide([BunServices.layer, BunCrypto.layerDigest]));

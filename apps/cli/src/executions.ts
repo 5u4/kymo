@@ -40,6 +40,12 @@ const DetailInput = Schema.Struct({
   full: Schema.optional(Schema.Literal(true)),
 });
 
+const ExecuteInput = Schema.Struct({
+  workflow: Schema.String.check(Schema.isNonEmpty()),
+  payload: Schema.fromJsonString(Schema.Json),
+  label: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+});
+
 const decodeInput =
   <S extends Schema.Decoder<unknown>>(schema: S, name?: string) =>
   (input: unknown) =>
@@ -56,6 +62,16 @@ const client = (daemon: Running) => HttpApiClient.make(Api, { baseUrl: url(daemo
 
 const truncate = (text: string, full: boolean) =>
   full || text.length <= textLimit ? text : `${text.slice(0, textLimit - 1)}…`;
+
+const labelText = ({ label, idempotencyKey }: ExecutionSummary): string | null =>
+  Option.match(label, {
+    onNone: () => Option.getOrNull(idempotencyKey),
+    onSome: (label) =>
+      Option.match(idempotencyKey, {
+        onNone: () => label,
+        onSome: (key) => `${label} (${key})`,
+      }),
+  });
 
 const statusText = (status: ExecutionStatus | ActivityStatus): string => {
   if (status._tag === "Failed") {
@@ -133,7 +149,7 @@ export const executions: Command = {
           executions: executions.map((execution) => ({
             id: execution.id,
             workflow: execution.workflow,
-            label: Option.getOrNull(execution.label),
+            label: labelText(execution),
             status: truncate(statusText(execution.status), false),
             ...Object.fromEntries(fields.map((field) => [field, extraFields[field](execution)])),
           })),
@@ -173,7 +189,7 @@ export const execution: Command = {
           execution: {
             id: detail.id,
             workflow: detail.workflow,
-            label: Option.getOrNull(detail.label),
+            label: labelText(detail),
             status: truncate(statusText(detail.status), full),
             started: DateTime.formatIso(detail.startedAt),
             updated: Option.getOrNull(Option.map(detail.updatedAt, DateTime.formatIso)),
@@ -208,6 +224,40 @@ export const execution: Command = {
             ? [`Run \`${kymo("execution <child id>")}\` to see a child`]
             : []),
           `Run \`${kymo("executions")}\` to list executions`,
+        ],
+      };
+    }),
+};
+
+export const execute: Command = {
+  _tag: "Daemon",
+  summary: "Start a registered workflow; a repeated idempotency key returns its execution",
+  positionals: [
+    { name: "workflow", summary: "Name of a registered workflow" },
+    { name: "payload", summary: "The workflow's payload as JSON" },
+  ],
+  flags: [{ name: "label", value: "<text>", summary: "Label a new execution" }],
+  run: (daemon, { input, kymo }) =>
+    Effect.gen(function* () {
+      const request = yield* decodeInput(ExecuteInput)(input);
+      const { execution, created } = yield* Effect.flatMap(client(daemon), (api) =>
+        api.executions.execute({ payload: request }),
+      );
+      return {
+        body: {
+          execution: {
+            id: execution.id,
+            workflow: execution.workflow,
+            label: labelText(execution),
+            status: truncate(statusText(execution.status), false),
+          },
+          created,
+        },
+        help: [
+          `Run \`${kymo(`execution ${execution.id}`)}\` to see it`,
+          ...(!created && request.label !== undefined
+            ? ["The execution already existed; its label was not changed"]
+            : []),
         ],
       };
     }),

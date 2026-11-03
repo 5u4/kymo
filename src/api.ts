@@ -71,6 +71,7 @@ export const ExecutionSummary = Schema.Struct({
   id: Schema.String,
   workflow: Schema.String,
   label: Schema.OptionFromNullOr(Schema.String),
+  idempotencyKey: Schema.OptionFromNullOr(Schema.String),
   status: ExecutionStatus,
   startedAt: Schema.DateTimeUtc,
   updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtc),
@@ -136,6 +137,39 @@ export class AmbiguousExecutionId extends Schema.TaggedError<AmbiguousExecutionI
   }
 }
 
+export const ExecuteRequest = Schema.Struct({
+  workflow: Schema.String,
+  payload: Schema.Json,
+  label: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+});
+export type ExecuteRequest = typeof ExecuteRequest.Type;
+
+export const Executed = Schema.Struct({
+  execution: ExecutionSummary,
+  created: Schema.Boolean,
+});
+export type Executed = typeof Executed.Type;
+
+export class WorkflowNotFound extends Schema.TaggedError<WorkflowNotFound>()(
+  "WorkflowNotFound",
+  { workflow: Schema.String, registered: Schema.Array(Schema.String) },
+  { httpApiStatus: 404 },
+) {
+  override get message() {
+    return `no workflow named ${this.workflow}`;
+  }
+}
+
+export class InvalidPayload extends Schema.TaggedError<InvalidPayload>()(
+  "InvalidPayload",
+  { workflow: Schema.String, issue: Schema.String },
+  { httpApiStatus: 400 },
+) {
+  override get message() {
+    return `invalid payload for ${this.workflow}: ${this.issue}`;
+  }
+}
+
 export class Api extends HttpApi.make("kymo")
   .add(
     HttpApiGroup.make("daemon", { topLevel: true }).add(
@@ -155,6 +189,13 @@ export class Api extends HttpApi.make("kymo")
           params: { id: Schema.String },
           success: ExecutionDetail,
           error: [ExecutionNotFound, AmbiguousExecutionId],
+        }),
+      )
+      .add(
+        HttpApiEndpoint.post("execute", "/api/executions", {
+          payload: ExecuteRequest,
+          success: Executed,
+          error: [WorkflowNotFound, InvalidPayload],
         }),
       ),
   ) {}
