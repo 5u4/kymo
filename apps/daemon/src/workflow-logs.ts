@@ -2,12 +2,14 @@ import * as Arr from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Formatter from "effect/Formatter";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Activity from "effect/workflow/Activity";
+import * as Workflow from "effect/workflow/Workflow";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 
 export const Pass = Context.Reference<number>("@kymo/daemon/WorkflowLogs/Pass", {
@@ -100,7 +102,24 @@ export const attribution: Layer.Layer<
               ));
             const pass = previous + 1;
             last.set(executionId, pass);
-            return yield* Effect.provideService(execute(payload, executionId), Pass, pass);
+            const instance = yield* WorkflowEngine.WorkflowInstance;
+            return yield* execute(payload, executionId).pipe(
+              Effect.provideService(Pass, pass),
+              Effect.onExit((exit) =>
+                Effect.sync(() => {
+                  // The engine flags failure-suspended, abandoned and cut-off runs after this exits.
+                  const final =
+                    Exit.isSuccess(exit) ||
+                    (!instance.suspended &&
+                      !instance.abandoned &&
+                      !Context.get(workflow.annotations, Workflow.SuspendOnFailure) &&
+                      !Cause.hasInterrupts(exit.cause));
+                  if (final) {
+                    last.delete(executionId);
+                  }
+                }),
+              ),
+            );
           }),
         ),
       activityExecute: (activity, attempt) =>
