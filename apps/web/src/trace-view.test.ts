@@ -472,6 +472,12 @@ describe("axis", () => {
     assert.strictEqual(scale.span, 1_560_000);
   });
 
+  it("ends a finished trace at its recorded end when a child is missing from the summaries", () => {
+    const root = traceOf(detail({ updatedAt: "2026-11-03T10:00:01Z", children: ["gone"] }), none);
+    assert.strictEqual(axis(root, ms("2026-11-03T10:00:05Z"), 1).span, 1040);
+    assert.strictEqual(axis(root, ms("2026-11-04T10:00:00Z"), 1).span, 1040);
+  });
+
   it("labels a trace of days in days and hours", () => {
     const root = traceOf(detail({ updatedAt: "2026-11-05T22:00:00Z" }), none);
     const scale = axis(root, ms("2026-11-06T00:00:00Z"), 1);

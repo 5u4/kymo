@@ -377,6 +377,9 @@ const offsetLabel = (offset: number, step: number): string => {
 
 export const endOf = (span: Span, now: number): number => Option.getOrElse(span.end, () => now);
 
+export const isDrawn = (span: Span): boolean =>
+  span._tag !== "Child" || Option.isSome(span.summary);
+
 export const reachOf = (span: Span, now: number): number =>
   span._tag === "Wait"
     ? Math.max(
@@ -398,7 +401,11 @@ export const axis = (
   window: { readonly from: number; readonly to: number } = { from: 0, to: 1 },
 ): Axis => {
   const t0 = root.start;
-  const t1 = Math.max(...spansOf(root).map((span) => reachOf(span, now)));
+  const t1 = Math.max(
+    ...spansOf(root)
+      .filter(isDrawn)
+      .map((span) => reachOf(span, now)),
+  );
   const span = Math.max(t1 - t0, 1) * 1.04;
   const step = niceStep(span / zoom);
   const ticks: Array<{ at: number; label: string }> = [];

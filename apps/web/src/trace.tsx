@@ -17,6 +17,7 @@ import {
   findSpan,
   fitZoom,
   initialSpan,
+  isDrawn,
   moveSpan,
   reachOf,
   spanName,
@@ -60,7 +61,7 @@ const future = (span: Span, now: number): Option.Option<number> =>
   span._tag === "Wait" ? Option.filter(span.wakeAt, (wakeAt) => wakeAt > now) : Option.none();
 
 const Bars = ({ span, scale, now }: { span: Span; scale: Axis; now: number }) => {
-  if (span._tag === "Child" && Option.isNone(span.summary)) return null;
+  if (!isDrawn(span)) return null;
   const pct = (at: number) => ((at - scale.t0) / scale.span) * 100;
   const color = spanColor(span);
   const end = endOf(span, now);
