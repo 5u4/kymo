@@ -20,11 +20,13 @@ import {
   spanName,
   spansOf,
   traceOf,
+  viewAt,
   visibleRows,
   waitKind,
   zoomLimit,
   type Axis,
   type Span,
+  type View,
 } from "./trace-view.ts";
 import { useMountEffect } from "./use-mount-effect.ts";
 
@@ -139,8 +141,8 @@ export const Trace = ({
   const [expanded, setExpanded] = useState(() =>
     expandTo(root, defaultExpanded(root), initialSpan(root, detail.status)),
   );
-  const [zoom, setZoom] = useState(1);
-  const [view, setView] = useState({ from: 0, to: 1 });
+  const [view, setView] = useState<View>({ zoom: 1, from: 0, to: 1 });
+  const { zoom } = view;
   const wrap = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const tree = useRef<HTMLDivElement>(null);
@@ -157,12 +159,13 @@ export const Trace = ({
 
   const syncView = () => {
     if (box.current === null || tree.current === null || label.current === null) return;
+    const scrollLeft = box.current.scrollLeft;
     const visible = box.current.clientWidth - label.current.offsetWidth;
     const width = tree.current.offsetWidth - label.current.offsetWidth;
-    const page = Math.floor(box.current.scrollLeft / Math.max(visible, 1));
-    const from = ((page - 1) * visible) / width;
-    const to = ((page + 2) * visible) / width;
-    setView((current) => (current.from === from && current.to === to ? current : { from, to }));
+    setView((current) => {
+      const next = viewAt(current.zoom, scrollLeft, visible, width);
+      return current.from === next.from && current.to === next.to ? current : next;
+    });
   };
 
   const rezoom = (
@@ -170,11 +173,14 @@ export const Trace = ({
     place: (width: number, visible: number) => number,
   ) => {
     if (box.current === null || tree.current === null || label.current === null) return;
-    flushSync(() => setZoom((zoom) => Math.min(zoomLimit, Math.max(1, next(zoom)))));
-    box.current.scrollLeft = place(
-      tree.current.offsetWidth - label.current.offsetWidth,
-      box.current.clientWidth - label.current.offsetWidth,
+    const visible = box.current.clientWidth - label.current.offsetWidth;
+    flushSync(() =>
+      setView((current) => {
+        const zoom = Math.min(zoomLimit, Math.max(1, next(current.zoom)));
+        return viewAt(zoom, place(visible * zoom, visible), visible, visible * zoom);
+      }),
     );
+    box.current.scrollLeft = place(tree.current.offsetWidth - label.current.offsetWidth, visible);
     syncView();
   };
 

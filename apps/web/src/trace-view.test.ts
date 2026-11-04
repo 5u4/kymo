@@ -16,7 +16,9 @@ import {
   moveSpan,
   stopNote,
   traceOf,
+  viewAt,
   visibleRows,
+  zoomLimit,
   type Span,
 } from "./trace-view.ts";
 
@@ -433,6 +435,37 @@ describe("axis", () => {
       "700ms",
       "750ms",
     ]);
+  });
+});
+
+describe("viewAt", () => {
+  it("renders from the page before the scrolled one through the page after it", () => {
+    assert.deepStrictEqual(viewAt(10, 2500, 800, 8000), { zoom: 10, from: 0.2, to: 0.5 });
+  });
+
+  it("reads the scroll position the browser clamps to", () => {
+    assert.deepStrictEqual(viewAt(10, -300, 800, 8000), { zoom: 10, from: -0.1, to: 0.2 });
+    assert.deepStrictEqual(viewAt(10, 9000, 800, 8000), { zoom: 10, from: 0.8, to: 1.1 });
+  });
+
+  it("keeps a 1ms span fitted in a minute-long trace to a few pages of ticks", () => {
+    const quick = "2026-11-03T10:00:20.000Z";
+    const root = traceOf(
+      detail({
+        updatedAt: "2026-11-03T10:01:00Z",
+        activities: [run("Quick", 1, succeeded, quick, "2026-11-03T10:00:20.001Z")],
+      }),
+      none,
+    );
+    const now = ms("2026-11-03T10:01:00Z");
+    const visible = 800;
+    const width = visible * zoomLimit;
+    const { span } = axis(root, now, 1);
+    const scrollLeft = ((ms(quick) - root.start) / span) * width - 0.2 * visible;
+    const { ticks } = axis(root, now, zoomLimit, viewAt(zoomLimit, scrollLeft, visible, width));
+    assert.isAtMost(ticks.length, 20);
+    assert.isAtMost(ticks[0]?.at ?? Infinity, ms(quick));
+    assert.isAtLeast(ticks.at(-1)?.at ?? -Infinity, ms(quick));
   });
 });
 

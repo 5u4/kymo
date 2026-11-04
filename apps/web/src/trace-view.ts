@@ -409,6 +409,18 @@ export const axis = (
   return { t0, span, ticks };
 };
 
+export interface View {
+  readonly zoom: number;
+  readonly from: number;
+  readonly to: number;
+}
+
+export const viewAt = (zoom: number, scrollLeft: number, visible: number, width: number): View => {
+  const left = Math.min(Math.max(scrollLeft, 0), Math.max(width - visible, 0));
+  const page = Math.floor(left / Math.max(visible, 1));
+  return { zoom, from: ((page - 1) * visible) / width, to: ((page + 2) * visible) / width };
+};
+
 export const duration = (ms: number): string => {
   const rounded = Math.max(0, Math.round(ms));
   if (rounded < 1000) return `${rounded}ms`;
