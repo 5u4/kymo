@@ -212,7 +212,12 @@ export const Trace = ({
       zoomAround((zoom) => zoom * Math.exp(-event.deltaY * 0.01), Math.max(0, offset));
     };
     element.addEventListener("wheel", onWheel, { passive: false });
-    return () => element.removeEventListener("wheel", onWheel);
+    const resized = new ResizeObserver(syncView);
+    resized.observe(element);
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      resized.disconnect();
+    };
   });
 
   const select = (key: string) => {
