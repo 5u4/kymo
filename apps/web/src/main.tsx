@@ -8,7 +8,8 @@ import "./styles.css";
 
 const router = createRouter({
   routeTree,
-  parseSearch: (search) => Object.fromEntries(new URLSearchParams(search)),
+  parseSearch: (search) =>
+    Object.fromEntries([...new URLSearchParams(search)].filter(([, value]) => value !== "")),
   stringifySearch: stringifySearchWith(String),
 });
 
