@@ -65,7 +65,7 @@ export const spanStatus = (span: Span): Option.Option<StatusName> => {
     case "Attempt":
       return Option.some(statusName(span.run.status));
     case "Wait":
-      return Option.none();
+      return Option.some("suspended");
     case "Child":
       return Option.map(span.summary, (summary) => statusName(summary.status));
   }

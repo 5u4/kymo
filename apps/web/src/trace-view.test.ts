@@ -16,6 +16,7 @@ import {
   fitZoom,
   initialSpan,
   moveSpan,
+  spanStatus,
   stopNote,
   traceOf,
   viewAt,
@@ -247,6 +248,35 @@ const retries = detail({
     run("B", 2, failed, "2026-11-03T10:00:05Z", "2026-11-03T10:00:06Z"),
     run("C", 1, failed, "2026-11-03T10:00:07Z", "2026-11-03T10:00:08Z"),
   ],
+});
+
+describe("spanStatus", () => {
+  it("reads each attempt's own status apart from its activity's", () => {
+    const root = traceOf(retries, none);
+    const status = (key: string) => Option.flatMap(findSpan(root, key), spanStatus);
+    assert.deepStrictEqual(status("exec"), Option.some("failed"));
+    assert.deepStrictEqual(status("a/A"), Option.some("succeeded"));
+    assert.deepStrictEqual(status("a/A/1"), Option.some("failed"));
+  });
+
+  it("reports a wait as suspended", () => {
+    const root = traceOf(
+      detail({
+        status: { _tag: "Suspended", reason: { _tag: "Deferred", name: Option.some("approval") } },
+        waits: [{ kind: "Deferred", name: "approval", since: at("2026-11-03T10:01:00Z") }],
+      }),
+      none,
+    );
+    assert.deepStrictEqual(
+      spanStatus(child(root, "w/Deferred/approval")),
+      Option.some("suspended"),
+    );
+  });
+
+  it("has no status for a child missing from the journal", () => {
+    const root = traceOf(detail({ children: ["c9"] }), none);
+    assert.isTrue(Option.isNone(spanStatus(child(root, "c/c9"))));
+  });
 });
 
 describe("defaultExpanded", () => {

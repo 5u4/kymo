@@ -20,6 +20,7 @@ import {
   moveSpan,
   reachOf,
   spanName,
+  spanStatus,
   spansOf,
   traceOf,
   viewAt,
@@ -438,6 +439,7 @@ export const Trace = ({
                 const name = spanName(row.span);
                 const tag = typeTag(row.span);
                 const wake = future(row.span, nowMs);
+                const status = Option.getOrUndefined(spanStatus(row.span));
                 return (
                   <div
                     key={row.span.key}
@@ -476,6 +478,7 @@ export const Trace = ({
                         >
                           {name}
                         </span>
+                        {status === undefined ? null : <span className="sr-only">{status}</span>}
                         {tag === "" ? null : (
                           <span className="flex-none font-mono text-[10.5px]/4 whitespace-nowrap text-fg-4">
                             {tag}
