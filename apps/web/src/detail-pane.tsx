@@ -145,7 +145,11 @@ const ExecutionHeader = ({
   const startedMs = DateTime.toEpochMillis(detail.startedAt);
   const note = Option.getOrUndefined(stopNote(detail));
   return (
-    <div className="flex-none border-b border-line-soft px-6 pt-[18px] pb-4">
+    <section
+      tabIndex={0}
+      aria-label="Execution summary"
+      className="max-h-1/2 flex-none overflow-y-auto overscroll-contain border-b border-line-soft px-6 pt-[18px] pb-4 focus-visible:-outline-offset-2"
+    >
       <nav
         aria-label="Execution path"
         className="flex flex-wrap items-center gap-2 text-[12.5px]/[1.3] text-fg-3"
@@ -218,7 +222,7 @@ const ExecutionHeader = ({
           <StopNoteText note={note} detail={detail} byId={byId} now={now} rootFlag={rootFlag} />
         </Note>
       )}
-    </div>
+    </section>
   );
 };
 
