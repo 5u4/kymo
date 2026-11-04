@@ -36,7 +36,7 @@
     "./gh-cli/*": "./plugins/gh-cli/src/*.ts"
   },
   "scripts": {
-    "prepare": "lefthook install && effect-tsgo patch --typescript",
+    "prepare": "[ -e .git ] || exit 0; lefthook install && effect-tsgo patch --typescript",
     "typecheck": "effect-tsgo tsc --build --noEmit tsconfig.json",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",

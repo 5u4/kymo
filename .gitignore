@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 repos/
 dist/
+!apps/web/dist/
 *.tsbuildinfo
 .vitest/
 .tanstack/
