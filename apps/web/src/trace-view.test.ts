@@ -479,6 +479,23 @@ describe("stopNote", () => {
     );
   });
 
+  it("ignores an activity whose latest attempt succeeded", () => {
+    const note = stopNote(
+      detail({
+        status: { _tag: "Suspended", reason: { _tag: "Failure", cause: "boom" } },
+        activities: [
+          run("Capture", 1, failed, "2026-11-03T10:00:01Z", "2026-11-03T10:00:02Z"),
+          run("Capture", 2, succeeded, "2026-11-03T10:00:03Z", "2026-11-03T10:00:04Z"),
+          run("Notify", 1, succeeded, "2026-11-03T10:00:05Z", "2026-11-03T10:00:06Z"),
+        ],
+      }),
+    );
+    assert.deepStrictEqual(
+      note,
+      Option.some({ _tag: "Failure", cause: "boom", activity: Option.none() }),
+    );
+  });
+
   it("has no activity when a failure stopped the body outside one", () => {
     assert.deepStrictEqual(
       stopNote(

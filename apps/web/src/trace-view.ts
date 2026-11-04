@@ -114,7 +114,11 @@ export const stopNote = (detail: ExecutionDetail): Option.Option<StopNote> => {
             cause: reason.cause,
             activity: Option.fromUndefinedOr(
               detail.activities.findLast(
-                (run) => run.status._tag === "Failed" || run.status._tag === "Suspended",
+                (run) =>
+                  (run.status._tag === "Failed" || run.status._tag === "Suspended") &&
+                  !detail.activities.some(
+                    (later) => later.name === run.name && later.attempt > run.attempt,
+                  ),
               ),
             ),
           });
