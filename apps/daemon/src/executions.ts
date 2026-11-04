@@ -36,7 +36,7 @@ import {
   WorkflowNotFound,
 } from "kymo/api";
 import { Awaits } from "./awaits.ts";
-import { Registry } from "./workflow-sources.ts";
+import { Registry, type Registered } from "./workflow-sources.ts";
 
 const CauseReason = Schema.Union([
   Schema.TaggedStruct("Fail", { error: Schema.Json }),
@@ -145,6 +145,12 @@ const describe = (value: Schema.Json): string => {
   }
   return Object.keys(rest).length > 0 ? `${title} ${Schema.encodeSync(JsonText)(rest)}` : title;
 };
+
+// RegisteredWorkflow erases its schemas' services; the source's registration context holds them.
+const inSource =
+  ({ context }: Registered) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.updateContext(effect, (daemon: Context.Context<R>) => Context.merge(context, daemon));
 
 const failure = (cause: ReadonlyArray<CauseReason>) => {
   const reason =
@@ -379,9 +385,14 @@ export class Executions extends Context.Service<
         Effect.map(
           Option.match(registry.get(run.workflow), {
             onNone: () => Effect.succeedNone,
-            onSome: (workflow) =>
-              Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(run.payload).pipe(
-                Effect.flatMap((payload) => Effect.try(() => workflow.idempotencyKey(payload))),
+            onSome: (entry) =>
+              Schema.decodeEffect(Schema.toCodecJson(entry.workflow.payloadSchema))(
+                run.payload,
+              ).pipe(
+                Effect.flatMap((payload) =>
+                  Effect.try(() => entry.workflow.idempotencyKey(payload)),
+                ),
+                inSource(entry),
                 Effect.option,
               ),
           }),
@@ -460,7 +471,8 @@ export class Executions extends Context.Service<
         );
 
       const execute = Effect.fn("Executions.execute")(function* (request: ExecuteRequest) {
-        const workflow = yield* registered(request.workflow);
+        const registration = yield* registered(request.workflow);
+        const { workflow } = registration;
         const payload = yield* Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(
           request.payload,
         ).pipe(
@@ -471,6 +483,7 @@ export class Executions extends Context.Service<
                 issue: error.message.replace(/\n\s*/g, " "),
               }),
           ),
+          inSource(registration),
         );
         const executionId = yield* workflow.executionId(payload).pipe(
           Effect.catchDefect((defect) =>
@@ -481,6 +494,7 @@ export class Executions extends Context.Service<
               }),
             ),
           ),
+          inSource(registration),
         );
         const created = yield* semaphore.withPermit(
           Effect.gen(function* () {
@@ -501,7 +515,11 @@ export class Executions extends Context.Service<
                     `
               ).pipe(Effect.orDie);
             }
-            yield* Effect.orDie(engine.execute(workflow, { executionId, payload, discard: true }));
+            yield* Effect.orDie(
+              engine
+                .execute(workflow, { executionId, payload, discard: true })
+                .pipe(inSource(registration)),
+            );
             return created;
           }),
         );
@@ -543,7 +561,7 @@ export class Executions extends Context.Service<
       const control = (action: ExecutionAction): Control =>
         Effect.fn(`Executions.${action}`)(function* (id: string) {
           const entry = yield* resolve(id);
-          const workflow = yield* registered(entry.run.workflow);
+          const { workflow } = yield* registered(entry.run.workflow);
           if (!actionsFor(entry.status).includes(action)) {
             return yield* new ActionNotAllowed({ id: entry.run.id, action, status: entry.status });
           }
@@ -580,7 +598,7 @@ export const resumeWaiting: Layer.Layer<
       ({ run }) =>
         Option.match(registry.get(run.workflow), {
           onNone: () => Effect.void,
-          onSome: (workflow) =>
+          onSome: ({ workflow }) =>
             engine
               .resume(workflow, run.id)
               .pipe(

@@ -27,10 +27,22 @@ export const AwaitApproval = Workflow.make("AwaitApproval", {
   idempotencyKey: ({ id }) => id,
 });
 
+const Greet = Workflow.make("Greet", {
+  payload: { name: Prefixed },
+  idempotencyKey: ({ name }) => name,
+});
+
 export const observed = new Map<string, string>();
 
-export default AwaitApproval.toLayer(({ id }) =>
-  Effect.map(DurableDeferred.await(Approval), (value) => {
-    observed.set(id, value);
-  }),
+export default Layer.mergeAll(
+  AwaitApproval.toLayer(({ id }) =>
+    Effect.map(DurableDeferred.await(Approval), (value) => {
+      observed.set(id, value);
+    }),
+  ),
+  Greet.toLayer(({ name }) =>
+    Effect.sync(() => {
+      observed.set("greet", name);
+    }),
+  ),
 ).pipe(Layer.provide(Layer.succeed(Prefix, "svc:"))) satisfies Workflows;
