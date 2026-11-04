@@ -309,8 +309,11 @@ export const Trace = ({
       <div
         ref={box}
         onScroll={zoom === 1 ? undefined : syncView}
-        style={Option.match(height, { onNone: () => undefined, onSome: (px) => ({ height: px }) })}
-        className={`@container min-h-24 overflow-auto overscroll-contain bg-canvas ${Option.isSome(height) ? "flex-none" : "max-h-[56%] flex-[0_1_auto]"}`}
+        style={Option.match(height, {
+          onNone: () => undefined,
+          onSome: (px) => ({ flexBasis: px }),
+        })}
+        className={`@container min-h-24 flex-[0_1_auto] overflow-auto overscroll-contain bg-canvas ${Option.isSome(height) ? "" : "max-h-[56%]"}`}
       >
         <div
           ref={tree}
