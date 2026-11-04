@@ -315,185 +315,193 @@ export const Trace = ({
   return (
     <div ref={wrap} className="flex min-h-0 flex-1 flex-col">
       <div
-        ref={box}
-        onScroll={zoom === 1 ? undefined : syncView}
         style={Option.match(height, {
           onNone: () => undefined,
           onSome: (px) => ({ flexBasis: px }),
         })}
-        className={`@container min-h-24 flex-[0_1_auto] overflow-auto overscroll-contain bg-canvas ${Option.isSome(height) ? "" : "max-h-[56%]"}`}
+        className={`relative flex min-h-24 flex-[0_1_auto] flex-col ${Option.isSome(height) ? "" : "max-h-[56%]"}`}
       >
         <div
-          ref={tree}
-          role="tree"
-          tabIndex={0}
-          aria-label={`Trace of ${detail.id}`}
-          aria-activedescendant={active === -1 ? undefined : `${ids}-${active}`}
-          onKeyDown={onKeyDown}
-          onClick={(event) => {
-            if (!(event.target instanceof Element)) return;
-            const key = event.target.closest<HTMLElement>("[data-span]")?.dataset["span"];
-            if (key !== undefined) select(key);
-          }}
-          style={{ width: `calc(var(--treew) + (100cqw - var(--treew)) * ${zoom})` }}
-          className="relative min-w-[460px] outline-none [--treew:clamp(280px,40cqw,420px)]"
+          ref={box}
+          onScroll={zoom === 1 ? undefined : syncView}
+          className="peer @container min-h-0 flex-[1_1_auto] overflow-auto overscroll-contain bg-canvas"
         >
-          <div className="sticky top-0 z-3 grid h-7 grid-cols-[var(--treew)_minmax(0,1fr)] border-b border-line-soft bg-sunk font-mono text-[10.5px]/none text-fg-4">
-            <div
-              ref={label}
-              className="sticky left-0 z-1 flex items-center gap-2 border-r border-line-soft bg-sunk pr-2 pl-3.5 font-sans text-[11.5px]/none font-medium text-fg-3"
-            >
-              Trace
-              <span className="font-mono text-[10.5px] font-normal text-fg-4">
-                {spanCount} span{spanCount === 1 ? "" : "s"}
-              </span>
-              <fieldset
-                aria-label="Zoom"
-                className="ml-auto inline-flex items-center gap-px rounded-md p-px inset-ring inset-ring-line-soft"
+          <div
+            ref={tree}
+            role="tree"
+            tabIndex={0}
+            aria-label={`Trace of ${detail.id}`}
+            aria-activedescendant={active === -1 ? undefined : `${ids}-${active}`}
+            onKeyDown={onKeyDown}
+            onClick={(event) => {
+              if (!(event.target instanceof Element)) return;
+              const key = event.target.closest<HTMLElement>("[data-span]")?.dataset["span"];
+              if (key !== undefined) select(key);
+            }}
+            style={{ width: `calc(var(--treew) + (100cqw - var(--treew)) * ${zoom})` }}
+            className="relative min-w-[460px] outline-none [--treew:clamp(280px,40cqw,420px)]"
+          >
+            <div className="sticky top-0 z-3 grid h-7 grid-cols-[var(--treew)_minmax(0,1fr)] border-b border-line-soft bg-sunk font-mono text-[10.5px]/none text-fg-4">
+              <div
+                ref={label}
+                className="sticky left-0 z-1 flex items-center gap-2 border-r border-line-soft bg-sunk pr-2 pl-3.5 font-sans text-[11.5px]/none font-medium text-fg-3"
               >
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Zoom out"
-                  aria-keyshortcuts="-"
-                  disabled={zoom <= 1}
-                  onClick={() => zoomAround((current) => current / 2)}
-                  className={zoomButton}
+                Trace
+                <span className="font-mono text-[10.5px] font-normal text-fg-4">
+                  {spanCount} span{spanCount === 1 ? "" : "s"}
+                </span>
+                <fieldset
+                  aria-label="Zoom"
+                  className="ml-auto inline-flex items-center gap-px rounded-md p-px inset-ring inset-ring-line-soft"
                 >
-                  −
-                </button>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Fit trace"
-                  aria-keyshortcuts="0"
-                  title="Fit (0)"
-                  onClick={() => zoomAround(() => 1)}
-                  className={zoomButton}
-                >
-                  {zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom)}×
-                </button>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Zoom in"
-                  aria-keyshortcuts="+"
-                  disabled={zoom >= zoomLimit}
-                  onClick={() => zoomAround((current) => current * 2)}
-                  className={zoomButton}
-                >
-                  +
-                </button>
-              </fieldset>
-            </div>
-            <div aria-hidden="true" className="relative overflow-hidden">
-              {scale.ticks.map((tick) => {
-                const at = pct(tick.at);
-                const hidden = at > 100 - 8 / zoom || (open && Math.abs(at - nowAt) < 16 / zoom);
-                return (
-                  <span
-                    key={tick.at}
-                    style={{ left: `${at}%` }}
-                    className="absolute inset-y-0 border-l border-line-soft pt-[9px] pl-1 whitespace-nowrap"
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Zoom out"
+                    aria-keyshortcuts="-"
+                    disabled={zoom <= 1}
+                    onClick={() => zoomAround((current) => current / 2)}
+                    className={zoomButton}
                   >
-                    {hidden ? "" : tick.label}
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Fit trace"
+                    aria-keyshortcuts="0"
+                    title="Fit (0)"
+                    onClick={() => zoomAround(() => 1)}
+                    className={zoomButton}
+                  >
+                    {zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom)}×
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Zoom in"
+                    aria-keyshortcuts="+"
+                    disabled={zoom >= zoomLimit}
+                    onClick={() => zoomAround((current) => current * 2)}
+                    className={zoomButton}
+                  >
+                    +
+                  </button>
+                </fieldset>
+              </div>
+              <div aria-hidden="true" className="relative overflow-hidden">
+                {scale.ticks.map((tick) => {
+                  const at = pct(tick.at);
+                  const hidden = at > 100 - 8 / zoom || (open && Math.abs(at - nowAt) < 16 / zoom);
+                  return (
+                    <span
+                      key={tick.at}
+                      style={{ left: `${at}%` }}
+                      className="absolute inset-y-0 border-l border-line-soft pt-[9px] pl-1 whitespace-nowrap"
+                    >
+                      {hidden ? "" : tick.label}
+                    </span>
+                  );
+                })}
+                {open ? (
+                  <span
+                    style={{ left: `${nowAt}%` }}
+                    className={`absolute inset-y-0 border-dashed border-fg-3 pt-[9px] whitespace-nowrap text-fg-2 ${nowAt > 100 - 14 / zoom ? "-translate-x-full border-r pr-1" : "border-l pl-1"}`}
+                  >
+                    now
                   </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="relative pt-1 pb-2">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-0 left-(--treew)"
+              >
+                {scale.ticks.map((tick) => (
+                  <i
+                    key={tick.at}
+                    style={{ left: `${pct(tick.at)}%` }}
+                    className="absolute inset-y-0 border-l border-line-soft/50"
+                  />
+                ))}
+                {open ? (
+                  <i
+                    style={{ left: `${nowAt}%` }}
+                    className="absolute inset-y-0 border-l border-dashed border-fg-3/55"
+                  />
+                ) : null}
+              </div>
+              {rows.map((row, index) => {
+                const current = row.span.key === span.key;
+                const isOpen = expanded.has(row.span.key);
+                const name = spanName(row.span);
+                const tag = typeTag(row.span);
+                const wake = future(row.span, nowMs);
+                return (
+                  <div
+                    key={row.span.key}
+                    id={`${ids}-${index}`}
+                    data-span={row.span.key}
+                    role="treeitem"
+                    aria-level={row.depth + 1}
+                    aria-selected={current}
+                    aria-expanded={row.hasChildren ? isOpen : undefined}
+                    className={`group relative grid h-7 cursor-pointer grid-cols-[var(--treew)_minmax(0,1fr)] transition-colors duration-140 ease-g ${current ? "bg-sel" : "hover:bg-hover"}`}
+                  >
+                    <div
+                      style={{ paddingLeft: 8 + row.depth * 16 }}
+                      className={`sticky left-0 z-1 flex min-w-0 items-center gap-1.5 border-r border-line-soft pr-2.5 ${current ? "bg-sel shadow-[inset_2px_0_0_var(--color-fg)]" : "bg-canvas group-hover:bg-hover"}`}
+                    >
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={`${isOpen ? "Collapse" : "Expand"} ${name}`}
+                        aria-expanded={isOpen}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggle(row.span);
+                        }}
+                        className={`grid size-4 flex-none place-items-center rounded-sm text-fg-4 transition-colors duration-140 ease-g hover:bg-line hover:text-fg ${row.hasChildren ? "" : "invisible"}`}
+                      >
+                        <Glyph
+                          name="chevron"
+                          className={`size-3 transition-transform duration-220 ease-g ${isOpen ? "rotate-180" : "rotate-90"}`}
+                        />
+                      </button>
+                      <SpanIcon span={row.span} />
+                      <span className="flex h-4 min-w-0 flex-1 flex-wrap content-start items-center gap-x-1.5 overflow-hidden">
+                        <span
+                          className={`max-w-max min-w-0 flex-1 basis-20 truncate ${row.span._tag === "Attempt" ? "font-mono text-xs/4 text-fg-2" : `text-[12.5px]/4 ${row.span._tag === "Execution" ? "font-semibold" : "font-medium"}`}`}
+                        >
+                          {name}
+                        </span>
+                        {tag === "" ? null : (
+                          <span className="flex-none font-mono text-[10.5px]/4 whitespace-nowrap text-fg-4">
+                            {tag}
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex-none pl-1.5 font-mono text-[11px]/none whitespace-nowrap text-fg-3">
+                        {Option.match(wake, {
+                          onNone: () => duration(endOf(row.span, nowMs) - row.span.start),
+                          onSome: (wakeAt) => `in ${duration(wakeAt - nowMs)}`,
+                        })}
+                      </span>
+                    </div>
+                    <div className="relative overflow-hidden">
+                      <Bars span={row.span} scale={scale} now={nowMs} />
+                    </div>
+                  </div>
                 );
               })}
-              {open ? (
-                <span
-                  style={{ left: `${nowAt}%` }}
-                  className={`absolute inset-y-0 border-dashed border-fg-3 pt-[9px] whitespace-nowrap text-fg-2 ${nowAt > 100 - 14 / zoom ? "-translate-x-full border-r pr-1" : "border-l pl-1"}`}
-                >
-                  now
-                </span>
-              ) : null}
             </div>
-          </div>
-          <div className="relative pt-1 pb-2">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 left-(--treew)"
-            >
-              {scale.ticks.map((tick) => (
-                <i
-                  key={tick.at}
-                  style={{ left: `${pct(tick.at)}%` }}
-                  className="absolute inset-y-0 border-l border-line-soft/50"
-                />
-              ))}
-              {open ? (
-                <i
-                  style={{ left: `${nowAt}%` }}
-                  className="absolute inset-y-0 border-l border-dashed border-fg-3/55"
-                />
-              ) : null}
-            </div>
-            {rows.map((row, index) => {
-              const current = row.span.key === span.key;
-              const isOpen = expanded.has(row.span.key);
-              const name = spanName(row.span);
-              const tag = typeTag(row.span);
-              const wake = future(row.span, nowMs);
-              return (
-                <div
-                  key={row.span.key}
-                  id={`${ids}-${index}`}
-                  data-span={row.span.key}
-                  role="treeitem"
-                  aria-level={row.depth + 1}
-                  aria-selected={current}
-                  aria-expanded={row.hasChildren ? isOpen : undefined}
-                  className={`group relative grid h-7 cursor-pointer grid-cols-[var(--treew)_minmax(0,1fr)] transition-colors duration-140 ease-g ${current ? "bg-sel" : "hover:bg-hover"}`}
-                >
-                  <div
-                    style={{ paddingLeft: 8 + row.depth * 16 }}
-                    className={`sticky left-0 z-1 flex min-w-0 items-center gap-1.5 border-r border-line-soft pr-2.5 ${current ? "bg-sel shadow-[inset_2px_0_0_var(--color-fg)]" : "bg-canvas group-hover:bg-hover"}`}
-                  >
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label={`${isOpen ? "Collapse" : "Expand"} ${name}`}
-                      aria-expanded={isOpen}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggle(row.span);
-                      }}
-                      className={`grid size-4 flex-none place-items-center rounded-sm text-fg-4 transition-colors duration-140 ease-g hover:bg-line hover:text-fg ${row.hasChildren ? "" : "invisible"}`}
-                    >
-                      <Glyph
-                        name="chevron"
-                        className={`size-3 transition-transform duration-220 ease-g ${isOpen ? "rotate-180" : "rotate-90"}`}
-                      />
-                    </button>
-                    <SpanIcon span={row.span} />
-                    <span className="flex h-4 min-w-0 flex-1 flex-wrap content-start items-center gap-x-1.5 overflow-hidden">
-                      <span
-                        className={`max-w-max min-w-0 flex-1 basis-20 truncate ${row.span._tag === "Attempt" ? "font-mono text-xs/4 text-fg-2" : `text-[12.5px]/4 ${row.span._tag === "Execution" ? "font-semibold" : "font-medium"}`}`}
-                      >
-                        {name}
-                      </span>
-                      {tag === "" ? null : (
-                        <span className="flex-none font-mono text-[10.5px]/4 whitespace-nowrap text-fg-4">
-                          {tag}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex-none pl-1.5 font-mono text-[11px]/none whitespace-nowrap text-fg-3">
-                      {Option.match(wake, {
-                        onNone: () => duration(endOf(row.span, nowMs) - row.span.start),
-                        onSome: (wakeAt) => `in ${duration(wakeAt - nowMs)}`,
-                      })}
-                    </span>
-                  </div>
-                  <div className="relative overflow-hidden">
-                    <Bars span={row.span} scale={scale} now={nowMs} />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-5 rounded-md -outline-offset-2 outline-fg peer-has-focus-visible:outline-2"
+        />
       </div>
       {/* oxlint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions -- jsx-a11y treats every separator as static, but ARIA makes a focusable one a widget */}
       <hr
