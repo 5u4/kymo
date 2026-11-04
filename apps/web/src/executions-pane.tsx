@@ -307,9 +307,13 @@ export const ExecutionsPane = ({
           })}
         </fieldset>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+      <section
+        tabIndex={0}
+        aria-label="Execution list"
+        className="min-h-0 flex-1 overflow-auto overscroll-contain focus-visible:-outline-offset-2"
+      >
         <ListBody list={view.list} filter={filter} now={now} />
-      </div>
+      </section>
     </Pane>
   );
 };

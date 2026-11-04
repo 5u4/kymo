@@ -97,6 +97,12 @@
         "react/jsx-curly-brace-presence": "warn",
         "react/jsx-fragments": "warn",
         "react/jsx-pascal-case": "warn",
+        "jsx-a11y/no-noninteractive-tabindex": [
+          "error",
+          {
+            "tags": ["section"]
+          }
+        ],
         "better-tailwindcss/no-unknown-classes": "error",
         "better-tailwindcss/no-conflicting-classes": "error",
         "better-tailwindcss/no-duplicate-classes": "error",
