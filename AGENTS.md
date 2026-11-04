@@ -101,9 +101,11 @@ and delete the old path in the same change, with no compatibility shims.
   not as the daemon being down. The trace is derived from the detail and the list in
   `apps/web/src/trace-view.ts`; the selected span, expanded rows, zoom and split height stay in
   component state.
-- Every `kymo` command the UI shows goes through `kymoCommand` (`kymo/shell`), which the CLI uses
-  too. It adds `--root` unless `GET /api/health` reports `defaultRoot`, so a copied command acts on
-  the daemon's own root.
+- Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
+  (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
+  `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same
+  `HOME` acts on the daemon's root. The daemon-down screen has no root to read and shows plain
+  `kymo` and `kymo start`.
 - `bun run --cwd apps/web dev` proxies `/api` to `KYMO_DAEMON` (default `http://127.0.0.1:4419`),
   rewriting `Host` and dropping `Origin` only when it is the dev server's own origin, so the daemon
   accepts the UI's requests and still answers 403 to a page from another origin.
