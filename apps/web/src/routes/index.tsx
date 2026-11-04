@@ -67,7 +67,8 @@ const Executions = () => {
 
 export const Route = createFileRoute("/")({
   validateSearch: Schema.toStandardSchemaV1(Filter),
-  loader: () => Effect.runPromise(snapshot),
+  loaderDeps: ({ search }) => ({ exec: search.exec }),
+  loader: ({ deps }) => Effect.runPromise(snapshot(deps.exec)),
   staleTime: Number.POSITIVE_INFINITY,
   pendingComponent: Loading,
   component: Executions,

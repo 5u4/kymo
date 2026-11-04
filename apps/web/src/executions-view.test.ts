@@ -185,6 +185,17 @@ describe("refine", () => {
       status: "failed",
     });
   });
+
+  it("keeps the selected execution across filter changes and clears it on request", () => {
+    const selected = refine({ status: "failed" }, { exec: "a1b2" });
+    assert.deepStrictEqual(selected, { status: "failed", exec: "a1b2" });
+    assert.deepStrictEqual(refine(selected, { workflow: "Deploy" }), {
+      workflow: "Deploy",
+      status: "failed",
+      exec: "a1b2",
+    });
+    assert.deepStrictEqual(refine(selected, { exec: undefined }), { status: "failed" });
+  });
 });
 
 describe("suspendTag", () => {
@@ -212,6 +223,14 @@ describe("Filter", () => {
     assert.deepStrictEqual(Schema.decodeUnknownSync(Filter)({ status: "failed" }), {
       status: "failed",
     });
+  });
+
+  it("decodes the selected execution as a raw string", () => {
+    assert.deepStrictEqual(Schema.decodeUnknownSync(Filter)({ exec: "a1b2", q: "mug" }), {
+      exec: "a1b2",
+      q: "mug",
+    });
+    assert.deepStrictEqual(Schema.decodeUnknownSync(Filter)({}), {});
   });
 });
 

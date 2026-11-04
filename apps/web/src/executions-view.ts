@@ -13,6 +13,7 @@ export const Filter = Schema.Struct({
     ),
   ),
   q: Schema.optionalKey(Schema.String),
+  exec: Schema.optionalKey(Schema.String),
 });
 export type Filter = typeof Filter.Type;
 
@@ -22,6 +23,7 @@ export const refine = (
     readonly workflow?: string | undefined;
     readonly status?: StatusName | undefined;
     readonly q?: string | undefined;
+    readonly exec?: string | undefined;
   },
 ): Filter => {
   const next = { ...filter, ...patch };
@@ -29,6 +31,7 @@ export const refine = (
     ...(next.workflow ? { workflow: next.workflow } : {}),
     ...(next.status ? { status: next.status } : {}),
     ...(next.q ? { q: next.q } : {}),
+    ...(next.exec ? { exec: next.exec } : {}),
   };
 };
 
@@ -196,14 +199,27 @@ export const suspendTag = (status: ExecutionStatus): Option.Option<string> => {
   }
 };
 
-export const ago = (now: DateTime.Utc, at: DateTime.Utc): string => {
-  const seconds = Math.max(0, Math.floor(Duration.toSeconds(DateTime.distance(at, now))));
-  if (seconds < 60) return `${seconds}s ago`;
+export const coarse = (from: DateTime.Utc, to: DateTime.Utc): string => {
+  const seconds = Math.max(0, Math.floor(Duration.toSeconds(DateTime.distance(from, to))));
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
-  return `${Math.floor(hours / 24)}d ${hours % 24}h ago`;
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 };
+
+export const ago = (now: DateTime.Utc, at: DateTime.Utc): string => `${coarse(at, now)} ago`;
+
+export const title = (
+  execution: ExecutionSummary,
+): { readonly text: string; readonly labelled: boolean } =>
+  Option.match(execution.label, {
+    onNone: () => ({
+      text: Option.getOrElse(execution.idempotencyKey, () => execution.id),
+      labelled: false,
+    }),
+    onSome: (label) => ({ text: label, labelled: true }),
+  });
 
 export const shortId = (id: string): string => id.slice(0, 8);

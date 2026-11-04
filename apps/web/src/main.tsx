@@ -1,11 +1,6 @@
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
-import {
-  createRouter,
-  parseSearchWith,
-  RouterProvider,
-  stringifySearchWith,
-} from "@tanstack/react-router";
+import { createRouter, RouterProvider, stringifySearchWith } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { routeTree } from "./route-tree.gen.ts";
@@ -13,7 +8,7 @@ import "./styles.css";
 
 const router = createRouter({
   routeTree,
-  parseSearch: parseSearchWith((value) => value),
+  parseSearch: (search) => Object.fromEntries(new URLSearchParams(search)),
   stringifySearch: stringifySearchWith(String),
 });
 
