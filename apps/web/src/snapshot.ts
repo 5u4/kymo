@@ -20,14 +20,16 @@ export type Snapshot =
       readonly executions: ReadonlyArray<ExecutionSummary>;
       readonly detail: Option.Option<Detail>;
       readonly now: DateTime.Utc;
+      readonly rootFlag: string | undefined;
     }
   | { readonly _tag: "Down"; readonly message: string };
 
 export const snapshot = (exec: string | undefined): Effect.Effect<Snapshot> =>
   Effect.gen(function* () {
     const client = yield* HttpApiClient.make(Api);
-    const [{ workflows }, { executions }, detail] = yield* Effect.all(
+    const [health, { workflows }, { executions }, detail] = yield* Effect.all(
       [
+        client.health(),
         client.workflows.list(),
         client.executions.list({ query: {} }),
         exec === undefined
@@ -44,7 +46,14 @@ export const snapshot = (exec: string | undefined): Effect.Effect<Snapshot> =>
       ],
       { concurrency: "unbounded" },
     );
-    return { _tag: "Live" as const, workflows, executions, detail, now: yield* DateTime.now };
+    return {
+      _tag: "Live" as const,
+      workflows,
+      executions,
+      detail,
+      now: yield* DateTime.now,
+      rootFlag: health.defaultRoot ? undefined : health.root,
+    };
   }).pipe(
     Effect.catch((error) => Effect.succeed({ _tag: "Down" as const, message: error.message })),
     Effect.provide(FetchHttpClient.layer),

@@ -125,12 +125,14 @@ export const Trace = ({
   detail,
   summaries,
   now,
+  rootFlag,
   height,
   onResize,
 }: {
   detail: ExecutionDetail;
   summaries: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
   height: Option.Option<number>;
   onResize: (height: number) => void;
 }) => {
@@ -505,7 +507,14 @@ export const Trace = ({
         aria-label="Selected span"
         className="min-h-[140px] flex-[1_1_0] overflow-auto overscroll-contain bg-panel"
       >
-        <Inspector span={span} root={root} summaries={summaries} now={now} onSelect={select} />
+        <Inspector
+          span={span}
+          root={root}
+          summaries={summaries}
+          now={now}
+          rootFlag={rootFlag}
+          onSelect={select}
+        />
       </section>
     </div>
   );

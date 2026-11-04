@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { statusName } from "kymo/api";
+import { kymoCommand } from "kymo/shell";
 import { useRef, type ReactNode } from "react";
 import {
   ago,
@@ -153,11 +154,13 @@ const ListBody = ({
   filter,
   now,
   selected,
+  rootFlag,
 }: {
   list: ListState;
   filter: Filter;
   now: DateTime.Utc;
   selected: string | undefined;
+  rootFlag: string | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const command = "font-mono text-fg";
@@ -166,16 +169,18 @@ const ListBody = ({
       return (
         <Blank title="The journal is empty.">
           No workflow has been executed yet. Run{" "}
-          <code className={command}>kymo execute &lt;workflow&gt; &lt;payload&gt;</code> and the
-          execution appears here the moment the engine journals it.
+          <code className={command}>{kymoCommand(rootFlag, "execute <workflow> <payload>")}</code>{" "}
+          and the execution appears here the moment the engine journals it.
         </Blank>
       );
     case "Unexecuted":
       return (
         <Blank title={`${list.workflow} has never been executed.`}>
           Nothing in the journal for this workflow yet. Run{" "}
-          <code className={command}>kymo execute {list.workflow} &lt;payload&gt;</code> and the
-          first execution lands here.
+          <code className={command}>
+            {kymoCommand(rootFlag, `execute ${list.workflow} <payload>`)}
+          </code>{" "}
+          and the first execution lands here.
         </Blank>
       );
     case "NoMatch": {
@@ -239,11 +244,13 @@ export const ExecutionsPane = ({
   filter,
   now,
   selected,
+  rootFlag,
 }: {
   view: ExecutionsView;
   filter: Filter;
   now: DateTime.Utc;
   selected: string | undefined;
+  rootFlag: string | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   // Route.useSearch only updates after the async route load, which moves the caret to the end.
@@ -365,7 +372,13 @@ export const ExecutionsPane = ({
         aria-label="Execution list"
         className="min-h-0 flex-1 overflow-auto overscroll-contain focus-visible:-outline-offset-2"
       >
-        <ListBody list={view.list} filter={filter} now={now} selected={selected} />
+        <ListBody
+          list={view.list}
+          filter={filter}
+          now={now}
+          selected={selected}
+          rootFlag={rootFlag}
+        />
       </section>
     </Pane>
   );

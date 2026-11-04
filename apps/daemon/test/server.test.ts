@@ -1,5 +1,6 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { assert, describe, it } from "@effect/vitest";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -14,7 +15,11 @@ import * as Server from "../src/server.ts";
 const fixtures = `${import.meta.dirname}/fixtures`;
 const index = "<!doctype html><title>kymo</title>";
 
-const serving = (options: { readonly workflows: ReadonlyArray<string>; readonly web: boolean }) =>
+const serving = (options: {
+  readonly workflows: ReadonlyArray<string>;
+  readonly web: boolean;
+  readonly root?: string;
+}) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const dir = yield* fs.makeTempDirectoryScoped();
@@ -25,7 +30,7 @@ const serving = (options: { readonly workflows: ReadonlyArray<string>; readonly 
       yield* fs.writeFileString(`${web}/assets/app.js`, "export {};\n");
     }
     const context = yield* Layer.build(
-      Server.layer({ root: fixtures, web, port: 0 }).pipe(
+      Server.layer({ root: options.root ?? fixtures, web, port: 0 }).pipe(
         Layer.provide(
           Runtime.layer({ root: fixtures, workflows: options.workflows, db: `${dir}/kymo.db` }),
         ),
@@ -48,6 +53,28 @@ const services = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer);
 const html = { accept: "text/html,application/xhtml+xml" };
 
 describe("daemon http server", () => {
+  it.live("reports whether the daemon serves the default root of $HOME", () =>
+    Effect.gen(function* () {
+      const health = (root: string, env: Record<string, string>) =>
+        Effect.gen(function* () {
+          const get = yield* serving({ workflows: [], web: false, root });
+          return yield* (yield* get("/api/health")).json;
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))),
+        );
+      assert.deepInclude(yield* health("/home/op/.kymo", { HOME: "/home/op" }), {
+        root: "/home/op/.kymo",
+        defaultRoot: true,
+      });
+      assert.deepInclude(yield* health(fixtures, { HOME: "/home/op" }), {
+        root: fixtures,
+        defaultRoot: false,
+      });
+      assert.deepInclude(yield* health("/home/op/.kymo", {}), { defaultRoot: false });
+    }).pipe(Effect.provide(services)),
+  );
+
   it.live("lists every registered workflow sorted by name", () =>
     Effect.gen(function* () {
       const get = yield* serving({

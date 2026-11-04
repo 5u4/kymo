@@ -13,7 +13,7 @@ import * as Predicate from "effect/Predicate";
 import * as Runtime from "effect/Runtime";
 import { url } from "kymo/api";
 import * as Root from "kymo/root";
-import { completeCommand, shellArg } from "kymo/shell";
+import { completeCommand, kymoCommand, shellArg } from "kymo/shell";
 import {
   type Command,
   type Invocation,
@@ -237,10 +237,7 @@ Effect.gen(function* () {
   const invocation: Invocation = {
     root,
     input,
-    kymo: (command) =>
-      ["kymo", rootFlag === undefined ? "" : `--root ${shellArg(root.root)}`, command]
-        .filter((part) => part.length > 0)
-        .join(" "),
+    kymo: (command) => kymoCommand(rootFlag === undefined ? undefined : root.root, command),
   };
   return yield* run(command, invocation).pipe(
     Effect.map((output) => ({ output, code: 0 })),

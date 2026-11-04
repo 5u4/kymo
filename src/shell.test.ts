@@ -3,7 +3,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import { completeCommand, shellArg } from "kymo/shell";
+import { completeCommand, kymoCommand, shellArg } from "kymo/shell";
 
 const argv = (command: string) =>
   Effect.gen(function* () {
@@ -20,6 +20,21 @@ describe("shell", () => {
       for (const arg of ["Manager Approval", "-odd name", "it's", "$HOME", "a;b"]) {
         assert.deepStrictEqual(yield* argv(`kymo ${shellArg(arg)}`), [arg]);
       }
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("kymoCommand names --root only when a root is given, quoted for sh", () =>
+    Effect.gen(function* () {
+      assert.strictEqual(kymoCommand(undefined, "resume e1"), "kymo resume e1");
+      assert.strictEqual(kymoCommand(undefined, ""), "kymo");
+      assert.strictEqual(kymoCommand("/tmp/x", ""), "kymo --root /tmp/x");
+      assert.deepStrictEqual(yield* argv(kymoCommand("/tmp/my root", "resume e1")), [
+        "--root",
+        "/tmp/my root",
+        "resume",
+        "e1",
+      ]);
+      assert.strictEqual(kymoCommand("/tmp/x", "resume e1"), "kymo --root /tmp/x resume e1");
     }).pipe(Effect.provide(BunServices.layer)),
   );
 

@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
-import { completeCommand } from "kymo/shell";
+import { completeCommand, kymoCommand } from "kymo/shell";
 import { useState, type ReactNode } from "react";
 import { ago, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { StatusGlyph, StatusIcon } from "./glyphs.tsx";
@@ -58,11 +58,13 @@ const StopNoteText = ({
   detail,
   byId,
   now,
+  rootFlag,
 }: {
   note: StopNote;
   detail: ExecutionDetail;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
 }) => {
   switch (note._tag) {
     case "Failure": {
@@ -77,7 +79,8 @@ const StopNoteText = ({
             </>
           )}
           : <code className={`${code} wrap-anywhere`}>{note.cause}</code>. Fix the cause, then{" "}
-          <code className={code}>kymo resume {detail.id}</code> replays the body
+          <code className={code}>{kymoCommand(rootFlag, `resume ${detail.id}`)}</code> replays the
+          body
           {activity === undefined ? null : (
             <>
               {" "}
@@ -95,7 +98,8 @@ const StopNoteText = ({
       ) : (
         <>
           Parked on DurableDeferred <b className={strong}>{name}</b>.{" "}
-          <code className={code}>kymo {completeCommand(detail.id, name)}</code> continues it.
+          <code className={code}>{kymoCommand(rootFlag, completeCommand(detail.id, name))}</code>{" "}
+          continues it.
         </>
       );
     }
@@ -125,10 +129,12 @@ const ExecutionHeader = ({
   detail,
   byId,
   now,
+  rootFlag,
 }: {
   detail: ExecutionDetail;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
 }) => {
   const status = statusName(detail.status);
   const heading = title(detail);
@@ -209,7 +215,7 @@ const ExecutionHeader = ({
       </dl>
       {note === undefined ? null : (
         <Note>
-          <StopNoteText note={note} detail={detail} byId={byId} now={now} />
+          <StopNoteText note={note} detail={detail} byId={byId} now={now} rootFlag={rootFlag} />
         </Note>
       )}
     </div>
@@ -255,10 +261,12 @@ export const DetailPane = ({
   detail,
   executions,
   now,
+  rootFlag,
 }: {
   detail: Option.Option<Detail>;
   executions: ReadonlyArray<ExecutionSummary>;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const [height, setHeight] = useState<Option.Option<number>>(Option.none());
@@ -286,7 +294,7 @@ export const DetailPane = ({
             >
               kymo draws what the engine journals. Run{" "}
               <code className="font-mono text-[12.5px] text-fg">
-                kymo execute &lt;workflow&gt; &lt;payload&gt;
+                {kymoCommand(rootFlag, "execute <workflow> <payload>")}
               </code>{" "}
               and its activities, waits and children trace across this pane.
             </Void>
@@ -337,12 +345,13 @@ export const DetailPane = ({
           aria-label={`Execution ${selected.detail.id}`}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <ExecutionHeader detail={selected.detail} byId={byId} now={now} />
+          <ExecutionHeader detail={selected.detail} byId={byId} now={now} rootFlag={rootFlag} />
           <Trace
             key={selected.detail.id}
             detail={selected.detail}
             summaries={byId}
             now={now}
+            rootFlag={rootFlag}
             height={height}
             onResize={(next) => setHeight(Option.some(next))}
           />

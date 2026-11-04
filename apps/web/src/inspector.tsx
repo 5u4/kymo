@@ -3,7 +3,7 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
-import { completeCommand } from "kymo/shell";
+import { completeCommand, kymoCommand } from "kymo/shell";
 import { useState, type ReactNode } from "react";
 import { ago, coarse, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
@@ -300,10 +300,12 @@ const WaitInspector = ({
   span,
   detail,
   now,
+  rootFlag,
 }: {
   span: WaitSpan;
   detail: ExecutionDetail;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
 }) => {
   const { wait } = span;
   const wakeAt = Option.getOrUndefined(Option.map(span.wakeAt, DateTime.makeUnsafe));
@@ -329,7 +331,7 @@ const WaitInspector = ({
         <Note>
           The execution waits until something completes this deferred. From the CLI:{" "}
           <code className="font-mono text-[11.5px] text-fg">
-            kymo {completeCommand(detail.id, wait.name)}
+            {kymoCommand(rootFlag, completeCommand(detail.id, wait.name))}
           </code>
         </Note>
       ) : (
@@ -400,12 +402,14 @@ export const Inspector = ({
   root,
   summaries,
   now,
+  rootFlag,
   onSelect,
 }: {
   span: Span;
   root: ExecutionSpan;
   summaries: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
+  rootFlag: string | undefined;
   onSelect: (key: string) => void;
 }) => {
   const header = (
@@ -442,7 +446,7 @@ export const Inspector = ({
             <ActivityInspector span={span} activity={activity} now={now} onSelect={onSelect} />
           )
         ) : span._tag === "Wait" ? (
-          <WaitInspector span={span} detail={root.detail} now={now} />
+          <WaitInspector span={span} detail={root.detail} now={now} rootFlag={rootFlag} />
         ) : (
           <ChildInspector span={span} now={now} />
         )}

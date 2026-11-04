@@ -67,8 +67,14 @@ const Executions = () => {
               detail._tag === "Loaded" ? Option.some(detail.detail.id) : Option.none(),
             ),
           )}
+          rootFlag={loaded.rootFlag}
         />
-        <DetailPane detail={loaded.detail} executions={loaded.executions} now={loaded.now} />
+        <DetailPane
+          detail={loaded.detail}
+          executions={loaded.executions}
+          now={loaded.now}
+          rootFlag={loaded.rootFlag}
+        />
       </main>
     </>
   );
