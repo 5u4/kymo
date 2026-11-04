@@ -7,17 +7,3 @@ pre-commit:
     - name: oxlint
       glob: "*.{ts,tsx,js,jsx}"
       run: bunx oxlint --no-error-on-unmatched-pattern {staged_files}
-    - name: web-dist
-      glob: "apps/web/**"
-      exclude:
-        - "apps/web/dist/**"
-      # lefthook hides unstaged hunks of staged files but stages oxfmt's fixes only after every job.
-      run: |
-        staged=$(git diff --cached --name-only)
-        unstaged=$(git diff --name-only -- apps/web ':(exclude)apps/web/dist' | grep -vxF "$staged")
-        untracked=$(git ls-files --others --exclude-standard -- apps/web ':(exclude)apps/web/dist')
-        if [ -n "$unstaged$untracked" ]; then
-          echo "web-dist builds the working tree: stage or stash the remaining apps/web changes"
-          exit 1
-        fi
-        bun run build:web && git add apps/web/dist
