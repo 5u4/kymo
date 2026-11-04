@@ -93,7 +93,8 @@ and delete the old path in the same change, with no compatibility shims.
   render or use an event handler; `useMountEffect` in `apps/web/src/use-mount-effect.ts` is the only
   escape.
 - The URL holds navigable UI state, through TanStack Router search params. `apps/web/src/main.tsx`
-  parses every search value as a string, so `?q=123` and `?exec=1` stay strings.
+  parses every search value as a string and drops empty ones, so `?q=123` and `?exec=1` stay
+  strings and `?exec=` selects nothing.
 - The `/` route loads `GET /api/health`, `GET /api/workflows` and the whole unfiltered
   `GET /api/executions`, plus `GET /api/executions/:id` when `?exec=<id or prefix>` selects an
   execution, reloads them every 2 seconds, and filters during render in
