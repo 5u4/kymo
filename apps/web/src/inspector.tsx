@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
 import { completeCommand, kymoCommand } from "kymo/shell";
 import { useState, type ReactNode } from "react";
-import { ago, coarse, refine, shortId, suspendTag, title } from "./executions-view.ts";
+import { ago, coarse, refine, shortId, suspendTag } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
 import { statusColor } from "./status-color.ts";
 import {
@@ -355,14 +355,14 @@ const ChildInspector = ({ span, now }: { span: ChildSpan; now: DateTime.Utc }) =
   }
   const status = statusName(summary.status);
   const ended = isEnded(summary.status);
-  const heading = title(summary);
+  const label = Option.getOrUndefined(summary.label);
   const key = Option.getOrUndefined(summary.idempotencyKey);
   return (
     <>
       <Pairs>
         <Pair term="workflow">{summary.workflow}</Pair>
-        <Pair term={heading.labelled ? "label" : "idempotencyKey"}>{heading.text}</Pair>
-        {heading.labelled && key !== undefined ? <Pair term="idempotencyKey">{key}</Pair> : null}
+        {label === undefined ? null : <Pair term="label">{label}</Pair>}
+        <Pair term="idempotencyKey">{key ?? <span className={muted}>none</span>}</Pair>
         <Pair term="executionId">{summary.id}</Pair>
         <Pair term="status">
           <span className={statusColor[status]}>{status}</span>
