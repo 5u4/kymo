@@ -94,7 +94,8 @@ and delete the old path in the same change, with no compatibility shims.
 - The `/` route loads `GET /api/workflows` and the whole unfiltered `GET /api/executions`, reloads
   them every 2 seconds, and filters during render in `apps/web/src/executions-view.ts`.
 - `bun run --cwd apps/web dev` proxies `/api` to `KYMO_DAEMON` (default `http://127.0.0.1:4419`),
-  rewriting `Host` and dropping `Origin` so the daemon accepts the requests.
+  rewriting `Host` and dropping `Origin` only when it is the dev server's own origin, so the daemon
+  accepts the UI's requests and still answers 403 to a page from another origin.
 
 ## Effect
 
