@@ -1,4 +1,5 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
+import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient";
 import { decode } from "@toon-format/toon";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,6 +13,7 @@ import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import { Api, url } from "kymo/api";
 import * as ProcessIdentity from "kymo/process-identity";
@@ -253,6 +255,38 @@ describe.concurrent("kymo start, stop and home", () => {
         assert.notInclude(result.stdout, "an earlier run");
         assert.deepStrictEqual(yield* daemonPids(root), []);
       }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("start fails and says to delete kymo.db when it has an older kymo schema", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* tempRoot([`${repo}/examples/demo/src/index.ts`]);
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          CREATE TABLE kymo_migrations (
+            migration_id integer PRIMARY KEY NOT NULL,
+            created_at datetime NOT NULL DEFAULT current_timestamp,
+            name VARCHAR(255) NOT NULL
+          )
+        `;
+        yield* sql`INSERT INTO kymo_migrations (migration_id, name) VALUES (1, 'labels')`;
+        yield* sql`
+          CREATE TABLE kymo_labels (execution_id TEXT PRIMARY KEY, label TEXT NOT NULL)
+        `;
+      }).pipe(Effect.provide(SqliteClient.layer({ filename: root.db })));
+
+      const result = yield* kymo(root, "start");
+      assert.strictEqual(result.code, 1, result.stdout);
+      assert.include(result.stdout, `${root.db} does not match this kymo's schema; delete it`);
+      assert.deepStrictEqual(yield* daemonPids(root), []);
+
+      yield* Effect.forEach(["", "-wal", "-shm"], (suffix) =>
+        fs.remove(`${root.db}${suffix}`, { force: true }),
+      );
+      const restarted = yield* kymo(root, "start");
+      assert.strictEqual(restarted.code, 0, restarted.stdout);
+    }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
   it.live("start fails when two sources register the same workflow", () =>

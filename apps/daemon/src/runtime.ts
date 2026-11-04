@@ -23,7 +23,9 @@ export const layer = (options: {
         Layer.provide(SingleRunner.layer({ runnerStorage: "memory" })),
         Layer.provide(WorkflowLogs.logger),
         Layer.provideMerge(
-          Migrations.layer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: options.db }))),
+          Migrations.layer(options.db).pipe(
+            Layer.provideMerge(SqliteClient.layer({ filename: options.db })),
+          ),
         ),
         Layer.provide(BunCrypto.layerDigest),
       ),
