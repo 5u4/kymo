@@ -1,7 +1,7 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 
 const RootLayout = () => (
-  <div className="flex min-h-dvh flex-col">
+  <div className="grid h-dvh grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
     <Outlet />
   </div>
 );

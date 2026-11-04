@@ -15,4 +15,15 @@ export default defineConfig({
     react(),
   ],
   publicDir: false,
+  server: {
+    proxy: {
+      "/api": {
+        target: process.env["KYMO_DAEMON"] ?? "http://127.0.0.1:4419",
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (request) => request.removeHeader("origin"));
+        },
+      },
+    },
+  },
 });

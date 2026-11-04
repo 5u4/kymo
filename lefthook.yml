@@ -7,3 +7,8 @@ pre-commit:
     - name: oxlint
       glob: "*.{ts,tsx,js,jsx}"
       run: bunx oxlint --no-error-on-unmatched-pattern {staged_files}
+    - name: web-dist
+      glob: "apps/web/**"
+      exclude:
+        - "apps/web/dist/**"
+      run: bun run build:web && git add apps/web/dist

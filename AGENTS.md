@@ -16,14 +16,23 @@ and delete the old path in the same change, with no compatibility shims.
   their runtime packages at literal versions, because a git install of kymo cannot resolve `catalog:`.
   The package's `bin.kymo` is `apps/cli/src/main.ts`. `apps/web` is the only workspace and depends
   on `"kymo": "workspace:*"`. Import shared modules as `kymo/<module>`, not by relative path into
-  `src/`.
+  `src/`. `prepare` installs the lefthook hooks and patches TypeScript only in a git checkout (where
+  `.git` is a directory or, in a worktree, a file); elsewhere, such as a `bun add -g` of kymo, it
+  does nothing.
+- The vite build of `apps/web` is committed in `apps/web/dist`, so a git install of kymo serves the
+  UI without building it. The lefthook `web-dist` pre-commit job runs `bun run build:web` and stages
+  `apps/web/dist` whenever a commit touches other files under `apps/web`. The daemon
+  (`apps/daemon/src/server.ts`) serves `apps/web/dist` at every path outside `/api`, falling back to
+  `index.html` for an extensionless path whose `Accept` includes `text/html`, and answers 404 to
+  an unknown path under `/api/`. When `apps/web/dist` is missing, the API still works and pages
+  answer 404.
 - The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   The daemon answers 403 to any request whose `Origin` header is present and is not the origin of
   `http://127.0.0.1:<port>` or `http://localhost:<port>` (the bound port, omitted when it is 80), so
   a page from another origin cannot start or change executions. It also answers 403 when the `Host`
   header is missing or is not the host of one of those URLs, so a page that rebinds its own domain
-  to 127.0.0.1 cannot read them either.
+  to 127.0.0.1 cannot read them either. Both rules cover the UI's static files too.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
   `Daemon` (bare `kymo`, `executions`, `execution`, `execute`, `complete`, `resume`, `interrupt`);
   add every new command as `Daemon`, which fails with the same "not running" error while no daemon
@@ -82,6 +91,10 @@ and delete the old path in the same change, with no compatibility shims.
   render or use an event handler; `useMountEffect` in `apps/web/src/use-mount-effect.ts` is the only
   escape.
 - The URL holds navigable UI state, through TanStack Router search params.
+- The `/` route loads `GET /api/workflows` and the whole unfiltered `GET /api/executions`, reloads
+  them every 2 seconds, and filters during render in `apps/web/src/executions-view.ts`.
+- `bun run --cwd apps/web dev` proxies `/api` to `KYMO_DAEMON` (default `http://127.0.0.1:4419`),
+  rewriting `Host` and dropping `Origin` so the daemon accepts the requests.
 
 ## Effect
 
