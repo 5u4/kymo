@@ -1,6 +1,8 @@
+import * as Option from "effect/Option";
 import type { StatusName } from "kymo/api";
 import type { ReactNode } from "react";
-import { statusColor } from "./status-color.ts";
+import { spanColor, statusColor } from "./status-color.ts";
+import { spanStatus, type Span } from "./trace-view.ts";
 
 const statusPaths: Record<StatusName, ReactNode> = {
   running: <circle cx="8" cy="8" r="3.6" fill="currentColor" />,
@@ -64,3 +66,68 @@ export const ParentIcon = () => (
     />
   </svg>
 );
+
+const spanPaths = {
+  deferred: (
+    <path
+      d="M8 2.6L13.4 8 8 13.4 2.6 8z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  ),
+  clock: (
+    <>
+      <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M8 5v3.3l2.1 1.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  child: (
+    <path
+      d="M4.5 3v6.5h7M9.2 7.2l2.3 2.3-2.3 2.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  chevron: (
+    <path
+      d="M4.5 10l3.5-3.5 3.5 3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+};
+
+export const Glyph = ({ name, className }: { name: keyof typeof spanPaths; className: string }) => (
+  <svg viewBox="0 0 16 16" aria-hidden="true" className={`block shrink-0 ${className}`}>
+    {spanPaths[name]}
+  </svg>
+);
+
+export const SpanIcon = ({ span }: { span: Span }) => {
+  const color = spanColor(span);
+  if (span._tag === "Wait") {
+    return (
+      <Glyph
+        name={span.wait.kind === "Clock" ? "clock" : "deferred"}
+        className={`size-3.5 ${color}`}
+      />
+    );
+  }
+  if (span._tag === "Child") return <Glyph name="child" className={`size-3.5 ${color}`} />;
+  const status = Option.getOrUndefined(spanStatus(span));
+  return status === undefined ? null : <StatusGlyph status={status} className="" />;
+};

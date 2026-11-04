@@ -58,3 +58,9 @@ export const Skeleton = ({ className }: { className: string }) => (
     className={`relative block overflow-hidden bg-raised after:absolute after:inset-0 after:animate-shimmer after:bg-linear-to-r after:from-transparent after:via-white/5 after:to-transparent ${className}`}
   />
 );
+
+export const Kbd = ({ children }: { children: ReactNode }) => (
+  <kbd className="inline-grid h-[18px] min-w-[18px] place-items-center rounded-[5px] bg-sunk px-[5px] font-mono text-[10.5px]/none font-medium text-fg-3 shadow-[0_1px_0_var(--color-line-soft)] inset-ring inset-ring-line">
+    {children}
+  </kbd>
+);

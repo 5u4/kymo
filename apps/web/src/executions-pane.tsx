@@ -1,4 +1,4 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { statusName } from "kymo/api";
@@ -10,6 +10,7 @@ import {
   shortId,
   statuses,
   suspendTag,
+  title,
   type ExecutionsView,
   type Filter,
   type ListState,
@@ -17,7 +18,7 @@ import {
 } from "./executions-view.ts";
 import { ParentIcon, StatusGlyph, StatusIcon } from "./glyphs.tsx";
 import { statusColor } from "./status-color.ts";
-import { Button, Pane, Skeleton } from "./ui.tsx";
+import { Button, Kbd, Pane, Skeleton } from "./ui.tsx";
 import { useMountEffect } from "./use-mount-effect.ts";
 
 const railLeft = (level: number) => 14 + 7.5 + level * 26;
@@ -59,60 +60,74 @@ const Rails = ({ row }: { row: Row }) => {
   );
 };
 
-const ExecutionRow = ({ row, now }: { row: Row; now: DateTime.Utc }) => {
+const ExecutionRow = ({
+  row,
+  now,
+  selected,
+}: {
+  row: Row;
+  now: DateTime.Utc;
+  selected: boolean;
+}) => {
   const { execution } = row;
-  const label = Option.getOrUndefined(execution.label);
-  const fallback = Option.getOrElse(execution.idempotencyKey, () => execution.id);
+  const heading = title(execution);
   const tag = Option.getOrUndefined(suspendTag(execution.status));
   const parent = Option.getOrUndefined(row.parent);
   const status = statusName(execution.status);
   const at = lastEntry(execution);
   return (
-    <li
-      style={{ paddingLeft: 14 + row.depth * 26 }}
-      className="relative grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-[3px] border-b border-line-soft pt-2.5 pr-3.5 pb-[11px]"
-    >
-      <Rails row={row} />
-      <StatusGlyph status={status} className="row-span-2" />
-      <span
-        className={`min-w-0 truncate ${label === undefined ? "font-mono text-[12.5px]/[1.3] text-fg-2" : "text-[13px]/[1.3] font-medium"}`}
+    <li>
+      <Link
+        to="/"
+        search={(prev) => refine(prev, { exec: execution.id })}
+        replace
+        data-execution={execution.id}
+        aria-current={selected ? "page" : undefined}
+        style={{ paddingLeft: 14 + row.depth * 26 }}
+        className={`relative grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-[3px] border-b border-line-soft pt-2.5 pr-3.5 pb-[11px] transition-colors duration-140 ease-g focus-visible:rounded-none focus-visible:-outline-offset-2 ${selected ? "bg-sel before:absolute before:inset-y-[9px] before:left-0 before:w-0.5 before:rounded-r-xs before:bg-fg" : "hover:bg-hover"}`}
       >
-        {label ?? fallback}
-      </span>
-      <time
-        dateTime={DateTime.formatIso(at)}
-        title="last journal entry"
-        className="font-mono text-[11px]/none whitespace-nowrap text-fg-3"
-      >
-        {ago(now, at)}
-      </time>
-      <span className="col-span-2 flex min-w-0 items-center gap-2 text-xs/[1.2] text-fg-2">
-        <span className="sr-only">{status}</span>
-        <span className="flex-none">{execution.workflow}</span>
-        <span className="flex-none font-mono text-[11px]/[1.2] text-fg-4">
-          {shortId(execution.id)}
+        <Rails row={row} />
+        <StatusGlyph status={status} className="row-span-2" />
+        <span
+          className={`min-w-0 truncate ${heading.labelled ? "text-[13px]/[1.3] font-medium" : "font-mono text-[12.5px]/[1.3] text-fg-2"}`}
+        >
+          {heading.text}
         </span>
-        {tag === undefined ? null : (
-          <span className="inline-flex h-[17px] flex-none items-center rounded-[5px] bg-sus/12 px-1.5 font-mono text-[10.5px]/none font-medium text-sus">
-            {tag}
+        <time
+          dateTime={DateTime.formatIso(at)}
+          title="last journal entry"
+          className="font-mono text-[11px]/none whitespace-nowrap text-fg-3"
+        >
+          {ago(now, at)}
+        </time>
+        <span className="col-span-2 flex min-w-0 items-center gap-2 text-xs/[1.2] text-fg-2">
+          <span className="sr-only">{status}</span>
+          <span className="flex-none">{execution.workflow}</span>
+          <span className="flex-none font-mono text-[11px]/[1.2] text-fg-4">
+            {shortId(execution.id)}
           </span>
-        )}
-        {parent === undefined ? null : (
-          <span
-            title={`child of ${parent.id}`}
-            className="inline-flex min-w-0 items-center gap-1 truncate font-mono text-[11px]/[1.2] text-fg-3"
-          >
-            <ParentIcon />
-            <span className="sr-only">child of</span>
-            {parent.workflow} {shortId(parent.id)}
-          </span>
-        )}
-        {row.depth > 0 ? (
-          <span className="sr-only">
-            child of {shortId(Option.getOrElse(execution.parentId, () => ""))}
-          </span>
-        ) : null}
-      </span>
+          {tag === undefined ? null : (
+            <span className="inline-flex h-[17px] flex-none items-center rounded-[5px] bg-sus/12 px-1.5 font-mono text-[10.5px]/none font-medium text-sus">
+              {tag}
+            </span>
+          )}
+          {parent === undefined ? null : (
+            <span
+              title={`child of ${parent.id}`}
+              className="inline-flex min-w-0 items-center gap-1 truncate font-mono text-[11px]/[1.2] text-fg-3"
+            >
+              <ParentIcon />
+              <span className="sr-only">child of</span>
+              {parent.workflow} {shortId(parent.id)}
+            </span>
+          )}
+          {row.depth > 0 ? (
+            <span className="sr-only">
+              child of {shortId(Option.getOrElse(execution.parentId, () => ""))}
+            </span>
+          ) : null}
+        </span>
+      </Link>
     </li>
   );
 };
@@ -137,10 +152,12 @@ const ListBody = ({
   list,
   filter,
   now,
+  selected,
 }: {
   list: ListState;
   filter: Filter;
   now: DateTime.Utc;
+  selected: string | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const command = "font-mono text-fg";
@@ -169,7 +186,11 @@ const ListBody = ({
           title={`No ${what === "" ? "" : `${what} `}executions${q === "" ? "" : ` match “${q}”`}.`}
           actions={
             <>
-              <Button onClick={() => void navigate({ search: {} })}>Clear filters</Button>
+              <Button
+                onClick={() => void navigate({ search: (prev) => refine({}, { exec: prev.exec }) })}
+              >
+                Clear filters
+              </Button>
               {filter.status === undefined ? null : (
                 <Button
                   onClick={() =>
@@ -192,7 +213,12 @@ const ListBody = ({
       return (
         <ul aria-label="Executions">
           {list.rows.map((row) => (
-            <ExecutionRow key={row.execution.id} row={row} now={now} />
+            <ExecutionRow
+              key={row.execution.id}
+              row={row}
+              now={now}
+              selected={row.execution.id === selected}
+            />
           ))}
         </ul>
       );
@@ -212,19 +238,21 @@ export const ExecutionsPane = ({
   view,
   filter,
   now,
+  selected,
 }: {
   view: ExecutionsView;
   filter: Filter;
   now: DateTime.Utc;
+  selected: string | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   // Route.useSearch only updates after the async route load, which moves the caret to the end.
   const q = useRouterState({ select: (state) => state.location.search.q });
   const search = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLElement>(null);
   useMountEffect(() => {
-    const focusSearch = (event: KeyboardEvent) => {
+    const onKey = (event: KeyboardEvent) => {
       if (
-        event.key !== "/" ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
@@ -233,11 +261,38 @@ export const ExecutionsPane = ({
       ) {
         return;
       }
+      if (event.key === "/") {
+        event.preventDefault();
+        search.current?.focus();
+        return;
+      }
+      if (event.key === "Escape") {
+        void navigate({ search: (prev) => refine(prev, { exec: undefined }), replace: true });
+        return;
+      }
+      if (
+        (event.key !== "j" && event.key !== "k") ||
+        (event.target instanceof Element && event.target.closest('[role="tree"]') !== null)
+      ) {
+        return;
+      }
+      const rows = [
+        ...(list.current?.querySelectorAll<HTMLAnchorElement>("a[data-execution]") ?? []),
+      ];
+      const current = rows.findIndex((row) => row.getAttribute("aria-current") === "page");
+      const next =
+        rows[
+          current === -1
+            ? 0
+            : Math.min(rows.length - 1, Math.max(0, current + (event.key === "j" ? 1 : -1)))
+        ];
+      if (next === undefined) return;
       event.preventDefault();
-      search.current?.focus();
+      next.click();
+      next.scrollIntoView({ block: "nearest" });
     };
-    document.addEventListener("keydown", focusSearch);
-    return () => document.removeEventListener("keydown", focusSearch);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   });
   const chips = [
     { status: undefined, label: "all", count: view.scopeTotal },
@@ -273,12 +328,9 @@ export const ExecutionsPane = ({
             }
             className="h-[30px] w-full rounded-[7px] bg-sunk pr-[34px] pl-[11px] font-mono text-[12.5px]/none inset-ring inset-ring-line-soft transition-shadow duration-140 ease-g placeholder:text-fg-4 focus-visible:ring-3 focus-visible:ring-fg/8 focus-visible:inset-ring-fg-3 focus-visible:outline-none"
           />
-          <kbd
-            aria-hidden="true"
-            className="pointer-events-none absolute right-[7px] inline-grid h-[18px] min-w-[18px] place-items-center rounded-[5px] bg-sunk px-[5px] font-mono text-[10.5px]/none font-medium text-fg-3 shadow-[0_1px_0_var(--color-line-soft)] inset-ring inset-ring-line"
-          >
-            /
-          </kbd>
+          <span aria-hidden="true" className="pointer-events-none absolute right-[7px] inline-flex">
+            <Kbd>/</Kbd>
+          </span>
         </div>
         <fieldset className="flex flex-wrap gap-1">
           <legend className="sr-only">Filter by status</legend>
@@ -308,11 +360,12 @@ export const ExecutionsPane = ({
         </fieldset>
       </div>
       <section
+        ref={list}
         tabIndex={0}
         aria-label="Execution list"
         className="min-h-0 flex-1 overflow-auto overscroll-contain focus-visible:-outline-offset-2"
       >
-        <ListBody list={view.list} filter={filter} now={now} />
+        <ListBody list={view.list} filter={filter} now={now} selected={selected} />
       </section>
     </Pane>
   );
