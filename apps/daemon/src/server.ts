@@ -1,4 +1,5 @@
 import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
@@ -7,7 +8,10 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as HttpStaticServer from "effect/http/HttpStaticServer";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import { Api, hostname } from "kymo/api";
+import * as Root from "kymo/root";
 import { Executions } from "./executions.ts";
 import { Registry } from "./workflow-sources.ts";
 
@@ -43,7 +47,14 @@ export const layer = (options: {
   readonly port: number;
 }) => {
   const health = HttpApiBuilder.group(Api, "daemon", (handlers) =>
-    handlers.handle("health", () => Effect.succeed({ pid: process.pid, root: options.root })),
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const home = yield* Config.option(Root.defaultRoot);
+      const defaultRoot = Option.exists(home, (dir) => path.resolve(dir) === options.root);
+      return handlers.handle("health", () =>
+        Effect.succeed({ pid: process.pid, root: options.root, defaultRoot }),
+      );
+    }),
   );
   const workflows = HttpApiBuilder.group(Api, "workflows", (handlers) =>
     Effect.map(Registry, (registry) =>

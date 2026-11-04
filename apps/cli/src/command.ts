@@ -33,9 +33,6 @@ export class NotRunning extends Schema.TaggedError<NotRunning>()("NotRunning", {
   }
 }
 
-export const shellArg = (arg: string) =>
-  /^[\w./:=@%+,-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`;
-
 export interface Invocation {
   readonly root: Root.KymoRoot;
   readonly kymo: (command: string) => string;

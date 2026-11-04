@@ -10,6 +10,7 @@ export const url = (port: number) => `http://${hostname}:${port}`;
 export const Health = Schema.Struct({
   pid: Schema.Int,
   root: Schema.String,
+  defaultRoot: Schema.Boolean,
 });
 export type Health = typeof Health.Type;
 

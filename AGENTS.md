@@ -92,9 +92,21 @@ and delete the old path in the same change, with no compatibility shims.
 - `useEffect`, `useLayoutEffect` and `useInsertionEffect` are banned by `bun run lint`. Derive during
   render or use an event handler; `useMountEffect` in `apps/web/src/use-mount-effect.ts` is the only
   escape.
-- The URL holds navigable UI state, through TanStack Router search params.
-- The `/` route loads `GET /api/workflows` and the whole unfiltered `GET /api/executions`, reloads
-  them every 2 seconds, and filters during render in `apps/web/src/executions-view.ts`.
+- The URL holds navigable UI state, through TanStack Router search params. `apps/web/src/main.tsx`
+  parses every search value as a string and drops empty ones, so `?q=123` and `?exec=1` stay
+  strings and `?exec=` selects nothing.
+- The `/` route loads `GET /api/health`, `GET /api/workflows` and the whole unfiltered
+  `GET /api/executions`, plus `GET /api/executions/:id` when `?exec=<id or prefix>` selects an
+  execution, reloads them every 2 seconds, and filters during render in
+  `apps/web/src/executions-view.ts`. A 404 or 409 from the detail request shows in the detail pane,
+  not as the daemon being down. The trace is derived from the detail and the list in
+  `apps/web/src/trace-view.ts`; the selected span, expanded rows, zoom and split height stay in
+  component state.
+- Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
+  (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
+  `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same
+  `HOME` acts on the daemon's root. The daemon-down screen has no root to read and shows plain
+  `kymo` and `kymo start`.
 - `bun run --cwd apps/web dev` proxies `/api` to `KYMO_DAEMON` (default `http://127.0.0.1:4419`),
   rewriting `Host` and dropping `Origin` only when it is the dev server's own origin, so the daemon
   accepts the UI's requests and still answers 403 to a page from another origin.

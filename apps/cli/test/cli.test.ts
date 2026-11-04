@@ -118,7 +118,11 @@ describe.concurrent("kymo start, stop and home", () => {
         const first = yield* kymo(root, "start");
         assert.strictEqual(first.code, 0, first.stdout);
         const file = yield* daemonFile(root);
-        assert.deepStrictEqual(yield* health(file.port), { pid: file.pid, root: root.root });
+        assert.deepStrictEqual(yield* health(file.port), {
+          pid: file.pid,
+          root: root.root,
+          defaultRoot: false,
+        });
         assert.deepStrictEqual(daemonIn(first.output), { status: "started", pid: file.pid });
 
         const second = yield* kymo(root, "start");
