@@ -75,19 +75,25 @@ const readConfig = (root: Root.KymoRoot) =>
     );
   });
 
-const sameOrigin = HttpRouter.middleware(
+const localOnly = HttpRouter.middleware(
   Effect.gen(function* () {
     const { address } = yield* HttpServer.HttpServer;
     if (address._tag === "UnixPathAddress") {
       return yield* Effect.die(`the daemon is listening on the unix socket ${address.path}`);
     }
-    const allowed = new Set(
-      ["127.0.0.1", "localhost"].map((host) => new URL(`http://${host}:${address.port}`).origin),
+    const local = ["127.0.0.1", "localhost"].map(
+      (host) => new URL(`http://${host}:${address.port}`),
     );
+    const origins = new Set(local.map((url) => url.origin));
+    const hosts = new Set(local.map((url) => url.host));
     return (httpEffect) =>
       Effect.gen(function* () {
-        const origin = (yield* HttpServerRequest.HttpServerRequest).headers["origin"];
-        return origin === undefined || allowed.has(origin)
+        const { headers } = yield* HttpServerRequest.HttpServerRequest;
+        const host = headers["host"];
+        const origin = headers["origin"];
+        return host !== undefined &&
+          hosts.has(host) &&
+          (origin === undefined || origins.has(origin))
           ? yield* httpEffect
           : HttpServerResponse.empty({ status: 403 });
       });
@@ -117,7 +123,7 @@ const daemon = (
     ),
   );
   const served = HttpRouter.serve(
-    Layer.merge(HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])), sameOrigin),
+    Layer.merge(HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])), localOnly),
     { disableLogger: true },
   ).pipe(
     Layer.provideMerge(

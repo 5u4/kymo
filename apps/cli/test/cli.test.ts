@@ -979,6 +979,40 @@ describe.concurrent("kymo complete, resume and interrupt", () => {
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
+  it.live("rejects a foreign Host before any handler runs and accepts the daemon's own", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${repo}/examples/demo/src/index.ts`]);
+      const { port } = yield* daemonFile(root);
+      const client = yield* HttpClient.HttpClient;
+      const withHost = (request: HttpClientRequest.HttpClientRequest, host: string) =>
+        client.execute(request.pipe(HttpClientRequest.setHeader("host", host)));
+
+      for (const host of [
+        `attacker.example:${port}`,
+        "attacker.example",
+        `127.0.0.1:${port + 1}`,
+      ]) {
+        const listed = yield* withHost(HttpClientRequest.get(`${url(port)}/api/executions`), host);
+        assert.strictEqual(listed.status, 403, host);
+      }
+      for (const host of [`127.0.0.1:${port}`, `localhost:${port}`]) {
+        const listed = yield* withHost(HttpClientRequest.get(`${url(port)}/api/executions`), host);
+        assert.strictEqual(listed.status, 200, host);
+      }
+
+      const { id } = yield* refund(root, "ord_00014");
+      const interrupted = yield* withHost(
+        HttpClientRequest.post(`${url(port)}/api/executions/${id}/interrupt`),
+        `attacker.example:${port}`,
+      );
+      assert.strictEqual(interrupted.status, 403);
+      assert.strictEqual(
+        (yield* statusOf(root, id)).execution.status,
+        "suspended (deferred ManagerApproval)",
+      );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
   it.live("resume runs a failure-suspended execution again", () =>
     Effect.gen(function* () {
       const root = yield* running([`${fixtures}/statuses.ts`]);

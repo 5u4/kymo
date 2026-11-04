@@ -21,7 +21,9 @@ and delete the old path in the same change, with no compatibility shims.
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   The daemon answers 403 to any request whose `Origin` header is present and is not the origin of
   `http://127.0.0.1:<port>` or `http://localhost:<port>` (the bound port, omitted when it is 80), so
-  a page from another origin cannot start or change executions.
+  a page from another origin cannot start or change executions. It also answers 403 when the `Host`
+  header is missing or is not the host of one of those URLs, so a page that rebinds its own domain
+  to 127.0.0.1 cannot read them either.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
   `Daemon` (bare `kymo`, `executions`, `execution`, `execute`, `complete`, `resume`, `interrupt`);
   add every new command as `Daemon`, which fails with the same "not running" error while no daemon
