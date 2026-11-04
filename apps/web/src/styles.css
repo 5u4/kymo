@@ -11,8 +11,8 @@
   --color-line-strong: oklch(0.36 0.008 75);
   --color-fg: oklch(0.945 0.012 85);
   --color-fg-2: oklch(0.8 0.01 80);
-  --color-fg-3: oklch(0.645 0.01 80);
-  --color-fg-4: oklch(0.47 0.008 80);
+  --color-fg-3: oklch(0.72 0.01 80);
+  --color-fg-4: oklch(0.62 0.008 80);
   --color-run: oklch(0.8 0.115 215);
   --color-sus: oklch(0.84 0.135 82);
   --color-ok: oklch(0.8 0.13 152);
