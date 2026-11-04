@@ -143,7 +143,7 @@ const activitySpans = (activities: ReadonlyArray<ActivityRun>): ReadonlyArray<Ac
     const [first] = attempts;
     const last = attempts.at(-1);
     if (first === undefined || last === undefined) return [];
-    const key = `a/${name}`;
+    const key = `a/${encodeURIComponent(name)}`;
     return [
       {
         _tag: "Activity",

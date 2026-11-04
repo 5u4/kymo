@@ -12,6 +12,7 @@ import type {
 import {
   axis,
   defaultExpanded,
+  findSpan,
   initialSpan,
   moveSpan,
   stopNote,
@@ -123,6 +124,28 @@ describe("traceOf", () => {
     assert.deepStrictEqual(first?.end, Option.some(ms("2026-11-03T10:00:02Z")));
 
     assert.deepStrictEqual(child(root, "a/Load").children, []);
+  });
+
+  it("keeps an activity named like another's attempt apart from that attempt", () => {
+    const root = traceOf(
+      detail({
+        activities: [
+          run("Capture", 1, failed, "2026-11-03T10:00:01Z", "2026-11-03T10:00:02Z"),
+          run("Capture", 2, succeeded, "2026-11-03T10:00:03Z", "2026-11-03T10:00:04Z"),
+          run("Capture/1", 1, succeeded, "2026-11-03T10:00:05Z", "2026-11-03T10:00:06Z"),
+        ],
+      }),
+      none,
+    );
+    const all = (span: Span): ReadonlyArray<string> => [span.key, ...span.children.flatMap(all)];
+    const spanKeys = all(root);
+    assert.strictEqual(new Set(spanKeys).size, spanKeys.length, spanKeys.join(" "));
+    const named = root.children.find(
+      (span) => span._tag === "Activity" && span.name === "Capture/1",
+    );
+    assert.isDefined(named);
+    assert.strictEqual(Option.getOrUndefined(findSpan(root, named?.key ?? "")), named);
+    assert.deepStrictEqual(keys(child(root, "a/Capture").children), ["a/Capture/1", "a/Capture/2"]);
   });
 
   it("leaves running executions, activities and attempts open", () => {
