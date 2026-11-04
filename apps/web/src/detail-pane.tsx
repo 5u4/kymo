@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
+import { completeCommand } from "kymo/shell";
 import { useState, type ReactNode } from "react";
 import { ago, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { StatusGlyph, StatusIcon } from "./glyphs.tsx";
@@ -94,10 +95,7 @@ const StopNoteText = ({
       ) : (
         <>
           Parked on DurableDeferred <b className={strong}>{name}</b>.{" "}
-          <code className={code}>
-            kymo complete {detail.id} {name} &lt;json&gt;
-          </code>{" "}
-          continues it.
+          <code className={code}>kymo {completeCommand(detail.id, name)}</code> continues it.
         </>
       );
     }

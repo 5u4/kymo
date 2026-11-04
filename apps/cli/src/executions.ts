@@ -14,7 +14,8 @@ import {
   statusName,
   url,
 } from "kymo/api";
-import { type Command, type Invocation, type Output, shellArg, UsageError } from "./command.ts";
+import { completeCommand, shellArg } from "kymo/shell";
+import { type Command, type Invocation, type Output, UsageError } from "./command.ts";
 import type { Running } from "./daemon-state.ts";
 
 const defaultLimit = 20;
@@ -109,9 +110,6 @@ export const statusText = (status: ExecutionStatus | ActivityStatus): string => 
       });
   }
 };
-
-export const completeCommand = (id: string, deferred: string) =>
-  `complete ${deferred.startsWith("-") ? "-- " : ""}${id} ${shellArg(deferred)} <json>`;
 
 const actionHelp: Record<ExecutionAction, string> = {
   resume: "to run it again",

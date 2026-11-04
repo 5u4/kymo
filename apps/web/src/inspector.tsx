@@ -3,6 +3,7 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
+import { completeCommand } from "kymo/shell";
 import { useState, type ReactNode } from "react";
 import { ago, coarse, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
@@ -328,7 +329,7 @@ const WaitInspector = ({
         <Note>
           The execution waits until something completes this deferred. From the CLI:{" "}
           <code className="font-mono text-[11.5px] text-fg">
-            kymo complete {detail.id} {wait.name} &lt;json&gt;
+            kymo {completeCommand(detail.id, wait.name)}
           </code>
         </Note>
       ) : (

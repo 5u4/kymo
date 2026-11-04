@@ -13,19 +13,18 @@ import * as Predicate from "effect/Predicate";
 import * as Runtime from "effect/Runtime";
 import { url } from "kymo/api";
 import * as Root from "kymo/root";
+import { completeCommand, shellArg } from "kymo/shell";
 import {
   type Command,
   type Invocation,
   NotRunning,
   type Output,
   type Run,
-  shellArg,
   UsageError,
 } from "./command.ts";
 import { derive, type Running } from "./daemon-state.ts";
 import {
   complete,
-  completeCommand,
   execute,
   execution,
   executions,
