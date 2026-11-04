@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as DurableDeferred from "effect/workflow/DurableDeferred";
 import * as Scope from "effect/Scope";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
+import { expectedShape } from "./expected-shape.ts";
 
 export type Await =
   | {
@@ -17,6 +18,7 @@ export type Await =
       readonly workflowName: string;
       readonly name: string;
       readonly since: DateTime.Utc;
+      readonly expected: Option.Option<string>;
       readonly complete: (
         value: Schema.Json,
       ) => Effect.Effect<void, Schema.SchemaError, WorkflowEngine.WorkflowEngine>;
@@ -75,12 +77,13 @@ export class Awaits extends Context.Service<
                       _tag: "Deferred",
                       ...base,
                       name: deferred.name,
+                      expected: expectedShape(deferred.successSchema),
                       // deferredResult erases the schemas' services; the body context below holds them.
                       complete: (value) =>
                         (
-                          Schema.decodeEffect(Schema.toCodecJson(deferred.successSchema))(
-                            value,
-                          ).pipe(
+                          Schema.decodeEffect(Schema.toCodecJson(deferred.successSchema))(value, {
+                            errors: "all",
+                          }).pipe(
                             Effect.flatMap((value) =>
                               DurableDeferred.succeed(deferred, {
                                 token: DurableDeferred.tokenFromExecutionId(deferred, instance),

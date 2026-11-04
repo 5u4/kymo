@@ -209,7 +209,7 @@ export class WorkflowNotFound extends Schema.TaggedError<WorkflowNotFound>()(
 
 export class InvalidPayload extends Schema.TaggedError<InvalidPayload>()(
   "InvalidPayload",
-  { workflow: Schema.String, issue: Schema.String },
+  { workflow: Schema.String, issue: Schema.String, expected: Schema.optionalKey(Schema.String) },
   { httpApiStatus: 400 },
 ) {
   override get message() {
@@ -245,7 +245,12 @@ export class NotWaiting extends Schema.TaggedError<NotWaiting>()(
 
 export class InvalidValue extends Schema.TaggedError<InvalidValue>()(
   "InvalidValue",
-  { deferred: Schema.String, issue: Schema.String },
+  {
+    id: Schema.String,
+    deferred: Schema.String,
+    issue: Schema.String,
+    expected: Schema.optionalKey(Schema.String),
+  },
   { httpApiStatus: 400 },
 ) {
   override get message() {

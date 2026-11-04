@@ -686,7 +686,10 @@ describe.concurrent("kymo execute", () => {
       assert.strictEqual(refused.code, 1, refused.stdout);
       assert.deepStrictEqual(refused.output, {
         error: 'invalid payload for Double: Expected number at ["n"]',
-        help: [],
+        expected: '{ readonly "n": number }',
+        help: [
+          `Run \`kymo --root ${root.root} execute Double <payload>\` with a payload of the expected shape`,
+        ],
       });
 
       const malformed = yield* kymo(root, "execute", "Double", "{n:1}");
@@ -813,6 +816,7 @@ const Requested = Schema.Struct({
 
 const Failure = Schema.Struct({
   error: Schema.String,
+  expected: Schema.optionalKey(Schema.String),
   waiting: Schema.optional(Schema.Array(Schema.String)),
   help: Schema.Array(Schema.String),
 });
@@ -865,10 +869,14 @@ describe.concurrent("kymo complete, resume and interrupt", () => {
 
       const invalid = yield* kymo(root, "complete", id, "ManagerApproval", '{"approved":"yes"}');
       assert.strictEqual(invalid.code, 1, invalid.stdout);
-      assert.match(
-        Schema.decodeUnknownSync(Failure)(invalid.output).error,
-        /^invalid value for ManagerApproval: /,
-      );
+      assert.deepStrictEqual(Schema.decodeUnknownSync(Failure)(invalid.output), {
+        error:
+          'invalid value for ManagerApproval: Expected boolean at ["approved"] Missing key at ["approver"]',
+        expected: '{ readonly "approved": boolean, readonly "approver": string }',
+        help: [
+          `Run \`${kymoHint} complete ${id} ManagerApproval <json>\` with a value of the expected shape`,
+        ],
+      });
 
       const other = yield* kymo(root, "complete", id, "Other", "{}");
       assert.strictEqual(other.code, 1, other.stdout);

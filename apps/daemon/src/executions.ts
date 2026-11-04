@@ -36,6 +36,7 @@ import {
   WorkflowNotFound,
 } from "kymo/api";
 import { Awaits } from "./awaits.ts";
+import { expectedShape } from "./expected-shape.ts";
 import { Registry, type Registered } from "./workflow-sources.ts";
 
 const CauseReason = Schema.Union([
@@ -475,12 +476,17 @@ export class Executions extends Context.Service<
         const { workflow } = registration;
         const payload = yield* Schema.decodeEffect(Schema.toCodecJson(workflow.payloadSchema))(
           request.payload,
+          { errors: "all" },
         ).pipe(
           Effect.mapError(
             (error) =>
               new InvalidPayload({
                 workflow: workflow._tag,
                 issue: error.message.replace(/\n\s*/g, " "),
+                ...Option.match(expectedShape(workflow.payloadSchema), {
+                  onNone: () => ({}),
+                  onSome: (expected) => ({ expected }),
+                }),
               }),
           ),
           inSource(registration),
@@ -549,8 +555,13 @@ export class Executions extends Context.Service<
           Effect.mapError(
             (error) =>
               new InvalidValue({
+                id: entry.run.id,
                 deferred: wait.name,
                 issue: error.message.replace(/\n\s*/g, " "),
+                ...Option.match(wait.expected, {
+                  onNone: () => ({}),
+                  onSome: (expected) => ({ expected }),
+                }),
               }),
           ),
           Effect.provideService(WorkflowEngine.WorkflowEngine, engine),
