@@ -377,6 +377,14 @@ const offsetLabel = (offset: number, step: number): string => {
 
 export const endOf = (span: Span, now: number): number => Option.getOrElse(span.end, () => now);
 
+export const reachOf = (span: Span, now: number): number =>
+  span._tag === "Wait"
+    ? Math.max(
+        endOf(span, now),
+        Option.getOrElse(span.wakeAt, () => now),
+      )
+    : endOf(span, now);
+
 export interface Axis {
   readonly t0: number;
   readonly span: number;
@@ -390,11 +398,7 @@ export const axis = (
   window: { readonly from: number; readonly to: number } = { from: 0, to: 1 },
 ): Axis => {
   const t0 = root.start;
-  const t1 = Math.max(
-    ...spansOf(root).map((span) =>
-      Math.max(endOf(span, now), span._tag === "Wait" ? Option.getOrElse(span.wakeAt, () => 0) : 0),
-    ),
-  );
+  const t1 = Math.max(...spansOf(root).map((span) => reachOf(span, now)));
   const span = Math.max(t1 - t0, 1) * 1.04;
   const step = niceStep(span / zoom);
   const ticks: Array<{ at: number; label: string }> = [];
@@ -408,6 +412,9 @@ export const axis = (
   }
   return { t0, span, ticks };
 };
+
+export const fitZoom = (target: Span, scale: Axis, now: number): number =>
+  (0.6 * scale.span) / Math.max(reachOf(target, now) - target.start, scale.span / zoomLimit);
 
 export interface View {
   readonly zoom: number;

@@ -15,8 +15,10 @@ import {
   endOf,
   expandTo,
   findSpan,
+  fitZoom,
   initialSpan,
   moveSpan,
+  reachOf,
   spanName,
   spansOf,
   traceOf,
@@ -99,7 +101,7 @@ const Bars = ({ span, scale, now }: { span: Span; scale: Axis; now: number }) =>
             ]
           : [segment("bar", span.start, end, `${full} bg-current ${color}`)];
   const left = pct(span.start);
-  const right = pct(Option.getOrElse(wake, () => end));
+  const right = pct(reachOf(span, now));
   const text = Option.match(wake, {
     onNone: () => duration(end - span.start),
     onSome: (wakeAt) => `wakes in ${duration(wakeAt - now)}`,
@@ -196,8 +198,7 @@ export const Trace = ({
 
   const zoomToSpan = (target: Span) =>
     rezoom(
-      () =>
-        (0.6 * scale.span) / Math.max(endOf(target, nowMs) - target.start, scale.span / zoomLimit),
+      () => fitZoom(target, scale, nowMs),
       (width, visible) => ((target.start - scale.t0) / scale.span) * width - 0.2 * visible,
     );
 

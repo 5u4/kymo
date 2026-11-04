@@ -13,6 +13,7 @@ import {
   axis,
   defaultExpanded,
   findSpan,
+  fitZoom,
   initialSpan,
   moveSpan,
   stopNote,
@@ -458,6 +459,40 @@ describe("axis", () => {
       "700ms",
       "750ms",
     ]);
+  });
+});
+
+describe("fitZoom", () => {
+  it("fits a waiting clock through its wakeAt into the middle 60% of the viewport", () => {
+    const root = traceOf(
+      detail({
+        status: {
+          _tag: "Suspended",
+          reason: { _tag: "Clock", name: "quiet", wakeAt: at("2026-11-03T10:01:00Z") },
+        },
+        waits: [{ kind: "Clock", name: "quiet", since: at("2026-11-03T10:00:01Z") }],
+      }),
+      none,
+    );
+    const now = ms("2026-11-03T10:00:02Z");
+    const scale = axis(root, now, 1);
+    const wait = child(root, "w/Clock/quiet");
+    const zoom = fitZoom(wait, scale, now);
+    assert.closeTo(((ms("2026-11-03T10:01:00Z") - wait.start) / scale.span) * zoom, 0.6, 1e-9);
+  });
+
+  it("fits a finished activity from its start to its end", () => {
+    const root = traceOf(
+      detail({
+        updatedAt: "2026-11-03T10:01:00Z",
+        activities: [run("Charge", 1, succeeded, "2026-11-03T10:00:10Z", "2026-11-03T10:00:20Z")],
+      }),
+      none,
+    );
+    const now = ms("2026-11-03T10:05:00Z");
+    const scale = axis(root, now, 1);
+    const charge = child(root, "a/Charge");
+    assert.closeTo((10_000 / scale.span) * fitZoom(charge, scale, now), 0.6, 1e-9);
   });
 });
 
