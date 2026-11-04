@@ -1,24 +1,18 @@
-import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Cause from "effect/Cause";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
-import * as HttpServerRequest from "effect/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { Api, hostname } from "kymo/api";
 import * as Ownership from "kymo/ownership";
 import * as ProcessIdentity from "kymo/process-identity";
 import * as Root from "kymo/root";
-import { Executions } from "./executions.ts";
 import * as Runtime from "./runtime.ts";
+import * as Server from "./server.ts";
 
 class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
   args: Schema.Array(Schema.String),
@@ -75,61 +69,14 @@ const readConfig = (root: Root.KymoRoot) =>
     );
   });
 
-const localOnly = HttpRouter.middleware(
-  Effect.gen(function* () {
-    const { address } = yield* HttpServer.HttpServer;
-    if (address._tag === "UnixPathAddress") {
-      return yield* Effect.die(`the daemon is listening on the unix socket ${address.path}`);
-    }
-    const local = ["127.0.0.1", "localhost"].map(
-      (host) => new URL(`http://${host}:${address.port}`),
-    );
-    const origins = new Set(local.map((url) => url.origin));
-    const hosts = new Set(local.map((url) => url.host));
-    return (httpEffect) =>
-      Effect.gen(function* () {
-        const { headers } = yield* HttpServerRequest.HttpServerRequest;
-        const host = headers["host"];
-        const origin = headers["origin"];
-        return host !== undefined &&
-          hosts.has(host) &&
-          (origin === undefined || origins.has(origin))
-          ? yield* httpEffect
-          : HttpServerResponse.empty({ status: 403 });
-      });
-  }),
-  { global: true },
-);
-
 const daemon = (
   root: Root.KymoRoot,
   config: Root.RootConfig,
   self: ProcessIdentity.ProcessIdentity,
+  web: string,
 ) => {
   const engine = Runtime.layer({ root: root.root, workflows: config.workflows, db: root.db });
-  const health = HttpApiBuilder.group(Api, "daemon", (handlers) =>
-    handlers.handle("health", () => Effect.succeed({ pid: process.pid, root: root.root })),
-  );
-  const executions = HttpApiBuilder.group(Api, "executions", (handlers) =>
-    Effect.map(Executions, (service) =>
-      handlers
-        .handle("list", ({ query }) => service.list(query))
-        .handle("get", ({ params }) => service.get(params.id))
-        .handle("logs", ({ params, query }) => service.logs(params.id, query))
-        .handle("execute", ({ payload }) => service.execute(payload))
-        .handle("complete", ({ params, payload }) => service.complete(params.id, payload))
-        .handle("resume", ({ params }) => service.resume(params.id))
-        .handle("interrupt", ({ params }) => service.interrupt(params.id)),
-    ),
-  );
-  const served = HttpRouter.serve(
-    Layer.merge(HttpApiBuilder.layer(Api).pipe(Layer.provide([health, executions])), localOnly),
-    { disableLogger: true },
-  ).pipe(
-    Layer.provideMerge(
-      BunHttpServer.layer({ hostname, port: config.port, gracefulShutdownTimeout: "1 second" }),
-    ),
-  );
+  const served = Server.layer({ root: root.root, web, port: config.port });
   const published = Layer.effectDiscard(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -160,7 +107,9 @@ Effect.gen(function* () {
     Effect.orDie,
   );
   yield* Ownership.acquire(root, self);
-  return yield* Layer.launch(daemon(root, config, self));
+  return yield* Layer.launch(
+    daemon(root, config, self, path.join(import.meta.dirname, "../../web/dist")),
+  );
 }).pipe(
   Effect.scoped,
   Effect.provide(BunServices.layer),

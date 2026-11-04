@@ -164,6 +164,11 @@ export const ExecutionList = Schema.Struct({
 });
 export type ExecutionList = typeof ExecutionList.Type;
 
+export const WorkflowList = Schema.Struct({
+  workflows: Schema.Array(Schema.Struct({ name: Schema.String })),
+});
+export type WorkflowList = typeof WorkflowList.Type;
+
 export class ExecutionNotFound extends Schema.TaggedError<ExecutionNotFound>()(
   "ExecutionNotFound",
   { id: Schema.String },
@@ -262,6 +267,11 @@ export class Api extends HttpApi.make("kymo")
   .add(
     HttpApiGroup.make("daemon", { topLevel: true }).add(
       HttpApiEndpoint.get("health", "/api/health", { success: Health }),
+    ),
+  )
+  .add(
+    HttpApiGroup.make("workflows").add(
+      HttpApiEndpoint.get("list", "/api/workflows", { success: WorkflowList }),
     ),
   )
   .add(
