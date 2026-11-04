@@ -78,9 +78,10 @@ export class EffectVersionMismatch extends Schema.TaggedError<EffectVersionMisma
   }
 }
 
-type Registered = {
+export type Registered = {
   readonly workflow: RegisteredWorkflow;
   readonly source: string;
+  readonly context: Context.Context<never>;
   readonly register: Effect.Effect<void>;
 };
 
@@ -221,7 +222,7 @@ export type RegisteredWorkflow = Workflow.Workflow<
 export class Registry extends Context.Service<
   Registry,
   {
-    readonly get: (workflow: string) => Option.Option<RegisteredWorkflow>;
+    readonly get: (workflow: string) => Option.Option<Registered>;
     readonly names: ReadonlyArray<string>;
   }
 >()("@kymo/daemon/Registry") {}
@@ -287,6 +288,7 @@ export const layer = (options: {
                         registered.set(workflow._tag, {
                           workflow: workflow as unknown as RegisteredWorkflow,
                           source,
+                          context,
                           register: Effect.provideContext(registration, context),
                         });
                         return Effect.void;
@@ -311,8 +313,7 @@ export const layer = (options: {
       startedWhileLoading = undefined;
       yield* Effect.forEach(registered.values(), ({ register }) => register, { discard: true });
       return Registry.of({
-        get: (workflow) =>
-          Option.map(Option.fromUndefinedOr(registered.get(workflow)), (entry) => entry.workflow),
+        get: (workflow) => Option.fromUndefinedOr(registered.get(workflow)),
         names: [...registered.keys()].toSorted(),
       });
     }),

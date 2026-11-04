@@ -1,4 +1,5 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
+import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient";
 import { decode } from "@toon-format/toon";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,6 +13,7 @@ import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import { Api, url } from "kymo/api";
 import * as ProcessIdentity from "kymo/process-identity";
@@ -253,6 +255,38 @@ describe.concurrent("kymo start, stop and home", () => {
         assert.notInclude(result.stdout, "an earlier run");
         assert.deepStrictEqual(yield* daemonPids(root), []);
       }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("start fails and says to delete kymo.db when it has an older kymo schema", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* tempRoot([`${repo}/examples/demo/src/index.ts`]);
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          CREATE TABLE kymo_migrations (
+            migration_id integer PRIMARY KEY NOT NULL,
+            created_at datetime NOT NULL DEFAULT current_timestamp,
+            name VARCHAR(255) NOT NULL
+          )
+        `;
+        yield* sql`INSERT INTO kymo_migrations (migration_id, name) VALUES (1, 'labels')`;
+        yield* sql`
+          CREATE TABLE kymo_labels (execution_id TEXT PRIMARY KEY, label TEXT NOT NULL)
+        `;
+      }).pipe(Effect.provide(SqliteClient.layer({ filename: root.db })));
+
+      const result = yield* kymo(root, "start");
+      assert.strictEqual(result.code, 1, result.stdout);
+      assert.include(result.stdout, `${root.db} does not match this kymo's schema; delete it`);
+      assert.deepStrictEqual(yield* daemonPids(root), []);
+
+      yield* Effect.forEach(["", "-wal", "-shm"], (suffix) =>
+        fs.remove(`${root.db}${suffix}`, { force: true }),
+      );
+      const restarted = yield* kymo(root, "start");
+      assert.strictEqual(restarted.code, 0, restarted.stdout);
+    }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
   it.live("start fails when two sources register the same workflow", () =>
@@ -686,7 +720,10 @@ describe.concurrent("kymo execute", () => {
       assert.strictEqual(refused.code, 1, refused.stdout);
       assert.deepStrictEqual(refused.output, {
         error: 'invalid payload for Double: Expected number at ["n"]',
-        help: [],
+        expected: '{ readonly "n": number }',
+        help: [
+          `Run \`kymo --root ${root.root} execute Double <payload>\` with a payload of the expected shape`,
+        ],
       });
 
       const malformed = yield* kymo(root, "execute", "Double", "{n:1}");
@@ -813,6 +850,7 @@ const Requested = Schema.Struct({
 
 const Failure = Schema.Struct({
   error: Schema.String,
+  expected: Schema.optionalKey(Schema.String),
   waiting: Schema.optional(Schema.Array(Schema.String)),
   help: Schema.Array(Schema.String),
 });
@@ -865,10 +903,14 @@ describe.concurrent("kymo complete, resume and interrupt", () => {
 
       const invalid = yield* kymo(root, "complete", id, "ManagerApproval", '{"approved":"yes"}');
       assert.strictEqual(invalid.code, 1, invalid.stdout);
-      assert.match(
-        Schema.decodeUnknownSync(Failure)(invalid.output).error,
-        /^invalid value for ManagerApproval: /,
-      );
+      assert.deepStrictEqual(Schema.decodeUnknownSync(Failure)(invalid.output), {
+        error:
+          'invalid value for ManagerApproval: Expected boolean at ["approved"] Missing key at ["approver"]',
+        expected: '{ readonly "approved": boolean, readonly "approver": string }',
+        help: [
+          `Run \`${kymoHint} complete ${id} ManagerApproval <json>\` with a value of the expected shape`,
+        ],
+      });
 
       const other = yield* kymo(root, "complete", id, "Other", "{}");
       assert.strictEqual(other.code, 1, other.stdout);
@@ -976,6 +1018,40 @@ describe.concurrent("kymo complete, resume and interrupt", () => {
         );
         assert.strictEqual(ended.execution.status, "interrupted");
       }
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("rejects a foreign Host before any handler runs and accepts the daemon's own", () =>
+    Effect.gen(function* () {
+      const root = yield* running([`${repo}/examples/demo/src/index.ts`]);
+      const { port } = yield* daemonFile(root);
+      const client = yield* HttpClient.HttpClient;
+      const withHost = (request: HttpClientRequest.HttpClientRequest, host: string) =>
+        client.execute(request.pipe(HttpClientRequest.setHeader("host", host)));
+
+      for (const host of [
+        `attacker.example:${port}`,
+        "attacker.example",
+        `127.0.0.1:${port + 1}`,
+      ]) {
+        const listed = yield* withHost(HttpClientRequest.get(`${url(port)}/api/executions`), host);
+        assert.strictEqual(listed.status, 403, host);
+      }
+      for (const host of [`127.0.0.1:${port}`, `localhost:${port}`]) {
+        const listed = yield* withHost(HttpClientRequest.get(`${url(port)}/api/executions`), host);
+        assert.strictEqual(listed.status, 200, host);
+      }
+
+      const { id } = yield* refund(root, "ord_00014");
+      const interrupted = yield* withHost(
+        HttpClientRequest.post(`${url(port)}/api/executions/${id}/interrupt`),
+        `attacker.example:${port}`,
+      );
+      assert.strictEqual(interrupted.status, 403);
+      assert.strictEqual(
+        (yield* statusOf(root, id)).execution.status,
+        "suspended (deferred ManagerApproval)",
+      );
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 

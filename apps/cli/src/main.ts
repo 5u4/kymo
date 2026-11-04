@@ -291,8 +291,28 @@ Effect.gen(function* () {
               ],
           1,
         ),
-      InvalidPayload: (error) => failure({ error: error.message }, [], 1),
-      InvalidValue: (error) => failure({ error: error.message }, [], 1),
+      InvalidPayload: (error) =>
+        failure(
+          {
+            error: error.message,
+            ...(error.expected === undefined ? {} : { expected: error.expected }),
+          },
+          [
+            `Run \`${invocation.kymo(`execute ${error.workflow.startsWith("-") ? "-- " : ""}${shellArg(error.workflow)} <payload>`)}\` with a payload of the expected shape`,
+          ],
+          1,
+        ),
+      InvalidValue: (error) =>
+        failure(
+          {
+            error: error.message,
+            ...(error.expected === undefined ? {} : { expected: error.expected }),
+          },
+          [
+            `Run \`${invocation.kymo(completeCommand(error.id, error.deferred))}\` with a value of the expected shape`,
+          ],
+          1,
+        ),
       NotWaiting: (error) =>
         failure(
           { error: error.message, waiting: error.waiting },

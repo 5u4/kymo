@@ -21,7 +21,9 @@ and delete the old path in the same change, with no compatibility shims.
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   The daemon answers 403 to any request whose `Origin` header is present and is not the origin of
   `http://127.0.0.1:<port>` or `http://localhost:<port>` (the bound port, omitted when it is 80), so
-  a page from another origin cannot start or change executions.
+  a page from another origin cannot start or change executions. It also answers 403 when the `Host`
+  header is missing or is not the host of one of those URLs, so a page that rebinds its own domain
+  to 127.0.0.1 cannot read them either.
   `apps/cli/src/main.ts` registers each command as `Lifecycle` (`start`, `stop`, `restart`) or
   `Daemon` (bare `kymo`, `executions`, `execution`, `execute`, `complete`, `resume`, `interrupt`);
   add every new command as `Daemon`, which fails with the same "not running" error while no daemon
@@ -53,8 +55,12 @@ and delete the old path in the same change, with no compatibility shims.
   execution id to the label `kymo execute --label` gave it, and `kymo_logs` holds the log lines at
   `Info` or above written in a workflow's body and activities. `apps/daemon/src/migrations.ts`
   creates them through `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
-  engine starts. On startup the daemon resumes every suspended execution except one suspended by a
-  failure, because resuming that one runs its body again.
+  engine starts. The migrator skips every migration whose id is at or below the highest recorded id,
+  so the daemon also compares the `kymo_*` definitions in `kymo.db` with those the same migrations
+  create in an empty database. When they differ, startup fails with `SchemaOutdated`, which tells the
+  operator to delete `kymo.db` and its `-wal` and `-shm` files. On startup the daemon resumes
+  every suspended execution except one suspended by a failure, because resuming that one runs its
+  body again.
 - `apps/daemon/src/workflow-logs.ts` replaces the engine's loggers: a log from a fiber that has a
   `WorkflowInstance` goes only to `kymo_logs`; every other log goes to stdout, which the CLI appends
   to `daemon.log`. Each line records its body pass, because a replay runs the body again and repeats

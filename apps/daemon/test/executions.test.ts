@@ -486,6 +486,38 @@ describe("executions", () => {
   );
 
   it.live(
+    "execute, list and get decode a payload whose schema needs a service only the workflow source provides",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const { execution, created } = yield* executions.execute({
+          workflow: "Greet",
+          payload: { name: "bob" },
+        });
+        assert.isTrue(created);
+        assert.deepStrictEqual(execution.idempotencyKey, Option.some("svc:bob"));
+        yield* eventually(statusOf(execution.id), (status) => status._tag === "Succeeded");
+        assert.strictEqual(observed.get("greet"), "svc:bob");
+
+        const listed = yield* list({ workflow: "Greet" });
+        assert.deepStrictEqual(
+          listed.executions.map(({ idempotencyKey }) => idempotencyKey),
+          [Option.some("svc:bob")],
+        );
+        assert.deepStrictEqual(
+          (yield* executions.get(execution.id)).idempotencyKey,
+          Option.some("svc:bob"),
+        );
+      }).pipe(
+        Effect.provide(
+          Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./service-schema.ts"]))),
+        ),
+        Effect.scoped,
+      ),
+    60_000,
+  );
+
+  it.live(
     "stores body and activity logs per pass, numbering passes on across a restart",
     () =>
       Effect.gen(function* () {
