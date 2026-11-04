@@ -80,7 +80,9 @@ export const nest = (
   for (const execution of sorted) {
     const parentId = Option.getOrUndefined(execution.parentId);
     if (parentId !== undefined && shown.has(parentId)) {
-      children.set(parentId, [...(children.get(parentId) ?? []), execution]);
+      const siblings = children.get(parentId);
+      if (siblings === undefined) children.set(parentId, [execution]);
+      else siblings.push(execution);
     } else {
       roots.push(execution);
     }
