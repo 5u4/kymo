@@ -21,7 +21,9 @@ and delete the old path in the same change, with no compatibility shims.
   does nothing.
 - The vite build of `apps/web` is committed in `apps/web/dist`, so a git install of kymo serves the
   UI without building it. The lefthook `web-dist` pre-commit job runs `bun run build:web` and stages
-  `apps/web/dist` whenever a commit touches other files under `apps/web`. The daemon
+  `apps/web/dist` whenever a commit touches other files under `apps/web`. Because the build reads the
+  working tree, the job refuses the commit while a file under `apps/web` outside `apps/web/dist` is
+  untracked or has changes that are not staged at all. The daemon
   (`apps/daemon/src/server.ts`) serves `apps/web/dist` at every path outside `/api`, falling back to
   `index.html` for an extensionless path whose `Accept` includes `text/html`, and answers 404 to
   an unknown path under `/api/`. When `apps/web/dist` is missing, the API still works and pages
