@@ -148,11 +148,12 @@ export const Trace = ({
   );
   const [view, setView] = useState<View>({ zoom: 1, from: 0, to: 1 });
   const { zoom } = view;
-  const wrap = useRef<HTMLDivElement>(null);
+  const inspector = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const tree = useRef<HTMLDivElement>(null);
   const label = useRef<HTMLDivElement>(null);
   const drag = useRef({ y: 0, height: 0, max: 0 });
+  const [split, setSplit] = useState<{ readonly now: number; readonly max: number }>();
   const ids = useId();
   const span = Option.getOrElse(findSpan(root, selected), () => root);
   const rows = visibleRows(root, expanded);
@@ -203,6 +204,13 @@ export const Trace = ({
       (width, visible) => ((target.start - scale.t0) / scale.span) * width - 0.2 * visible,
     );
 
+  const measure = () => {
+    if (box.current === null || inspector.current === null) return undefined;
+    const now = box.current.getBoundingClientRect().height;
+    const room = now + inspector.current.getBoundingClientRect().height - minInspector;
+    return { now, max: Math.max(minTrace, room) };
+  };
+
   useMountEffect(() => {
     const element = box.current;
     if (element === null) return;
@@ -214,8 +222,12 @@ export const Trace = ({
       zoomAround((zoom) => zoom * Math.exp(-event.deltaY * 0.01), Math.max(0, offset));
     };
     element.addEventListener("wheel", onWheel, { passive: false });
-    const resized = new ResizeObserver(syncView);
+    const resized = new ResizeObserver(() => {
+      syncView();
+      setSplit(measure());
+    });
     resized.observe(element);
+    if (inspector.current !== null) resized.observe(inspector.current);
     return () => {
       element.removeEventListener("wheel", onWheel);
       resized.disconnect();
@@ -283,14 +295,11 @@ export const Trace = ({
     onResize(Math.round(Math.max(minTrace, Math.min(max, next))));
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (box.current === null || wrap.current === null) return;
+    const current = measure();
+    if (current === undefined) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = {
-      y: event.clientY,
-      height: box.current.getBoundingClientRect().height,
-      max: wrap.current.clientHeight - minInspector,
-    };
+    drag.current = { y: event.clientY, height: current.now, max: current.max };
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -299,14 +308,12 @@ export const Trace = ({
   };
 
   const onSeparatorKey = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (box.current === null || wrap.current === null) return;
+    const current = measure();
+    if (current === undefined) return;
     const step = event.key === "ArrowUp" ? -16 : event.key === "ArrowDown" ? 16 : 0;
     if (step === 0) return;
     event.preventDefault();
-    resizeTo(
-      box.current.getBoundingClientRect().height + step,
-      wrap.current.clientHeight - minInspector,
-    );
+    resizeTo(current.now + step, current.max);
   };
 
   const zoomButton =
@@ -314,7 +321,7 @@ export const Trace = ({
   const spanCount = spansOf(root).length;
 
   return (
-    <div ref={wrap} className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         style={Option.match(height, {
           onNone: () => undefined,
@@ -511,7 +518,8 @@ export const Trace = ({
         aria-orientation="horizontal"
         aria-label="Resize trace"
         aria-valuemin={minTrace}
-        aria-valuenow={Option.getOrUndefined(height)}
+        aria-valuemax={split === undefined ? undefined : Math.round(split.max)}
+        aria-valuenow={split === undefined ? undefined : Math.round(split.now)}
         tabIndex={0}
         title="Drag to resize"
         onPointerDown={onPointerDown}
@@ -521,6 +529,7 @@ export const Trace = ({
       />
       {/* oxlint-enable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions */}
       <section
+        ref={inspector}
         aria-label="Selected span"
         className="min-h-[140px] flex-[1_1_0] overflow-auto overscroll-contain bg-panel"
       >
