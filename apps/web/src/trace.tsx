@@ -6,7 +6,9 @@ import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "
 import { flushSync } from "react-dom";
 import { refine } from "./executions-view.ts";
 import { Glyph, SpanIcon } from "./glyphs.tsx";
-import { Inspector } from "./inspector.tsx";
+import { Inspector, type InspectorTab } from "./inspector.tsx";
+import { logMarks, type LevelFilter, type LogMark } from "./log-view.ts";
+import type { Logs } from "./snapshot.ts";
 import { spanColor, statusColor } from "./status-color.ts";
 import {
   axis,
@@ -60,7 +62,17 @@ const typeTag = (span: Span): string => {
 const future = (span: Span, now: number): Option.Option<number> =>
   span._tag === "Wait" ? Option.filter(span.wakeAt, (wakeAt) => wakeAt > now) : Option.none();
 
-const Bars = ({ span, scale, now }: { span: Span; scale: Axis; now: number }) => {
+const Bars = ({
+  span,
+  scale,
+  now,
+  marks,
+}: {
+  span: Span;
+  scale: Axis;
+  now: number;
+  marks: ReadonlyArray<LogMark>;
+}) => {
   if (!isDrawn(span)) return null;
   const pct = (at: number) => ((at - scale.t0) / scale.span) * 100;
   const color = spanColor(span);
@@ -112,6 +124,13 @@ const Bars = ({ span, scale, now }: { span: Span; scale: Axis; now: number }) =>
   return (
     <>
       {bars}
+      {marks.map((mark) => (
+        <i
+          key={mark.seq}
+          style={{ left: `${pct(mark.at)}%` }}
+          className={`pointer-events-none absolute top-0.5 ml-[-2.5px] size-[5px] rounded-full shadow-[0_0_0_1.5px_var(--color-canvas)] ${mark.level === "Warn" ? "bg-sus" : "bg-fail"}`}
+        />
+      ))}
       {right <= 80 ? (
         <span style={{ left: `calc(${right}% + 7px)` }} className={label}>
           {text}
@@ -127,6 +146,7 @@ const Bars = ({ span, scale, now }: { span: Span; scale: Axis; now: number }) =>
 
 export const Trace = ({
   detail,
+  logs,
   summaries,
   now,
   rootFlag,
@@ -134,6 +154,7 @@ export const Trace = ({
   onResize,
 }: {
   detail: ExecutionDetail;
+  logs: Logs;
   summaries: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
@@ -148,6 +169,8 @@ export const Trace = ({
     expandTo(root, defaultExpanded(root), initialSpan(root, detail.status)),
   );
   const [view, setView] = useState<View>({ zoom: 1, from: 0, to: 1 });
+  const [tab, setTab] = useState<InspectorTab>("Overview");
+  const [level, setLevel] = useState<LevelFilter>("all");
   const { zoom } = view;
   const inspector = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -501,7 +524,12 @@ export const Trace = ({
                       </span>
                     </div>
                     <div className="relative overflow-hidden">
-                      <Bars span={row.span} scale={scale} now={nowMs} />
+                      <Bars
+                        span={row.span}
+                        scale={scale}
+                        now={nowMs}
+                        marks={logMarks(row.span, logs.entries)}
+                      />
                     </div>
                   </div>
                 );
@@ -540,6 +568,11 @@ export const Trace = ({
           summaries={summaries}
           now={now}
           rootFlag={rootFlag}
+          logs={logs}
+          tab={tab}
+          level={level}
+          onTab={setTab}
+          onLevel={setLevel}
           onSelect={select}
         />
       </section>

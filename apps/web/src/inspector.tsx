@@ -2,11 +2,26 @@ import { Link } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
-import { completeCommand, kymoCommand } from "kymo/shell";
-import { useState, type ReactNode } from "react";
+import {
+  statusName,
+  type ExecutionDetail,
+  type ActivityRun,
+  type ExecutionSummary,
+  type LogLevel,
+} from "kymo/api";
+import { completeCommand, kymoCommand, shellArg } from "kymo/shell";
+import type { ReactNode } from "react";
 import { ago, coarse, refine, shortId, suspendTag } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
+import {
+  levelFilters,
+  logsView,
+  type LevelFilter,
+  type LogLine,
+  type LogOrigin,
+  type LogsView,
+} from "./log-view.ts";
+import type { Logs } from "./snapshot.ts";
 import { statusColor } from "./status-color.ts";
 import {
   duration,
@@ -159,53 +174,204 @@ const ExecutionOverview = ({
   );
 };
 
-const tabs = ["Overview", "Payload"] as const;
+const levelLabel: Record<LogLevel, string> = {
+  Trace: "TRACE",
+  Debug: "DEBUG",
+  Info: "INFO",
+  Warn: "WARN",
+  Error: "ERROR",
+  Fatal: "FATAL",
+};
 
-const ExecutionInspector = ({
-  detail,
-  summaries,
-  now,
-  header,
+const levelColor: Record<LogLevel, string> = {
+  Trace: "text-fg-4",
+  Debug: "text-fg-4",
+  Info: "text-fg-3",
+  Warn: "text-sus",
+  Error: "text-fail",
+  Fatal: "text-fail",
+};
+
+const filterLabel: Record<LevelFilter, string> = { all: "all", warn: "warn+", error: "error+" };
+
+const Source = ({ origin, onSelect }: { origin: LogOrigin; onSelect: (key: string) => void }) => {
+  if (origin._tag === "Body") return <span className="text-fg-4">body</span>;
+  const attempt = Option.getOrUndefined(origin.attempt);
+  const label = (
+    <>
+      {origin.name}
+      {attempt === undefined ? null : <span className="ml-1 text-fg-4">#{attempt}</span>}
+    </>
+  );
+  const key = Option.getOrUndefined(origin.key);
+  const name = attempt === undefined ? origin.name : `${origin.name}#${attempt}`;
+  return key === undefined ? (
+    <span title={name} className="truncate text-fg-2">
+      {label}
+    </span>
+  ) : (
+    <button
+      type="button"
+      title={name}
+      onClick={() => onSelect(key)}
+      className="max-w-full justify-self-start truncate text-left text-fg-2 underline decoration-line-strong underline-offset-3 transition-[text-decoration-color] duration-140 ease-g hover:decoration-fg"
+    >
+      {label}
+    </button>
+  );
+};
+
+const LogRow = ({
+  line,
+  columns,
+  showPass,
+  onSelect,
 }: {
-  detail: ExecutionDetail;
-  summaries: ReadonlyMap<string, ExecutionSummary>;
-  now: DateTime.Utc;
-  header: ReactNode;
+  line: LogLine;
+  columns: string;
+  showPass: boolean;
+  onSelect: (key: string) => void;
 }) => {
-  const [tab, setTab] = useState<(typeof tabs)[number]>("Overview");
+  const { entry, origin } = line;
+  const iso = DateTime.formatIso(entry.at);
+  const cause = Option.getOrUndefined(entry.cause);
+  const severe = entry.level === "Error" || entry.level === "Fatal";
+  const loud = severe || entry.level === "Warn";
+  return (
+    <div
+      style={{ gridTemplateColumns: columns }}
+      className={`-mx-2 grid items-baseline gap-x-3 border-b border-line-soft px-2 py-1.5 ${severe ? "bg-[color-mix(in_oklch,var(--color-fail)_6%,transparent)]" : ""}`}
+    >
+      <time dateTime={iso} title={iso} className="text-fg-4">
+        {iso.slice(11, 23)}
+      </time>
+      <span className={`text-[10.5px] tracking-[.02em] ${levelColor[entry.level]}`}>
+        {levelLabel[entry.level]}
+      </span>
+      {showPass ? (
+        <span title={`body pass ${entry.pass}`} className="text-[10.5px] text-fg-4">
+          p{entry.pass}
+        </span>
+      ) : null}
+      {Option.isSome(origin) ? <Source origin={origin.value} onSelect={onSelect} /> : null}
+      <span
+        className={`min-w-0 wrap-anywhere whitespace-pre-wrap ${loud ? "text-fg" : "text-fg-2"}`}
+      >
+        {entry.message}
+      </span>
+      {cause === undefined ? null : (
+        <details className="col-span-full mt-1">
+          <summary className="w-max cursor-pointer text-[11px] text-fg-3 transition-colors duration-140 ease-g hover:text-fg">
+            cause
+          </summary>
+          <pre className="mt-1 overflow-x-auto text-[11.5px]/[1.5] text-fg-2">{cause}</pre>
+        </details>
+      )}
+    </div>
+  );
+};
+
+const LogsPanel = ({
+  view,
+  attempts,
+  logs,
+  executionId,
+  rootFlag,
+  level,
+  onLevel,
+  onSelect,
+}: {
+  view: LogsView;
+  attempts: ReadonlyArray<ActivityRun>;
+  logs: Logs;
+  executionId: string;
+  rootFlag: string | undefined;
+  level: LevelFilter;
+  onLevel: (level: LevelFilter) => void;
+  onSelect: (key: string) => void;
+}) => {
+  const fetched = logs.entries.length;
+  const truncated =
+    logs.total > fetched ? (
+      <Note>
+        Showing the last {fetched} of {logs.total} lines; the counts here cover only those. All
+        lines:{" "}
+        <code className="font-mono text-[11.5px] text-fg">
+          {kymoCommand(rootFlag, `execution ${shellArg(executionId)} --logs --full`)}
+        </code>
+      </Note>
+    ) : null;
+  if (view.count === 0) {
+    return (
+      <>
+        <p className="text-[12.5px]/[1.55] text-fg-3">
+          {truncated === null ? "No logs." : `No logs in the last ${fetched} lines.`}{" "}
+          <code className="font-mono text-[11.5px]">Effect.log</code> calls inside{" "}
+          {view.scope._tag === "Execution" ? "the workflow and its activities" : "this Activity"}{" "}
+          show up here.
+        </p>
+        {truncated}
+      </>
+    );
+  }
+  const source = view.scope._tag === "Execution";
+  const columns = [
+    "90px 42px",
+    view.showPass ? "max-content" : "",
+    source ? "minmax(0,140px)" : "",
+    "minmax(0,1fr)",
+  ]
+    .filter((column) => column !== "")
+    .join(" ");
   return (
     <>
-      <div className="sticky top-0 z-2 border-b border-line-soft bg-panel px-6 pt-3.5">
-        {header}
-        <div role="tablist" aria-label="Execution" className="mt-2 flex gap-[18px]">
-          {tabs.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              id={`inspector-tab-${name}`}
-              aria-selected={tab === name}
-              aria-controls="inspector-panel"
-              onClick={() => setTab(name)}
-              className={`-mb-px border-b-2 pt-1.5 pb-[9px] text-[12.5px]/none font-medium transition-colors duration-140 ease-g ${tab === name ? "border-fg text-fg" : "border-transparent text-fg-3 hover:text-fg-2"}`}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div
-        id="inspector-panel"
-        role="tabpanel"
-        aria-labelledby={`inspector-tab-${tab}`}
-        className="max-w-[780px] px-6 pt-4 pb-7"
-      >
-        {tab === "Overview" ? (
-          <ExecutionOverview detail={detail} summaries={summaries} now={now} />
+      <fieldset aria-label="Minimum level" className="flex gap-1">
+        {levelFilters.map((filter) => (
+          <button
+            key={filter}
+            type="button"
+            aria-pressed={level === filter}
+            onClick={() => onLevel(filter)}
+            className={`h-6 rounded-md px-[9px] font-mono text-[11.5px]/none transition-colors duration-140 ease-g ${level === filter ? "bg-sel text-fg inset-ring inset-ring-line" : "text-fg-3 inset-ring inset-ring-line-soft hover:text-fg"}`}
+          >
+            {filterLabel[filter]}
+            <b className="ml-[3px] font-normal text-fg-4">{view.counts[filter]}</b>
+          </button>
+        ))}
+      </fieldset>
+      {truncated}
+      <div className="mt-3 font-mono text-xs/normal">
+        {view.groups.length === 0 ? (
+          <p className="font-sans text-[12.5px]/[1.55] text-fg-3">Nothing at this level.</p>
         ) : (
-          <pre className="overflow-x-auto font-mono text-xs/[1.6] text-fg-2">
-            {prettyJson(detail.payload)}
-          </pre>
+          view.groups.map((group, index) => {
+            const attempt = Option.getOrUndefined(group.attempt);
+            const run = attempts.find((candidate) => candidate.attempt === attempt);
+            const status = run === undefined ? undefined : statusName(run.status);
+            return (
+              <div key={attempt ?? "all"}>
+                {attempt === undefined ? null : (
+                  <div
+                    className={`mb-1 flex items-center gap-1.5 font-sans text-[11.5px]/none text-fg-3 ${index === 0 ? "" : "mt-3.5"}`}
+                  >
+                    {status === undefined ? null : (
+                      <StatusIcon status={status} className={`size-3.5 ${statusColor[status]}`} />
+                    )}
+                    attempt {attempt}
+                  </div>
+                )}
+                {group.lines.map((line) => (
+                  <LogRow
+                    key={line.entry.seq}
+                    line={line}
+                    columns={columns}
+                    showPass={view.showPass}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </div>
+            );
+          })
         )}
       </div>
     </>
@@ -397,12 +563,19 @@ const kinds: Record<Exclude<Span["_tag"], "Wait">, string> = {
   Child: "child execution",
 };
 
+export type InspectorTab = "Overview" | "Payload" | "Logs";
+
 export const Inspector = ({
   span,
   root,
   summaries,
   now,
   rootFlag,
+  logs,
+  tab,
+  level,
+  onTab,
+  onLevel,
   onSelect,
 }: {
   span: Span;
@@ -410,45 +583,102 @@ export const Inspector = ({
   summaries: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  logs: Logs;
+  tab: InspectorTab;
+  level: LevelFilter;
+  onTab: (tab: InspectorTab) => void;
+  onLevel: (level: LevelFilter) => void;
   onSelect: (key: string) => void;
 }) => {
-  const header = (
-    <div className="flex min-w-0 items-center gap-2">
-      <SpanIcon span={span} />
-      <span className="truncate text-sm/[1.3] font-medium">{spanName(span)}</span>
-      <span className="font-mono text-[11px]/none whitespace-nowrap text-fg-3">
-        {span._tag === "Wait" ? waitKind[span.wait.kind] : kinds[span._tag]}
-      </span>
-    </div>
-  );
-  if (span._tag === "Execution") {
-    return (
-      <ExecutionInspector detail={span.detail} summaries={summaries} now={now} header={header} />
-    );
-  }
+  const view = logsView(span, root, logs.entries, level);
+  const tabs: ReadonlyArray<InspectorTab> = [
+    "Overview",
+    ...(span._tag === "Execution" ? (["Payload"] as const) : []),
+    ...(Option.isSome(view) ? (["Logs"] as const) : []),
+  ];
+  const shown = tabs.includes(tab) ? tab : "Overview";
   const activity =
-    span._tag === "Attempt"
-      ? root.children.find(
-          (candidate): candidate is ActivitySpan =>
-            candidate._tag === "Activity" && candidate.name === span.run.name,
-        )
-      : undefined;
+    span._tag === "Activity"
+      ? span
+      : span._tag === "Attempt"
+        ? root.children.find(
+            (candidate): candidate is ActivitySpan =>
+              candidate._tag === "Activity" && candidate.name === span.run.name,
+          )
+        : undefined;
+  const overview =
+    span._tag === "Execution" ? (
+      <ExecutionOverview detail={span.detail} summaries={summaries} now={now} />
+    ) : span._tag === "Activity" || span._tag === "Attempt" ? (
+      activity === undefined ? null : (
+        <ActivityInspector span={span} activity={activity} now={now} onSelect={onSelect} />
+      )
+    ) : span._tag === "Wait" ? (
+      <WaitInspector span={span} detail={root.detail} now={now} rootFlag={rootFlag} />
+    ) : (
+      <ChildInspector span={span} now={now} />
+    );
+  const kind = span._tag === "Wait" ? waitKind[span.wait.kind] : kinds[span._tag];
   return (
     <>
-      <div className="sticky top-0 z-2 border-b border-line-soft bg-panel px-6 pt-3.5 pb-3">
-        {header}
+      <div
+        className={`sticky top-0 z-2 border-b border-line-soft bg-panel px-6 pt-3.5 ${tabs.length > 1 ? "" : "pb-3"}`}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <SpanIcon span={span} />
+          <span className="truncate text-sm/[1.3] font-medium">{spanName(span)}</span>
+          <span className="font-mono text-[11px]/none whitespace-nowrap text-fg-3">{kind}</span>
+        </div>
+        {tabs.length > 1 ? (
+          <div role="tablist" aria-label={kind} className="mt-2 flex gap-[18px]">
+            {tabs.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`inspector-tab-${name}`}
+                aria-selected={shown === name}
+                aria-controls="inspector-panel"
+                onClick={() => onTab(name)}
+                className={`-mb-px border-b-2 pt-1.5 pb-[9px] text-[12.5px]/none font-medium transition-colors duration-140 ease-g ${shown === name ? "border-fg text-fg" : "border-transparent text-fg-3 hover:text-fg-2"}`}
+              >
+                {name}
+                {name === "Logs" && Option.isSome(view) && view.value.count > 0 ? (
+                  <span
+                    className={`ml-[5px] font-mono text-[11px]/none font-normal ${view.value.hasError ? "text-fail" : "text-fg-4"}`}
+                  >
+                    {view.value.count}
+                    {view.value.hasError ? <span className="sr-only"> with errors</span> : null}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
-      <div className="max-w-[780px] px-6 pt-4 pb-7">
-        {span._tag === "Activity" ? (
-          <ActivityInspector span={span} activity={span} now={now} onSelect={onSelect} />
-        ) : span._tag === "Attempt" ? (
-          activity === undefined ? null : (
-            <ActivityInspector span={span} activity={activity} now={now} onSelect={onSelect} />
-          )
-        ) : span._tag === "Wait" ? (
-          <WaitInspector span={span} detail={root.detail} now={now} rootFlag={rootFlag} />
+      <div
+        id="inspector-panel"
+        role={tabs.length > 1 ? "tabpanel" : undefined}
+        aria-labelledby={tabs.length > 1 ? `inspector-tab-${shown}` : undefined}
+        className="max-w-[780px] px-6 pt-4 pb-7"
+      >
+        {shown === "Logs" && Option.isSome(view) ? (
+          <LogsPanel
+            view={view.value}
+            attempts={span._tag === "Activity" ? span.attempts : []}
+            logs={logs}
+            executionId={root.detail.id}
+            rootFlag={rootFlag}
+            level={level}
+            onLevel={onLevel}
+            onSelect={onSelect}
+          />
+        ) : shown === "Payload" ? (
+          <pre className="overflow-x-auto font-mono text-xs/[1.6] text-fg-2">
+            {prettyJson(root.detail.payload)}
+          </pre>
         ) : (
-          <ChildInspector span={span} now={now} />
+          overview
         )}
       </div>
     </>
