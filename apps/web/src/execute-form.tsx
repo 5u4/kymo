@@ -108,7 +108,11 @@ export const ExecuteForm = ({
             id="execute-payload-hint"
             className="min-h-[15px] font-mono text-[11.5px]/[1.35] text-fg-4"
           >
-            {issue === undefined ? null : <p className="font-sans text-fail">{issue}</p>}
+            {issue === undefined ? null : (
+              <p role="alert" className="font-sans text-fail">
+                {issue}
+              </p>
+            )}
             {expected === undefined ? null : (
               <p>
                 <span className="font-sans">Expected</span>{" "}

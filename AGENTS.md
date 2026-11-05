@@ -109,11 +109,17 @@ and delete the old path in the same change, with no compatibility shims.
   in the pane, never as the daemon being down; a completion's error shows under that wait's form,
   or at the top of the inspector while the form is not shown.
 - The execute form (`apps/web/src/execute-form.tsx`) keeps its open state and per-workflow drafts
-  in the `/` route's component state, not the URL, and shows only while `?exec` keeps the value it
-  had when the form opened. Its Expected text is the `expected` that `GET /api/workflows` lists, the
-  value the daemon also puts in `InvalidPayload.expected`. It sends no payload that does not parse
-  as JSON and omits a label that is empty or only whitespace; the daemon answers an empty label with
-  a 400 that has no body. Its errors show in the form, never as the daemon being down.
+  and submission states in the `/` route's component state, not the URL, and shows only while
+  `?exec` keeps the value it had when the form opened. Each workflow has at most one submit in
+  flight, and its response settles only that workflow's submission state and draft, clearing the
+  draft only if it is still the object that was submitted. Only while the form still shows that
+  workflow over the same `?exec`, read through the `opened` ref and the router's current search
+  because the response callback holds stale state, does the response close the form, set the
+  existed note and open the new execution. Its Expected text is the `expected` that
+  `GET /api/workflows` lists, the value the daemon also puts in `InvalidPayload.expected`. It sends
+  no payload that does not parse as JSON and omits a label that is empty or only whitespace; the
+  daemon answers an empty label with a 400 that has no body. Its errors show in the form, never as
+  the daemon being down.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

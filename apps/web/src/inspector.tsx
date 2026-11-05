@@ -545,7 +545,9 @@ const WaitInspector = ({
               className="min-h-[15px] font-mono text-[11.5px]/[1.35] text-fg-4"
             >
               {notJson === undefined ? null : (
-                <p className="font-sans text-fail">Not JSON: {notJson}</p>
+                <p role="alert" className="font-sans text-fail">
+                  Not JSON: {notJson}
+                </p>
               )}
               {expected === undefined ? null : (
                 <p>

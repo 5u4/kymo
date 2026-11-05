@@ -5,7 +5,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AppHeader, DaemonDown } from "../connection.tsx";
 import { DetailPane, DetailPaneSkeleton } from "../detail-pane.tsx";
 import {
@@ -50,8 +50,15 @@ const Executions = () => {
   const router = useRouter();
   const navigate = useNavigate({ from: "/" });
   const [open, setOpen] = useState<Option.Option<Open>>(Option.none());
+  const opened = useRef(open);
+  const show = (next: Option.Option<Open>) => {
+    opened.current = next;
+    setOpen(next);
+  };
   const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(new Map());
-  const [state, setState] = useState<ExecuteState>(idle);
+  const [states, setStates] = useState<ReadonlyMap<string, ExecuteState>>(new Map());
+  const settle = (workflow: string, state: ExecuteState) =>
+    setStates((prev) => new Map(prev).set(workflow, state));
   const [existed, setExisted] = useState<Option.Option<Existed>>(Option.none());
   useMountEffect(() => {
     const poll = Effect.runFork(
@@ -86,21 +93,18 @@ const Executions = () => {
   if (note !== undefined && note.shown && note.id !== shown) {
     setExisted(Option.none());
   }
-  const editing = (current: ExecuteState) => (current._tag === "Submitting" ? current : idle);
-  const execute = (workflow: string) => {
-    setOpen(Option.some({ workflow, over: filter.exec }));
-    setState(editing);
-  };
+  const execute = (workflow: string) => show(Option.some({ workflow, over: filter.exec }));
   const submit = (workflow: string) => {
-    if (state._tag === "Submitting") return;
+    if (states.get(workflow)?._tag === "Submitting") return;
     const draft = drafts.get(workflow) ?? emptyDraft;
     const payload = parsePayload(draft.payload);
     if (Result.isFailure(payload)) {
-      setState(ExecuteState.NotJson({ message: payload.failure }));
+      settle(workflow, ExecuteState.NotJson({ message: payload.failure }));
       return;
     }
     const label = labelToSend(draft.label);
-    setState(ExecuteState.Submitting());
+    const over = filter.exec;
+    settle(workflow, ExecuteState.Submitting());
     void Effect.runPromise(
       requestExecute({
         workflow,
@@ -109,17 +113,23 @@ const Executions = () => {
       }),
     ).then((result) => {
       if (Result.isFailure(result)) {
-        setState(ExecuteState.Failed({ error: result.failure }));
+        settle(workflow, ExecuteState.Failed({ error: result.failure }));
         return;
       }
-      const { execution, created } = result.success;
+      settle(workflow, idle);
       setDrafts((prev) => {
+        if (prev.get(workflow) !== draft) return prev;
         const next = new Map(prev);
         next.delete(workflow);
         return next;
       });
-      setState(idle);
-      setOpen(Option.none());
+      const followed = Option.exists(
+        opened.current,
+        (current) => current.workflow === workflow && current.over === over,
+      );
+      if (!followed || router.state.location.search.exec !== over) return;
+      const { execution, created } = result.success;
+      show(Option.none());
       setExisted(
         created
           ? Option.none()
@@ -164,16 +174,13 @@ const Executions = () => {
                 workflows={loaded.workflows}
                 workflow={form.workflow}
                 draft={drafts.get(form.workflow) ?? emptyDraft}
-                state={state}
+                state={states.get(form.workflow) ?? idle}
                 rootFlag={loaded.rootFlag}
-                onWorkflow={(workflow) => {
-                  setOpen(Option.some({ ...form, workflow }));
-                  setState(editing);
-                }}
+                onWorkflow={(workflow) => show(Option.some({ ...form, workflow }))}
                 onDraft={(draft) => setDrafts((prev) => new Map(prev).set(form.workflow, draft))}
                 onSubmit={() => submit(form.workflow)}
-                onCancel={() => setOpen(Option.none())}
-                onDismiss={() => setState(editing)}
+                onCancel={() => show(Option.none())}
+                onDismiss={() => settle(form.workflow, idle)}
               />
             )
           }
