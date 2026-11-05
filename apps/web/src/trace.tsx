@@ -7,6 +7,7 @@ import { flushSync } from "react-dom";
 import { refine } from "./executions-view.ts";
 import { Glyph, SpanIcon } from "./glyphs.tsx";
 import { Inspector, type InspectorTab } from "./inspector.tsx";
+import type { Actions } from "./actions.ts";
 import { logMarks, type LevelFilter, type LogMark } from "./log-view.ts";
 import type { Logs } from "./snapshot.ts";
 import { spanColor, statusColor } from "./status-color.ts";
@@ -152,6 +153,7 @@ export const Trace = ({
   rootFlag,
   height,
   onResize,
+  actions,
 }: {
   detail: ExecutionDetail;
   logs: Logs;
@@ -160,6 +162,7 @@ export const Trace = ({
   rootFlag: string | undefined;
   height: Option.Option<number>;
   onResize: (height: number) => void;
+  actions: Actions;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const root = traceOf(detail, summaries);
@@ -574,6 +577,7 @@ export const Trace = ({
           onTab={setTab}
           onLevel={setLevel}
           onSelect={select}
+          actions={actions}
         />
       </section>
     </div>

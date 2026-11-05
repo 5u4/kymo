@@ -99,6 +99,13 @@ and delete the old path in the same change, with no compatibility shims.
   `apps/web/src/log-view.ts`, whose counts come from the response's `counts` because those cover
   every line, not only the fetched ones; the selected span, expanded rows, zoom, split height,
   inspector tab and log level filter stay in component state.
+- The detail pane offers the actions `actionsFor` allows plus completing an open Deferred wait. It
+  POSTs them through `apps/web/src/actions.ts` and then reloads the route. Each POST answers with
+  the execution as it was before the action, and the status name can stay the same across one (a
+  resume that fails again, a completed wait followed by the next), so the pane keeps every action
+  disabled until the detail's `updatedAt` differs from the one the POST returned, or until 10
+  seconds after the POST answered. An action's error shows in the pane, never as the daemon being
+  down.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

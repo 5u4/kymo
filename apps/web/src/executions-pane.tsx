@@ -260,6 +260,7 @@ export const ExecutionsPane = ({
   useMountEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
+        event.defaultPrevented ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
