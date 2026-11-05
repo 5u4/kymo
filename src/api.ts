@@ -109,6 +109,7 @@ export const Wait = Schema.Struct({
   kind: Schema.Literals(["Deferred", "Clock"]),
   name: Schema.String,
   since: Schema.DateTimeUtc,
+  expected: Schema.OptionFromNullOr(Schema.String),
 });
 export type Wait = typeof Wait.Type;
 
