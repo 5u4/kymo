@@ -101,7 +101,7 @@ const originOf = (root: ExecutionSpan, source: LogSource): LogOrigin => {
       key: Option.none(),
     };
   }
-  if (activity.attempts.length === 1) {
+  if (activity.attempts.length === 1 && activity.attempts[0]?.attempt === source.attempt) {
     return {
       _tag: "Activity",
       name: source.name,

@@ -189,6 +189,17 @@ describe("logsView", () => {
     });
   });
 
+  it("keeps a retry's attempt and no jump target while the detail still shows one attempt", () => {
+    const [line] =
+      view("exec", "all", [entry(1, "Info", activity("Capture", 2), "00")]).groups[0]?.lines ?? [];
+    assert.deepStrictEqual(Option.getOrUndefined(line?.origin ?? Option.none()), {
+      _tag: "Activity",
+      name: "Capture",
+      attempt: Option.some(2),
+      key: Option.none(),
+    });
+  });
+
   it("names no source inside an activity", () => {
     const lines = view("a/Charge").groups.flatMap((group) => group.lines);
     assert.isTrue(lines.every((line) => Option.isNone(line.origin)));
