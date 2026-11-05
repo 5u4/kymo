@@ -19,15 +19,10 @@ and delete the old path in the same change, with no compatibility shims.
   `src/`. `prepare` installs the lefthook hooks and patches TypeScript only in a git checkout (where
   `.git` is a directory or, in a worktree, a file); elsewhere, such as a `bun add -g` of kymo, it
   does nothing.
-- The vite build of `apps/web` is committed in `apps/web/dist`, so a git install of kymo serves the
-  UI without building it. The lefthook `web-dist` pre-commit job runs `bun run build:web` and stages
-  `apps/web/dist` whenever a commit touches other files under `apps/web`. Because the build reads the
-  working tree, the job refuses the commit while a file under `apps/web` outside `apps/web/dist` is
-  untracked or has changes that are not staged at all. The daemon
-  (`apps/daemon/src/server.ts`) serves `apps/web/dist` at every path outside `/api`, falling back to
-  `index.html` for an extensionless path whose `Accept` includes `text/html`, and answers 404 to
-  an unknown path under `/api/`. When `apps/web/dist` is missing, the API still works and pages
-  answer 404.
+- The daemon (`apps/daemon/src/server.ts`) serves `apps/web/dist` to GET requests at every path
+  outside `/api`, falling back to `index.html` for an extensionless path whose `Accept` includes
+  `text/html`, and answers 404 to an unknown path under `/api/`. When `apps/web/dist` is missing,
+  the API still works and pages answer 404.
 - The CLI never imports daemon code. It spawns `apps/daemon/src/main.ts --root <dir>`, reads the
   root's files, signals the daemon's pid, and calls the daemon through the HttpApi in `kymo/api`.
   The daemon answers 403 to any request whose `Origin` header is present and is not the origin of
