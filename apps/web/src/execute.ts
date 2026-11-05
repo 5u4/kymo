@@ -36,7 +36,6 @@ export const emptyDraft: Draft = { payload: "", label: "" };
 export interface Existed {
   readonly id: string;
   readonly labelled: boolean;
-  readonly shown: boolean;
 }
 
 const decodeJson = Schema.decodeResult(Schema.fromJsonString(Schema.Json));

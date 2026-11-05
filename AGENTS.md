@@ -105,21 +105,25 @@ and delete the old path in the same change, with no compatibility shims.
   the execution as it was before the action, and the status name can stay the same across one (a
   resume that fails again, a completed wait followed by the next), so the pane keeps every action
   disabled until a detail requested after the POST answered has an `updatedAt` that differs from
-  the one the POST returned, or until 10 seconds after the POST answered. An action's error shows
-  in the pane, never as the daemon being down; a completion's error shows under that wait's form,
-  or at the top of the inspector while the form is not shown.
+  the one the POST returned, or until 10 seconds after the POST answered. The pane keeps that state
+  for the loaded execution outside the view the execute form replaces, so opening the form keeps
+  it, and it resets as soon as the pane no longer has that execution loaded (another execution, no
+  selection, or a not-found or ambiguous id). An action's error shows in the pane, never as the
+  daemon being down; a completion's error shows under that wait's form, or at the top of the
+  inspector while the form is not shown.
 - The execute form (`apps/web/src/execute-form.tsx`) keeps its open state and per-workflow drafts
   and submission states in the `/` route's component state, not the URL, and shows only while
   `?exec` keeps the value it had when the form opened. Each workflow has at most one submit in
   flight, and its response settles only that workflow's submission state and draft, clearing the
   draft only if it is still the object that was submitted. Only while the form still shows that
   workflow over the same `?exec`, read through the `opened` ref and the router's current search
-  because the response callback holds stale state, does the response close the form, set the
-  existed note and open the new execution. Its Expected text is the `expected` that
-  `GET /api/workflows` lists, the value the daemon also puts in `InvalidPayload.expected`. It sends
-  no payload that does not parse as JSON and omits a label that is empty or only whitespace; the
-  daemon answers an empty label with a 400 that has no body. Its errors show in the form, never as
-  the daemon being down.
+  because the response callback holds stale state, does the response close the form and open the
+  new execution. For one that already existed, the existed note appears only if `?exec` still
+  names it once that navigation finishes, and clears as soon as `?exec` names anything else. The
+  form's Expected text is the `expected` that `GET /api/workflows` lists, the value the daemon also
+  puts in `InvalidPayload.expected`. The form sends no payload that does not parse as JSON and
+  omits a label that is empty or only whitespace; the daemon answers an empty label with a 400 that
+  has no body. The form's errors show in the form, never as the daemon being down.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

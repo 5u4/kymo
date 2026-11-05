@@ -371,6 +371,11 @@ const ExecutionHeader = ({
 
 const idle = ActionState.Idle();
 
+interface HeldAction {
+  readonly id: string;
+  readonly state: ActionState;
+}
+
 const ExecutionView = ({
   detail,
   logs,
@@ -381,6 +386,9 @@ const ExecutionView = ({
   height,
   onResize,
   existed,
+  state,
+  onState,
+  onAnswer,
 }: {
   detail: ExecutionDetail;
   logs: Logs;
@@ -391,20 +399,22 @@ const ExecutionView = ({
   height: Option.Option<number>;
   onResize: (height: number) => void;
   existed: Existed | undefined;
+  state: ActionState;
+  onState: (state: ActionState) => void;
+  onAnswer: (state: ActionState) => void;
 }) => {
   const router = useRouter();
-  const [state, setState] = useState<ActionState>(idle);
   const submit = (request: ActionRequest) => {
-    setState(ActionState.Submitting({ target: request }));
+    onState(ActionState.Submitting({ target: request }));
     void Effect.runPromise(requestAction(detail.id, request)).then((next) => {
-      setState(next);
+      onAnswer(next);
       void router.invalidate();
     });
   };
   const actions: Actions = {
     phase: phase(state, { updatedAt: detail.updatedAt, requestedAt }, now),
-    confirm: () => setState(ActionState.Confirming()),
-    dismiss: () => setState(idle),
+    confirm: () => onState(ActionState.Confirming()),
+    dismiss: () => onState(idle),
     submit,
   };
   return (
@@ -488,8 +498,22 @@ export const DetailPane = ({
 }) => {
   const navigate = useNavigate({ from: "/" });
   const [height, setHeight] = useState<Option.Option<number>>(Option.none());
+  const [held, setHeld] = useState<Option.Option<HeldAction>>(Option.none());
   const byId = new Map(executions.map((execution) => [execution.id, execution]));
   const selected = Option.getOrUndefined(detail);
+  const loadedId = selected?._tag === "Loaded" ? selected.detail.id : undefined;
+  if (Option.exists(held, ({ id }) => id !== loadedId)) {
+    setHeld(Option.none());
+  }
+  const actionState = (id: string) =>
+    Option.match(
+      Option.filter(held, (action) => action.id === id),
+      { onNone: () => idle, onSome: (action) => action.state },
+    );
+  const answer = (id: string) => (state: ActionState) =>
+    setHeld((prev) =>
+      Option.exists(prev, (action) => action.id === id) ? Option.some({ id, state }) : prev,
+    );
   const back = (
     <Button onClick={() => void navigate({ search: (prev) => refine(prev, { exec: undefined }) })}>
       Back to executions
@@ -580,6 +604,9 @@ export const DetailPane = ({
           height={height}
           onResize={(next) => setHeight(Option.some(next))}
           existed={existed}
+          state={actionState(selected.detail.id)}
+          onState={(state) => setHeld(Option.some({ id: selected.detail.id, state }))}
+          onAnswer={answer(selected.detail.id)}
         />
       )}
     </Pane>

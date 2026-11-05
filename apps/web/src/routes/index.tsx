@@ -87,10 +87,7 @@ const Executions = () => {
     ),
   );
   const note = Option.getOrUndefined(existed);
-  if (note !== undefined && !note.shown && note.id === shown) {
-    setExisted(Option.some({ ...note, shown: true }));
-  }
-  if (note !== undefined && note.shown && note.id !== shown) {
+  if (note !== undefined && note.id !== filter.exec) {
     setExisted(Option.none());
   }
   const execute = (workflow: string) => show(Option.some({ workflow, over: filter.exec }));
@@ -130,12 +127,10 @@ const Executions = () => {
       if (!followed || router.state.location.search.exec !== over) return;
       const { execution, created } = result.success;
       show(Option.none());
-      setExisted(
-        created
-          ? Option.none()
-          : Option.some({ id: execution.id, labelled: label !== undefined, shown: false }),
-      );
-      void navigate({ search: (prev) => refine(prev, { exec: execution.id }) });
+      void navigate({ search: (prev) => refine(prev, { exec: execution.id }) }).then(() => {
+        if (created || router.state.location.search.exec !== execution.id) return;
+        setExisted(Option.some({ id: execution.id, labelled: label !== undefined }));
+      });
     });
   };
   const registered = loaded.workflows.map((workflow) => workflow.name);
