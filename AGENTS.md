@@ -103,9 +103,10 @@ and delete the old path in the same change, with no compatibility shims.
   POSTs them through `apps/web/src/actions.ts` and then reloads the route. Each POST answers with
   the execution as it was before the action, and the status name can stay the same across one (a
   resume that fails again, a completed wait followed by the next), so the pane keeps every action
-  disabled until the detail's `updatedAt` differs from the one the POST returned, or until 10
-  seconds after the POST answered. An action's error shows in the pane, never as the daemon being
-  down.
+  disabled until a detail requested after the POST answered has an `updatedAt` that differs from
+  the one the POST returned, or until 10 seconds after the POST answered. An action's error shows
+  in the pane, never as the daemon being down; a completion's error shows under that wait's form,
+  or at the top of the inspector while the form is not shown.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

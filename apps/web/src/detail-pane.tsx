@@ -2,8 +2,6 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
 import {
   actionsFor,
   statusName,
@@ -31,8 +29,6 @@ import { Trace } from "./trace.tsx";
 import { duration, isEnded, stopNote, type StopNote } from "./trace-view.ts";
 import { useMountEffect } from "./use-mount-effect.ts";
 import { Button, Kbd, Pane, Skeleton, Spinner } from "./ui.tsx";
-
-const decodeJson = Schema.decodeResult(Schema.fromJsonString(Schema.Json));
 
 const Void = ({
   code,
@@ -252,7 +248,7 @@ const ActionsBar = ({
                 action === "interrupt" ? actions.confirm() : actions.submit({ action })
               }
             >
-              {busy && current.action === action ? (
+              {busy && current.target.action === action ? (
                 <>
                   <Spinner />
                   {headerActions[action].busy}
@@ -264,10 +260,10 @@ const ActionsBar = ({
           ))}
         </div>
       )}
-      {current._tag === "Confirming" || (busy && current.action === "interrupt") ? (
+      {current._tag === "Confirming" || (busy && current.target.action === "interrupt") ? (
         <InterruptConfirm detail={detail} byId={byId} actions={actions} />
       ) : null}
-      <ActionAlert actions={actions} complete={false} />
+      <ActionAlert actions={actions} shows={(target) => target.action !== "complete"} />
     </>
   );
 };
@@ -381,6 +377,7 @@ const idle = ActionState.Idle();
 const ExecutionView = ({
   detail,
   logs,
+  requestedAt,
   byId,
   now,
   rootFlag,
@@ -389,6 +386,7 @@ const ExecutionView = ({
 }: {
   detail: ExecutionDetail;
   logs: Logs;
+  requestedAt: DateTime.Utc;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
@@ -398,30 +396,17 @@ const ExecutionView = ({
   const router = useRouter();
   const [state, setState] = useState<ActionState>(idle);
   const submit = (request: ActionRequest) => {
-    setState(ActionState.Submitting({ action: request.action }));
+    setState(ActionState.Submitting({ target: request }));
     void Effect.runPromise(requestAction(detail.id, request)).then((next) => {
       setState(next);
       void router.invalidate();
     });
   };
   const actions: Actions = {
-    phase: phase(state, detail.updatedAt, now),
+    phase: phase(state, { updatedAt: detail.updatedAt, requestedAt }, now),
     confirm: () => setState(ActionState.Confirming()),
     dismiss: () => setState(idle),
     submit,
-    complete: (name, text) => {
-      const value = decodeJson(text);
-      if (Result.isSuccess(value)) {
-        submit({ action: "complete", name, value: value.success });
-        return;
-      }
-      setState(
-        ActionState.Failed({
-          action: "complete",
-          error: { _tag: "NotJson", issue: value.failure.message },
-        }),
-      );
-    },
   };
   return (
     <article
@@ -572,6 +557,7 @@ export const DetailPane = ({
           key={selected.detail.id}
           detail={selected.detail}
           logs={selected.logs}
+          requestedAt={selected.requestedAt}
           byId={byId}
           now={now}
           rootFlag={rootFlag}

@@ -21,7 +21,11 @@ export interface Logs {
 }
 
 export type Detail = Data.TaggedEnum<{
-  Loaded: { readonly detail: ExecutionDetail; readonly logs: Logs };
+  Loaded: {
+    readonly detail: ExecutionDetail;
+    readonly logs: Logs;
+    readonly requestedAt: DateTime.Utc;
+  };
   NotFound: { readonly id: string };
   Ambiguous: { readonly id: string; readonly candidates: ReadonlyArray<string> };
 }>;
@@ -48,16 +52,19 @@ export const snapshot = (exec: string | undefined): Effect.Effect<Snapshot> =>
         client.executions.list({ query: {} }),
         exec === undefined
           ? Effect.succeedNone
-          : Effect.all(
-              [
-                client.executions.get({ params: { id: exec } }),
-                client.executions.logs({ params: { id: exec }, query: { limit: logLimit } }),
-              ],
-              { concurrency: "unbounded" },
-            ).pipe(
-              Effect.map(([detail, { counts, logs }]) =>
-                Detail.Loaded({ detail, logs: { counts, entries: logs } }),
+          : Effect.flatMap(DateTime.now, (requestedAt) =>
+              Effect.all(
+                [
+                  client.executions.get({ params: { id: exec } }),
+                  client.executions.logs({ params: { id: exec }, query: { limit: logLimit } }),
+                ],
+                { concurrency: "unbounded" },
+              ).pipe(
+                Effect.map(([detail, { counts, logs }]) =>
+                  Detail.Loaded({ detail, logs: { counts, entries: logs }, requestedAt }),
+                ),
               ),
+            ).pipe(
               Effect.catchTags({
                 ExecutionNotFound: (error) => Effect.succeed(Detail.NotFound({ id: error.id })),
                 AmbiguousExecutionId: (error) =>

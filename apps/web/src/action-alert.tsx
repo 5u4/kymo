@@ -1,6 +1,6 @@
 import { statusName } from "kymo/api";
 import type { ReactNode } from "react";
-import type { ActionError, Actions } from "./actions.ts";
+import type { ActionError, Actions, Target } from "./actions.ts";
 import { shortId } from "./executions-view.ts";
 import { Button } from "./ui.tsx";
 
@@ -47,8 +47,6 @@ const errorCopy = (error: ActionError): { code: string; body: ReactNode } => {
       return { code: "error: ambiguous_id", body: error.message };
     case "WorkflowNotFound":
       return { code: "error: workflow_not_found", body: error.message };
-    case "NotJson":
-      return { code: "error: not_json", body: `Not JSON: ${error.issue}` };
     case "Unreachable":
       return {
         code: "error: unreachable",
@@ -57,7 +55,14 @@ const errorCopy = (error: ActionError): { code: string; body: ReactNode } => {
   }
 };
 
-const nouns = { interrupt: "interrupt", resume: "resume", complete: "value" } as const;
+const subject = (target: Target): ReactNode =>
+  target.action === "complete" ? (
+    <>
+      value for <code className={code}>{target.name}</code>
+    </>
+  ) : (
+    target.action
+  );
 
 const Alert = ({
   tone,
@@ -90,22 +95,32 @@ const Alert = ({
   </div>
 );
 
-export const ActionAlert = ({ actions, complete }: { actions: Actions; complete: boolean }) => {
+export const ActionAlert = ({
+  actions,
+  shows,
+}: {
+  actions: Actions;
+  shows: (target: Target) => boolean;
+}) => {
   const { phase } = actions;
-  if (phase._tag === "Failed") {
-    if (phase.error._tag === "NotJson" || (phase.action === "complete") !== complete) return null;
+  if (phase._tag === "Failed" && shows(phase.target)) {
     const failure = errorCopy(phase.error);
     return (
       <Alert tone="fail" code={failure.code} onDismiss={actions.dismiss}>
+        {phase.target.action === "complete" ? (
+          <>
+            Completing <code className={code}>{phase.target.name}</code> failed.{" "}
+          </>
+        ) : null}
         {failure.body}
       </Alert>
     );
   }
-  if (phase._tag === "NoChange" && (phase.action === "complete") === complete) {
+  if (phase._tag === "NoChange" && shows(phase.target)) {
     return (
       <Alert tone="sus" code={undefined} onDismiss={actions.dismiss}>
-        No change 10 s after the {nouns[phase.action]} was accepted. A running activity may still be
-        finishing.
+        No change 10 s after the {subject(phase.target)} was accepted. A running activity may still
+        be finishing.
       </Alert>
     );
   }

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
   statusName,
@@ -12,7 +13,7 @@ import {
 import { completeCommand, kymoCommand, shellArg } from "kymo/shell";
 import { useState, type ReactNode } from "react";
 import { ActionAlert } from "./action-alert.tsx";
-import type { Actions } from "./actions.ts";
+import type { Actions, Target } from "./actions.ts";
 import { ago, coarse, refine, shortId, suspendTag } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
 import {
@@ -40,6 +41,11 @@ import {
 import { Button, Spinner } from "./ui.tsx";
 
 const prettyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Json, { space: 2 }));
+
+const decodeJson = Schema.decodeResult(Schema.fromJsonString(Schema.Json));
+
+const completes = (target: Target, name: string) =>
+  target.action === "complete" && target.name === name;
 
 const muted = "text-fg-4";
 
@@ -480,12 +486,21 @@ const WaitInspector = ({
 }) => {
   const { wait } = span;
   const [text, setText] = useState("");
+  const [notJson, setNotJson] = useState<string>();
   const wakeAt = Option.getOrUndefined(Option.map(span.wakeAt, DateTime.makeUnsafe));
   const expected = Option.getOrUndefined(wait.expected);
   const { phase } = actions;
   const busy = phase._tag === "Busy";
-  const notJson =
-    phase._tag === "Failed" && phase.error._tag === "NotJson" ? phase.error.issue : undefined;
+  const complete = () => {
+    const value = decodeJson(text);
+    if (Result.isFailure(value)) {
+      actions.dismiss();
+      setNotJson(value.failure.message);
+      return;
+    }
+    setNotJson(undefined);
+    actions.submit({ action: "complete", name: wait.name, value: value.success });
+  };
   return (
     <>
       <Pairs>
@@ -539,14 +554,10 @@ const WaitInspector = ({
                 </p>
               )}
             </div>
-            <ActionAlert actions={actions} complete />
+            <ActionAlert actions={actions} shows={(target) => completes(target, wait.name)} />
             <div>
-              <Button
-                variant="primary"
-                disabled={busy}
-                onClick={() => actions.complete(wait.name, text)}
-              >
-                {busy && phase.action === "complete" ? (
+              <Button variant="primary" disabled={busy} onClick={complete}>
+                {busy && completes(phase.target, wait.name) ? (
                   <>
                     <Spinner />
                     Completing…
@@ -675,6 +686,7 @@ export const Inspector = ({
       )
     ) : span._tag === "Wait" ? (
       <WaitInspector
+        key={span.key}
         span={span}
         detail={root.detail}
         now={now}
@@ -728,6 +740,20 @@ export const Inspector = ({
         aria-labelledby={tabs.length > 1 ? `inspector-tab-${shown}` : undefined}
         className="max-w-[780px] px-6 pt-4 pb-7"
       >
+        <div className="mb-4 *:mt-0 empty:hidden">
+          <ActionAlert
+            actions={actions}
+            shows={(target) =>
+              target.action === "complete" &&
+              !(
+                shown === "Overview" &&
+                span._tag === "Wait" &&
+                span.wait.kind === "Deferred" &&
+                span.wait.name === target.name
+              )
+            }
+          />
+        </div>
         {shown === "Logs" && Option.isSome(view) ? (
           <LogsPanel
             view={view.value}
