@@ -41,12 +41,25 @@ const serving = (options: {
       return yield* Effect.die(`listening on the unix socket ${address.path}`);
     }
     const client = yield* HttpClient.HttpClient;
-    return (path: string, headers: Record<string, string> = {}) =>
+    const send = (request: HttpClientRequest.HttpClientRequest, headers: Record<string, string>) =>
       client.execute(
-        HttpClientRequest.get(`${url(address.port)}${path}`).pipe(
+        request.pipe(
           HttpClientRequest.setHeaders({ host: `127.0.0.1:${address.port}`, ...headers }),
         ),
       );
+    return Object.assign(
+      (path: string, headers: Record<string, string> = {}) =>
+        send(HttpClientRequest.get(`${url(address.port)}${path}`), headers),
+      {
+        post: (path: string, body: unknown) =>
+          send(
+            HttpClientRequest.post(`${url(address.port)}${path}`).pipe(
+              HttpClientRequest.bodyJsonUnsafe(body),
+            ),
+            {},
+          ),
+      },
+    );
   });
 
 const services = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer);
@@ -83,9 +96,30 @@ describe("daemon http server", () => {
       });
       const response = yield* get("/api/workflows");
       assert.strictEqual(response.status, 200);
-      assert.deepStrictEqual(yield* response.json, {
-        workflows: [{ name: "Child" }, { name: "Double" }, { name: "Parent" }],
+      const { workflows } = (yield* response.json) as {
+        workflows: ReadonlyArray<{ name: string }>;
+      };
+      assert.deepStrictEqual(
+        workflows.map(({ name }) => name),
+        ["Child", "Double", "Parent"],
+      );
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.live("lists the payload shape that a rejected execute reports as expected", () =>
+    Effect.gen(function* () {
+      const get = yield* serving({ workflows: ["./double.ts"], web: false });
+      const { workflows } = (yield* (yield* get("/api/workflows")).json) as {
+        workflows: ReadonlyArray<{ name: string; expected: string | null }>;
+      };
+      const listed = workflows.find(({ name }) => name === "Double")?.expected;
+      assert.isString(listed);
+      const rejected = yield* get.post("/api/executions", {
+        workflow: "Double",
+        payload: { n: "two" },
       });
+      assert.strictEqual(rejected.status, 400);
+      assert.deepInclude(yield* rejected.json, { workflow: "Double", expected: listed });
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 
@@ -130,9 +164,13 @@ describe("daemon http server", () => {
   it.live("serves the api and 404s pages when the web build is missing", () =>
     Effect.gen(function* () {
       const get = yield* serving({ workflows: ["./double.ts"], web: false });
-      assert.deepStrictEqual(yield* (yield* get("/api/workflows")).json, {
-        workflows: [{ name: "Double" }],
-      });
+      const { workflows } = (yield* (yield* get("/api/workflows")).json) as {
+        workflows: ReadonlyArray<{ name: string }>;
+      };
+      assert.deepStrictEqual(
+        workflows.map(({ name }) => name),
+        ["Double"],
+      );
       assert.strictEqual((yield* get("/", html)).status, 404);
       assert.strictEqual((yield* get("/x/y", html)).status, 404);
     }).pipe(Effect.scoped, Effect.provide(services)),

@@ -13,6 +13,7 @@ import * as Schema from "effect/Schema";
 import type * as Workflow from "effect/workflow/Workflow";
 import * as WorkflowEngine from "effect/workflow/WorkflowEngine";
 import type { Workflows } from "kymo/workflows";
+import { expectedShape } from "./expected-shape.ts";
 
 export class WorkflowSourceError extends Schema.TaggedError<WorkflowSourceError>()(
   "WorkflowSourceError",
@@ -81,6 +82,7 @@ export class EffectVersionMismatch extends Schema.TaggedError<EffectVersionMisma
 export type Registered = {
   readonly workflow: RegisteredWorkflow;
   readonly source: string;
+  readonly expected: Option.Option<string>;
   readonly context: Context.Context<never>;
   readonly register: Effect.Effect<void>;
 };
@@ -288,6 +290,7 @@ export const layer = (options: {
                         registered.set(workflow._tag, {
                           workflow: workflow as unknown as RegisteredWorkflow,
                           source,
+                          expected: expectedShape(workflow.payloadSchema),
                           context,
                           register: Effect.provideContext(registration, context),
                         });

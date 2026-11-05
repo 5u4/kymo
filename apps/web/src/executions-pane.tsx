@@ -74,6 +74,7 @@ const ExecutionRow = ({
   const heading = title(execution);
   const tag = Option.getOrUndefined(suspendTag(execution.status));
   const parent = Option.getOrUndefined(row.parent);
+  const key = heading.labelled ? Option.getOrUndefined(execution.idempotencyKey) : undefined;
   const status = statusName(execution.status);
   const at = lastEntry(execution);
   return (
@@ -107,6 +108,11 @@ const ExecutionRow = ({
           <span className="flex-none font-mono text-[11px]/[1.2] text-fg-4">
             {shortId(execution.id)}
           </span>
+          {key === undefined ? null : (
+            <span title={key} className="min-w-0 truncate font-mono text-[11px]/[1.2] text-fg-3">
+              {key}
+            </span>
+          )}
           {tag === undefined ? null : (
             <span className="inline-flex h-[17px] flex-none items-center rounded-[5px] bg-sus/12 px-1.5 font-mono text-[10.5px]/none font-medium text-sus">
               {tag}
@@ -265,7 +271,8 @@ export const ExecutionsPane = ({
         event.ctrlKey ||
         event.altKey ||
         event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
       ) {
         return;
       }

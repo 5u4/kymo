@@ -59,7 +59,12 @@ export const layer = (options: {
   const workflows = HttpApiBuilder.group(Api, "workflows", (handlers) =>
     Effect.map(Registry, (registry) =>
       handlers.handle("list", () =>
-        Effect.succeed({ workflows: registry.names.map((name) => ({ name })) }),
+        Effect.succeed({
+          workflows: registry.names.map((name) => ({
+            name,
+            expected: Option.flatMap(registry.get(name), (entry) => entry.expected),
+          })),
+        }),
       ),
     ),
   );

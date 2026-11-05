@@ -38,7 +38,6 @@ import {
   WorkflowNotFound,
 } from "kymo/api";
 import { Awaits } from "./awaits.ts";
-import { expectedShape } from "./expected-shape.ts";
 import { Registry, type Registered } from "./workflow-sources.ts";
 
 const CauseReason = Schema.Union([
@@ -499,7 +498,7 @@ export class Executions extends Context.Service<
               new InvalidPayload({
                 workflow: workflow._tag,
                 issue: error.message.replace(/\n\s*/g, " "),
-                ...Option.match(expectedShape(workflow.payloadSchema), {
+                ...Option.match(registration.expected, {
                   onNone: () => ({}),
                   onSome: (expected) => ({ expected }),
                 }),

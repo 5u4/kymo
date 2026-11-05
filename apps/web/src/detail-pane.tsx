@@ -20,6 +20,8 @@ import {
   type Actions,
 } from "./actions.ts";
 import { ActionAlert } from "./action-alert.tsx";
+import { EscapeCancels } from "./escape-cancels.tsx";
+import type { Existed } from "./execute.ts";
 import { ago, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { StatusGlyph, StatusIcon } from "./glyphs.tsx";
 import { ExecutionLink, Note, When } from "./inspector.tsx";
@@ -142,19 +144,6 @@ const StopNoteText = ({
   }
 };
 
-const EscapeCancels = ({ onCancel }: { onCancel: () => void }) => {
-  useMountEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onCancel();
-    };
-    document.addEventListener("keydown", onKey, { capture: true });
-    return () => document.removeEventListener("keydown", onKey, { capture: true });
-  });
-  return null;
-};
-
 const InterruptConfirm = ({
   detail,
   byId,
@@ -274,11 +263,13 @@ const ExecutionHeader = ({
   now,
   rootFlag,
   actions,
+  existed,
 }: {
   detail: ExecutionDetail;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  existed: Existed | undefined;
   actions: Actions;
 }) => {
   const status = statusName(detail.status);
@@ -368,11 +359,22 @@ const ExecutionHeader = ({
           <StopNoteText note={note} detail={detail} byId={byId} now={now} rootFlag={rootFlag} />
         </Note>
       )}
+      {existed?.id === detail.id ? (
+        <Note>
+          <span className="font-mono">{shortId(detail.id)}</span> already existed.
+          {existed.labelled ? " Its label was not changed." : null}
+        </Note>
+      ) : null}
     </section>
   );
 };
 
 const idle = ActionState.Idle();
+
+interface HeldAction {
+  readonly id: string;
+  readonly state: ActionState;
+}
 
 const ExecutionView = ({
   detail,
@@ -383,6 +385,10 @@ const ExecutionView = ({
   rootFlag,
   height,
   onResize,
+  existed,
+  state,
+  onState,
+  onAnswer,
 }: {
   detail: ExecutionDetail;
   logs: Logs;
@@ -392,20 +398,23 @@ const ExecutionView = ({
   rootFlag: string | undefined;
   height: Option.Option<number>;
   onResize: (height: number) => void;
+  existed: Existed | undefined;
+  state: ActionState;
+  onState: (state: ActionState) => void;
+  onAnswer: (state: ActionState) => void;
 }) => {
   const router = useRouter();
-  const [state, setState] = useState<ActionState>(idle);
   const submit = (request: ActionRequest) => {
-    setState(ActionState.Submitting({ target: request }));
+    onState(ActionState.Submitting({ target: request }));
     void Effect.runPromise(requestAction(detail.id, request)).then((next) => {
-      setState(next);
+      onAnswer(next);
       void router.invalidate();
     });
   };
   const actions: Actions = {
     phase: phase(state, { updatedAt: detail.updatedAt, requestedAt }, now),
-    confirm: () => setState(ActionState.Confirming()),
-    dismiss: () => setState(idle),
+    confirm: () => onState(ActionState.Confirming()),
+    dismiss: () => onState(idle),
     submit,
   };
   return (
@@ -419,6 +428,7 @@ const ExecutionView = ({
         now={now}
         rootFlag={rootFlag}
         actions={actions}
+        existed={existed}
       />
       <Trace
         detail={detail}
@@ -474,35 +484,64 @@ export const DetailPane = ({
   executions,
   now,
   rootFlag,
+  form,
+  existed,
+  onExecute,
 }: {
   detail: Option.Option<Detail>;
   executions: ReadonlyArray<ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  form: ReactNode | undefined;
+  existed: Existed | undefined;
+  onExecute: (() => void) | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const [height, setHeight] = useState<Option.Option<number>>(Option.none());
+  const [held, setHeld] = useState<Option.Option<HeldAction>>(Option.none());
   const byId = new Map(executions.map((execution) => [execution.id, execution]));
   const selected = Option.getOrUndefined(detail);
+  const loadedId = selected?._tag === "Loaded" ? selected.detail.id : undefined;
+  if (Option.exists(held, ({ id }) => id !== loadedId)) {
+    setHeld(Option.none());
+  }
+  const actionState = (id: string) =>
+    Option.match(
+      Option.filter(held, (action) => action.id === id),
+      { onNone: () => idle, onSome: (action) => action.state },
+    );
+  const answer = (id: string) => (state: ActionState) =>
+    setHeld((prev) =>
+      Option.exists(prev, (action) => action.id === id) ? Option.some({ id, state }) : prev,
+    );
   const back = (
     <Button onClick={() => void navigate({ search: (prev) => refine(prev, { exec: undefined }) })}>
       Back to executions
     </Button>
   );
+  const execute =
+    onExecute === undefined ? undefined : (
+      <Button variant="primary" onClick={onExecute}>
+        Execute a workflow
+      </Button>
+    );
   const scroll = "min-h-0 flex-1 overflow-auto";
   return (
     <Pane
       id="detail-title"
       title="Execution"
-      count={selected?._tag === "Loaded" ? shortId(selected.detail.id) : ""}
+      count={form === undefined && selected?._tag === "Loaded" ? shortId(selected.detail.id) : ""}
       className="bg-panel"
     >
-      {selected === undefined ? (
+      {form !== undefined ? (
+        <div className={scroll}>{form}</div>
+      ) : selected === undefined ? (
         <div className={scroll}>
           {executions.length === 0 ? (
             <Void
               code={<span className="text-fg-3">executions[0]</span>}
               heading="Nothing has run yet."
+              actions={execute}
             >
               kymo draws what the engine journals. Run{" "}
               <code className="font-mono text-[12.5px] text-fg">
@@ -514,6 +553,7 @@ export const DetailPane = ({
             <Void
               code={<span className="text-fg-3">no selection</span>}
               heading="Pick an execution."
+              actions={execute}
             >
               Move with <Kbd>j</Kbd> <Kbd>k</Kbd> through the executions or click one; its trace
               opens here.
@@ -563,6 +603,10 @@ export const DetailPane = ({
           rootFlag={rootFlag}
           height={height}
           onResize={(next) => setHeight(Option.some(next))}
+          existed={existed}
+          state={actionState(selected.detail.id)}
+          onState={(state) => setHeld(Option.some({ id: selected.detail.id, state }))}
+          onAnswer={answer(selected.detail.id)}
         />
       )}
     </Pane>

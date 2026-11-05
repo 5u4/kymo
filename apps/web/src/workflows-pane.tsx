@@ -28,9 +28,13 @@ const Trace = ({ counts, total }: { counts: StatusCounts; total: number }) =>
 export const WorkflowsPane = ({
   rows,
   selected,
+  registered,
+  onExecute,
 }: {
   rows: ReadonlyArray<WorkflowRow>;
   selected: string | undefined;
+  registered: ReadonlySet<string>;
+  onExecute: (workflow: string) => void;
 }) => (
   <Pane id="workflows-title" title="Workflows" count={String(rows.length - 1)} className="bg-sunk">
     <nav aria-labelledby="workflows-title" className="min-h-0 flex-1 overflow-auto py-1.5">
@@ -38,13 +42,14 @@ export const WorkflowsPane = ({
         {rows.map((row) => {
           const name = Option.getOrUndefined(row.name);
           const current = name === selected;
+          const executable = name !== undefined && registered.has(name);
           const breakdown =
             statuses
               .filter((status) => row.counts[status] > 0)
               .map((status) => `${row.counts[status]} ${status}`)
               .join(", ") || "no executions";
           return (
-            <li key={name ?? ""}>
+            <li key={name ?? ""} className="group/row relative">
               <Link
                 to="/"
                 search={(prev) => refine(prev, { workflow: name })}
@@ -57,7 +62,11 @@ export const WorkflowsPane = ({
                 >
                   {name ?? "All workflows"}
                 </span>
-                <span className="font-mono text-[11.5px]/none text-fg-3">{row.total}</span>
+                <span
+                  className={`font-mono text-[11.5px]/none text-fg-3 transition-opacity duration-140 ease-g ${executable ? "group-focus-within/row:opacity-0 group-hover/row:opacity-0" : ""}`}
+                >
+                  {row.total}
+                </span>
                 <Trace counts={row.counts} total={row.total} />
                 <span
                   aria-hidden="true"
@@ -78,6 +87,16 @@ export const WorkflowsPane = ({
                   ))}
                 </span>
               </Link>
+              {name !== undefined && executable ? (
+                <button
+                  type="button"
+                  aria-label={`Execute ${name}`}
+                  onClick={() => onExecute(name)}
+                  className="absolute top-[7px] right-2.5 inline-flex h-6 items-center rounded-md bg-raised px-2 text-[11.5px]/none font-medium text-fg opacity-0 shadow-[0_1px_0_oklch(0_0_0/.25)] inset-ring inset-ring-line transition-[opacity,background-color] duration-140 ease-g group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-hover active:scale-96"
+                >
+                  Execute
+                </button>
+              ) : null}
             </li>
           );
         })}
