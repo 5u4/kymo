@@ -189,9 +189,24 @@ describe("traceOf", () => {
           reason: { _tag: "Clock", name: "quiet", wakeAt: at("2026-11-03T12:00:00Z") },
         },
         waits: [
-          { kind: "Deferred", name: "approval", since: at("2026-11-03T10:02:00Z") },
-          { kind: "Clock", name: "quiet", since: at("2026-11-03T10:01:00Z") },
-          { kind: "Clock", name: "other", since: at("2026-11-03T10:03:00Z") },
+          {
+            kind: "Deferred",
+            name: "approval",
+            since: at("2026-11-03T10:02:00Z"),
+            expected: Option.none(),
+          },
+          {
+            kind: "Clock",
+            name: "quiet",
+            since: at("2026-11-03T10:01:00Z"),
+            expected: Option.none(),
+          },
+          {
+            kind: "Clock",
+            name: "other",
+            since: at("2026-11-03T10:03:00Z"),
+            expected: Option.none(),
+          },
         ],
       }),
       none,
@@ -263,7 +278,14 @@ describe("spanStatus", () => {
     const root = traceOf(
       detail({
         status: { _tag: "Suspended", reason: { _tag: "Deferred", name: Option.some("approval") } },
-        waits: [{ kind: "Deferred", name: "approval", since: at("2026-11-03T10:01:00Z") }],
+        waits: [
+          {
+            kind: "Deferred",
+            name: "approval",
+            since: at("2026-11-03T10:01:00Z"),
+            expected: Option.none(),
+          },
+        ],
       }),
       none,
     );
@@ -321,7 +343,14 @@ describe("initialSpan", () => {
   const waiting = detail({
     status: { _tag: "Suspended", reason: { _tag: "Deferred", name: Option.some("approval") } },
     activities: [run("Load", 1, failed, "2026-11-03T10:00:01Z", "2026-11-03T10:00:02Z")],
-    waits: [{ kind: "Deferred", name: "approval", since: at("2026-11-03T10:00:03Z") }],
+    waits: [
+      {
+        kind: "Deferred",
+        name: "approval",
+        since: at("2026-11-03T10:00:03Z"),
+        expected: Option.none(),
+      },
+    ],
   });
 
   it("picks the open wait of a suspended execution before a failed activity", () => {
@@ -457,7 +486,14 @@ describe("axis", () => {
           _tag: "Suspended",
           reason: { _tag: "Clock", name: "quiet", wakeAt: at("2026-11-03T10:25:00Z") },
         },
-        waits: [{ kind: "Clock", name: "quiet", since: at("2026-11-03T10:01:00Z") }],
+        waits: [
+          {
+            kind: "Clock",
+            name: "quiet",
+            since: at("2026-11-03T10:01:00Z"),
+            expected: Option.none(),
+          },
+        ],
       }),
       none,
     );
@@ -506,7 +542,14 @@ describe("fitZoom", () => {
           _tag: "Suspended",
           reason: { _tag: "Clock", name: "quiet", wakeAt: at("2026-11-03T10:01:00Z") },
         },
-        waits: [{ kind: "Clock", name: "quiet", since: at("2026-11-03T10:00:01Z") }],
+        waits: [
+          {
+            kind: "Clock",
+            name: "quiet",
+            since: at("2026-11-03T10:00:01Z"),
+            expected: Option.none(),
+          },
+        ],
       }),
       none,
     );

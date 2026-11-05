@@ -49,7 +49,7 @@ const detail: ExecutionDetail = {
     run("Charge", 2, succeeded, "07", "08"),
   ],
   children: ["child1"],
-  waits: [{ kind: "Deferred", name: "Approval", since: at("09") }],
+  waits: [{ kind: "Deferred", name: "Approval", since: at("09"), expected: Option.none() }],
 };
 
 const root = traceOf(detail, new Map());

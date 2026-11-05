@@ -72,7 +72,7 @@ export const DaemonDown = ({ message }: { message: string }) => {
           daemon answers again.
         </p>
         <div className="mt-[22px] flex flex-wrap items-center gap-2.5">
-          <Button primary onClick={() => void router.invalidate()}>
+          <Button variant="primary" onClick={() => void router.invalidate()}>
             Retry connection
           </Button>
         </div>

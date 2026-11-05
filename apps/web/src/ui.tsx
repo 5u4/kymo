@@ -1,25 +1,44 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
+
+const buttonVariants = {
+  secondary:
+    "bg-raised text-fg shadow-[0_1px_0_oklch(0_0_0/.25)] inset-ring inset-ring-line enabled:hover:bg-hover enabled:hover:inset-ring-line-strong",
+  primary: "bg-fg text-canvas shadow-[0_1px_0_oklch(0_0_0/.3)] enabled:hover:bg-white",
+  danger:
+    "bg-raised text-fail shadow-[0_1px_0_oklch(0_0_0/.25)] inset-ring inset-ring-fail/40 enabled:hover:bg-[color-mix(in_oklch,var(--color-fail)_10%,var(--color-raised))] enabled:hover:inset-ring-fail/60",
+  dangerSolid: "bg-fail text-[oklch(0.16_0.02_28)] enabled:hover:bg-[oklch(0.76_0.17_28)]",
+  ghost: "h-7 px-2.5 text-fg-3 enabled:hover:bg-hover enabled:hover:text-fg",
+} as const;
 
 export const Button = ({
-  primary = false,
+  variant = "secondary",
+  disabled = false,
+  ref,
   onClick,
   children,
 }: {
-  primary?: boolean;
+  variant?: keyof typeof buttonVariants;
+  disabled?: boolean;
+  ref?: Ref<HTMLButtonElement>;
   onClick: () => void;
   children: ReactNode;
 }) => (
   <button
     type="button"
+    disabled={disabled}
+    ref={ref}
     onClick={onClick}
-    className={`inline-flex h-8 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px]/none font-medium whitespace-nowrap transition-[background-color,box-shadow,color] duration-140 ease-g active:scale-96 ${
-      primary
-        ? "bg-fg text-canvas shadow-[0_1px_0_oklch(0_0_0/.3)] hover:bg-white"
-        : "bg-raised text-fg shadow-[0_1px_0_oklch(0_0_0/.25)] inset-ring inset-ring-line hover:bg-hover hover:inset-ring-line-strong"
-    }`}
+    className={`inline-flex h-8 items-center justify-center gap-2 rounded-lg px-3 text-[12.5px]/none font-medium whitespace-nowrap transition-[background-color,box-shadow,color,opacity] duration-140 ease-g enabled:active:scale-96 disabled:cursor-default disabled:opacity-55 ${buttonVariants[variant]}`}
   >
     {children}
   </button>
+);
+
+export const Spinner = () => (
+  <span
+    aria-hidden="true"
+    className="size-3 flex-none animate-spin rounded-full border-[1.5px] border-current border-r-transparent"
+  />
 );
 
 export const Pane = ({

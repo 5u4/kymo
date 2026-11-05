@@ -435,7 +435,12 @@ describe("executions", () => {
         const invalid = yield* Effect.flip(
           executions.complete(ids.gate, { name: "Gate", value: 1 }),
         );
-        assert.strictEqual(invalid._tag, "InvalidValue");
+        assert(invalid._tag === "InvalidValue");
+        const gateWait = (yield* executions.get(ids.gate)).waits.find(
+          (wait) => wait.name === "Gate",
+        );
+        assert.isDefined(invalid.expected);
+        assert.deepStrictEqual(gateWait?.expected, Option.some(invalid.expected));
         const resumeWaiting = yield* Effect.flip(executions.resume(ids.gate));
         assert.deepInclude(resumeWaiting, { _tag: "ActionNotAllowed", action: "resume" });
 

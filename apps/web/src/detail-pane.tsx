@@ -1,17 +1,34 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import { statusName, type ExecutionDetail, type ExecutionSummary } from "kymo/api";
+import {
+  actionsFor,
+  statusName,
+  type ExecutionAction,
+  type ExecutionDetail,
+  type ExecutionSummary,
+} from "kymo/api";
 import { completeCommand, kymoCommand } from "kymo/shell";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import {
+  ActionState,
+  phase,
+  requestAction,
+  unfinishedChildren,
+  type ActionRequest,
+  type Actions,
+} from "./actions.ts";
+import { ActionAlert } from "./action-alert.tsx";
 import { ago, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { StatusGlyph, StatusIcon } from "./glyphs.tsx";
 import { ExecutionLink, Note, When } from "./inspector.tsx";
-import type { Detail } from "./snapshot.ts";
+import type { Detail, Logs } from "./snapshot.ts";
 import { statusColor } from "./status-color.ts";
 import { Trace } from "./trace.tsx";
 import { duration, isEnded, stopNote, type StopNote } from "./trace-view.ts";
-import { Button, Kbd, Pane, Skeleton } from "./ui.tsx";
+import { useMountEffect } from "./use-mount-effect.ts";
+import { Button, Kbd, Pane, Skeleton, Spinner } from "./ui.tsx";
 
 const Void = ({
   code,
@@ -125,16 +142,144 @@ const StopNoteText = ({
   }
 };
 
+const EscapeCancels = ({ onCancel }: { onCancel: () => void }) => {
+  useMountEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCancel();
+    };
+    document.addEventListener("keydown", onKey, { capture: true });
+    return () => document.removeEventListener("keydown", onKey, { capture: true });
+  });
+  return null;
+};
+
+const InterruptConfirm = ({
+  detail,
+  byId,
+  actions,
+}: {
+  detail: ExecutionDetail;
+  byId: ReadonlyMap<string, ExecutionSummary>;
+  actions: Actions;
+}) => {
+  const busy = actions.phase._tag === "Busy";
+  const children = unfinishedChildren(detail.children, byId);
+  const keep = useRef<HTMLButtonElement>(null);
+  useMountEffect(() => keep.current?.focus());
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby="interrupt-confirm-heading"
+      aria-describedby="interrupt-confirm-body"
+      className="mt-[18px] rounded-xl bg-canvas px-[18px] py-4 shadow-[0_12px_32px_oklch(0_0_0/.35)] inset-ring inset-ring-fail/40"
+    >
+      {actions.phase._tag === "Confirming" ? <EscapeCancels onCancel={actions.dismiss} /> : null}
+      <h4 id="interrupt-confirm-heading" className="text-[15px]/[1.35] font-medium text-balance">
+        Interrupt <span className="font-mono">{shortId(detail.id)}</span>? There is no undo.
+      </h4>
+      <div id="interrupt-confirm-body" className="mt-1 text-[12.5px]/[1.5] text-fg-3">
+        <p>
+          The fiber is interrupted, registered compensations run, and the execution can never be
+          resumed.
+        </p>
+        {children === 0 ? null : (
+          <p className="mt-1">
+            {children === 1
+              ? "1 child execution stops with it."
+              : `${children} child executions stop with it.`}
+          </p>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line-soft pt-3.5">
+        <Button ref={keep} disabled={busy} onClick={actions.dismiss}>
+          Keep {statusName(detail.status)} <Kbd>esc</Kbd>
+        </Button>
+        <Button
+          variant="dangerSolid"
+          disabled={busy}
+          onClick={() => actions.submit({ action: "interrupt" })}
+        >
+          {busy ? (
+            <>
+              <Spinner />
+              Interrupting…
+            </>
+          ) : (
+            "Interrupt execution"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const headerActions: Record<
+  ExecutionAction,
+  { label: string; busy: string; variant: "primary" | "danger" }
+> = {
+  resume: { label: "Resume", busy: "Resuming…", variant: "primary" },
+  interrupt: { label: "Interrupt", busy: "Interrupting…", variant: "danger" },
+};
+
+const ActionsBar = ({
+  detail,
+  byId,
+  actions,
+}: {
+  detail: ExecutionDetail;
+  byId: ReadonlyMap<string, ExecutionSummary>;
+  actions: Actions;
+}) => {
+  const { phase: current } = actions;
+  const allowed = actionsFor(detail.status);
+  const busy = current._tag === "Busy";
+  return (
+    <>
+      {allowed.length === 0 ? null : (
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          {allowed.map((action) => (
+            <Button
+              key={action}
+              variant={headerActions[action].variant}
+              disabled={busy}
+              onClick={() =>
+                action === "interrupt" ? actions.confirm() : actions.submit({ action })
+              }
+            >
+              {busy && current.target.action === action ? (
+                <>
+                  <Spinner />
+                  {headerActions[action].busy}
+                </>
+              ) : (
+                headerActions[action].label
+              )}
+            </Button>
+          ))}
+        </div>
+      )}
+      {current._tag === "Confirming" || (busy && current.target.action === "interrupt") ? (
+        <InterruptConfirm detail={detail} byId={byId} actions={actions} />
+      ) : null}
+      <ActionAlert actions={actions} shows={(target) => target.action !== "complete"} />
+    </>
+  );
+};
+
 const ExecutionHeader = ({
   detail,
   byId,
   now,
   rootFlag,
+  actions,
 }: {
   detail: ExecutionDetail;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  actions: Actions;
 }) => {
   const status = statusName(detail.status);
   const heading = title(detail);
@@ -217,12 +362,75 @@ const ExecutionHeader = ({
           <dd>{duration(DateTime.toEpochMillis(ended ? last : now) - startedMs)}</dd>
         </div>
       </dl>
+      <ActionsBar detail={detail} byId={byId} actions={actions} />
       {note === undefined ? null : (
         <Note>
           <StopNoteText note={note} detail={detail} byId={byId} now={now} rootFlag={rootFlag} />
         </Note>
       )}
     </section>
+  );
+};
+
+const idle = ActionState.Idle();
+
+const ExecutionView = ({
+  detail,
+  logs,
+  requestedAt,
+  byId,
+  now,
+  rootFlag,
+  height,
+  onResize,
+}: {
+  detail: ExecutionDetail;
+  logs: Logs;
+  requestedAt: DateTime.Utc;
+  byId: ReadonlyMap<string, ExecutionSummary>;
+  now: DateTime.Utc;
+  rootFlag: string | undefined;
+  height: Option.Option<number>;
+  onResize: (height: number) => void;
+}) => {
+  const router = useRouter();
+  const [state, setState] = useState<ActionState>(idle);
+  const submit = (request: ActionRequest) => {
+    setState(ActionState.Submitting({ target: request }));
+    void Effect.runPromise(requestAction(detail.id, request)).then((next) => {
+      setState(next);
+      void router.invalidate();
+    });
+  };
+  const actions: Actions = {
+    phase: phase(state, { updatedAt: detail.updatedAt, requestedAt }, now),
+    confirm: () => setState(ActionState.Confirming()),
+    dismiss: () => setState(idle),
+    submit,
+  };
+  return (
+    <article
+      aria-label={`Execution ${detail.id}`}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      <ExecutionHeader
+        detail={detail}
+        byId={byId}
+        now={now}
+        rootFlag={rootFlag}
+        actions={actions}
+      />
+      <Trace
+        detail={detail}
+        logs={logs}
+        summaries={byId}
+        now={now}
+        rootFlag={rootFlag}
+        height={height}
+        onResize={onResize}
+        actions={actions}
+      />
+    </article>
   );
 };
 
@@ -345,22 +553,17 @@ export const DetailPane = ({
           <Candidates candidates={selected.candidates} byId={byId} />
         </div>
       ) : (
-        <article
-          aria-label={`Execution ${selected.detail.id}`}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          <ExecutionHeader detail={selected.detail} byId={byId} now={now} rootFlag={rootFlag} />
-          <Trace
-            key={selected.detail.id}
-            detail={selected.detail}
-            logs={selected.logs}
-            summaries={byId}
-            now={now}
-            rootFlag={rootFlag}
-            height={height}
-            onResize={(next) => setHeight(Option.some(next))}
-          />
-        </article>
+        <ExecutionView
+          key={selected.detail.id}
+          detail={selected.detail}
+          logs={selected.logs}
+          requestedAt={selected.requestedAt}
+          byId={byId}
+          now={now}
+          rootFlag={rootFlag}
+          height={height}
+          onResize={(next) => setHeight(Option.some(next))}
+        />
       )}
     </Pane>
   );

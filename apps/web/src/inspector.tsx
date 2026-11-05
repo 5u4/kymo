@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
   statusName,
@@ -10,7 +11,9 @@ import {
   type LogLevel,
 } from "kymo/api";
 import { completeCommand, kymoCommand, shellArg } from "kymo/shell";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ActionAlert } from "./action-alert.tsx";
+import type { Actions, Target } from "./actions.ts";
 import { ago, coarse, refine, shortId, suspendTag } from "./executions-view.ts";
 import { Glyph, SpanIcon, StatusIcon } from "./glyphs.tsx";
 import {
@@ -35,8 +38,14 @@ import {
   type Span,
   type WaitSpan,
 } from "./trace-view.ts";
+import { Button, Spinner } from "./ui.tsx";
 
 const prettyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Json, { space: 2 }));
+
+const decodeJson = Schema.decodeResult(Schema.fromJsonString(Schema.Json));
+
+const completes = (target: Target, name: string) =>
+  target.action === "complete" && target.name === name;
 
 const muted = "text-fg-4";
 
@@ -467,14 +476,31 @@ const WaitInspector = ({
   detail,
   now,
   rootFlag,
+  actions,
 }: {
   span: WaitSpan;
   detail: ExecutionDetail;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  actions: Actions;
 }) => {
   const { wait } = span;
+  const [text, setText] = useState("");
+  const [notJson, setNotJson] = useState<string>();
   const wakeAt = Option.getOrUndefined(Option.map(span.wakeAt, DateTime.makeUnsafe));
+  const expected = Option.getOrUndefined(wait.expected);
+  const { phase } = actions;
+  const busy = phase._tag === "Busy";
+  const complete = () => {
+    const value = decodeJson(text);
+    if (Result.isFailure(value)) {
+      actions.dismiss();
+      setNotJson(value.failure.message);
+      return;
+    }
+    setNotJson(undefined);
+    actions.submit({ action: "complete", name: wait.name, value: value.success });
+  };
   return (
     <>
       <Pairs>
@@ -494,12 +520,55 @@ const WaitInspector = ({
         )}
       </Pairs>
       {wait.kind === "Deferred" ? (
-        <Note>
-          The execution waits until something completes this deferred. From the CLI:{" "}
-          <code className="font-mono text-[11.5px] text-fg">
-            {kymoCommand(rootFlag, completeCommand(detail.id, wait.name))}
-          </code>
-        </Note>
+        <>
+          <Note>
+            The execution waits until something completes this deferred. From the CLI:{" "}
+            <code className="font-mono text-[11.5px] text-fg">
+              {kymoCommand(rootFlag, completeCommand(detail.id, wait.name))}
+            </code>
+          </Note>
+          <div className="mt-[18px] grid gap-1.5">
+            <label htmlFor="complete-value" className="text-[12.5px]/[1.3] font-medium">
+              Value (JSON)
+            </label>
+            <textarea
+              id="complete-value"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              spellCheck={false}
+              aria-invalid={notJson !== undefined}
+              aria-describedby="complete-value-hint"
+              className={`min-h-[68px] w-full resize-y rounded-lg bg-sunk px-[11px] py-[9px] font-mono text-[12.5px]/[1.5] text-fg transition-shadow duration-140 ease-g placeholder:text-fg-4 focus-visible:outline-0 ${notJson === undefined ? "inset-ring inset-ring-line hover:inset-ring-line-strong focus-visible:inset-ring-fg-3" : "inset-ring inset-ring-fail/70 focus-visible:inset-ring-fail"}`}
+            />
+            <div
+              id="complete-value-hint"
+              className="min-h-[15px] font-mono text-[11.5px]/[1.35] text-fg-4"
+            >
+              {notJson === undefined ? null : (
+                <p className="font-sans text-fail">Not JSON: {notJson}</p>
+              )}
+              {expected === undefined ? null : (
+                <p>
+                  <span className="font-sans">Expected</span>{" "}
+                  <code className="wrap-anywhere text-fg-2">{expected}</code>
+                </p>
+              )}
+            </div>
+            <ActionAlert actions={actions} shows={(target) => completes(target, wait.name)} />
+            <div>
+              <Button variant="primary" disabled={busy} onClick={complete}>
+                {busy && completes(phase.target, wait.name) ? (
+                  <>
+                    <Spinner />
+                    Completing…
+                  </>
+                ) : (
+                  `Complete ${wait.name}`
+                )}
+              </Button>
+            </div>
+          </div>
+        </>
       ) : (
         <Note>The engine wakes the execution when the clock fires.</Note>
       )}
@@ -577,6 +646,7 @@ export const Inspector = ({
   onTab,
   onLevel,
   onSelect,
+  actions,
 }: {
   span: Span;
   root: ExecutionSpan;
@@ -589,6 +659,7 @@ export const Inspector = ({
   onTab: (tab: InspectorTab) => void;
   onLevel: (level: LevelFilter) => void;
   onSelect: (key: string) => void;
+  actions: Actions;
 }) => {
   const view = logsView(span, root, logs, level);
   const tabs: ReadonlyArray<InspectorTab> = [
@@ -614,7 +685,14 @@ export const Inspector = ({
         <ActivityInspector span={span} activity={activity} now={now} onSelect={onSelect} />
       )
     ) : span._tag === "Wait" ? (
-      <WaitInspector span={span} detail={root.detail} now={now} rootFlag={rootFlag} />
+      <WaitInspector
+        key={span.key}
+        span={span}
+        detail={root.detail}
+        now={now}
+        rootFlag={rootFlag}
+        actions={actions}
+      />
     ) : (
       <ChildInspector span={span} now={now} />
     );
@@ -662,6 +740,20 @@ export const Inspector = ({
         aria-labelledby={tabs.length > 1 ? `inspector-tab-${shown}` : undefined}
         className="max-w-[780px] px-6 pt-4 pb-7"
       >
+        <div className="mb-4 *:mt-0 empty:hidden">
+          <ActionAlert
+            actions={actions}
+            shows={(target) =>
+              target.action === "complete" &&
+              !(
+                shown === "Overview" &&
+                span._tag === "Wait" &&
+                span.wait.kind === "Deferred" &&
+                span.wait.name === target.name
+              )
+            }
+          />
+        </div>
         {shown === "Logs" && Option.isSome(view) ? (
           <LogsPanel
             view={view.value}

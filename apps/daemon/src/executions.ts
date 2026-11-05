@@ -444,6 +444,7 @@ export class Executions extends Context.Service<
             kind: wait._tag,
             name: wait.name,
             since: wait.since,
+            expected: wait._tag === "Deferred" ? wait.expected : Option.none(),
           })),
         };
       }, Effect.provideContext(context));
