@@ -5,7 +5,7 @@ import type { ActivitySpan, ExecutionSpan, Span } from "./trace-view.ts";
 
 export type LogScope =
   | { readonly _tag: "Execution" }
-  | { readonly _tag: "Activity"; readonly name: string; readonly byAttempt: boolean }
+  | { readonly _tag: "Activity"; readonly name: string; readonly attempts: ReadonlyArray<number> }
   | { readonly _tag: "Attempt"; readonly name: string; readonly attempt: number };
 
 export type LevelFilter = "all" | "warn" | "error";
@@ -65,7 +65,7 @@ const scopeOf = (span: Span): Option.Option<LogScope> => {
       return Option.some({
         _tag: "Activity",
         name: span.name,
-        byAttempt: span.attempts.length > 1,
+        attempts: span.attempts.map((run) => run.attempt),
       });
     case "Attempt":
       return Option.some({ _tag: "Attempt", name: span.run.name, attempt: span.run.attempt });
@@ -121,9 +121,20 @@ const originOf = (root: ExecutionSpan, source: LogSource): LogOrigin => {
   };
 };
 
-const groupsOf = (scope: LogScope, lines: ReadonlyArray<LogLine>): ReadonlyArray<LogGroup> => {
+const groupsOf = (
+  scope: LogScope,
+  scoped: ReadonlyArray<LogEntry>,
+  lines: ReadonlyArray<LogLine>,
+): ReadonlyArray<LogGroup> => {
   if (lines.length === 0) return [];
-  if (scope._tag !== "Activity" || !scope.byAttempt) return [{ attempt: Option.none(), lines }];
+  const attempts =
+    scope._tag === "Activity"
+      ? new Set([
+          ...scope.attempts,
+          ...scoped.map(({ source }) => (source._tag === "Activity" ? source.attempt : 0)),
+        ])
+      : new Set<number>();
+  if (attempts.size < 2) return [{ attempt: Option.none(), lines }];
   return [
     ...Map.groupBy(lines, ({ entry }) =>
       entry.source._tag === "Activity" ? entry.source.attempt : 0,
@@ -155,7 +166,7 @@ export const logsView = (
         error: atLevel("error", scoped).length,
       },
       showPass: new Set(shown.map((entry) => entry.pass)).size > 1,
-      groups: groupsOf(scope, lines),
+      groups: groupsOf(scope, scoped, lines),
     };
   });
 

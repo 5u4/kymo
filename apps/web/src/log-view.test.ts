@@ -229,6 +229,20 @@ describe("logsView", () => {
     assert.deepStrictEqual(view("exec").groups.length, 1);
   });
 
+  it("groups by attempt when the logs already hold a retry the detail does not show yet", () => {
+    const groups = view("a/Capture", "all", [
+      entry(1, "Info", activity("Capture", 1), "00"),
+      entry(2, "Info", activity("Capture", 2), "01"),
+    ]).groups.map((group) => ({
+      attempt: group.attempt,
+      seqs: group.lines.map((line) => line.entry.seq),
+    }));
+    assert.deepStrictEqual(groups, [
+      { attempt: Option.some(1), seqs: [1] },
+      { attempt: Option.some(2), seqs: [2] },
+    ]);
+  });
+
   it("has no groups when nothing is at the chosen level", () => {
     const logs = view("a/Capture", "warn");
     assert.deepStrictEqual(logs.groups, []);
