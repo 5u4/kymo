@@ -525,8 +525,8 @@ describe("executions", () => {
         const logsOf = (id: string, query: LogsQuery = {}) =>
           Effect.map(
             Effect.flatMap(Executions, (service) => service.logs(id, query)),
-            ({ total, logs }) => ({
-              total,
+            ({ counts, logs }) => ({
+              total: counts.reduce((sum, { count }) => sum + count, 0),
               seqs: logs.map(({ seq }) => seq),
               causes: logs.map(({ cause }) => cause),
               lines: logs.map(({ pass, level, message, source }) => ({
@@ -604,7 +604,46 @@ describe("executions", () => {
   );
 
   it.live(
-    "reports a log total that matches the lines it returns while the execution keeps logging",
+    "counts every log line per source and level, including lines outside the limit",
+    () =>
+      Effect.gen(function* () {
+        const executions = yield* Executions;
+        const id = yield* Chatty.execute({ id: "counted" }, { discard: true });
+        yield* eventually(
+          Effect.map(executions.logs(id, {}), ({ logs }) => logs.length),
+          (lines) => lines >= 4,
+        );
+        yield* executions.complete(id, { name: "Approval", value: "ann" });
+        yield* eventually(
+          Effect.map(executions.logs(id, {}), ({ logs }) => logs.length),
+          (lines) => lines >= 7,
+        );
+        const { counts, logs } = yield* executions.logs(id, { limit: 2 });
+        assert.strictEqual(logs.length, 2);
+        assert.deepStrictEqual(counts, [
+          { source: { _tag: "Body" }, level: "Error", count: 1 },
+          { source: { _tag: "Body" }, level: "Info", count: 2 },
+          { source: { _tag: "Body" }, level: "Warn", count: 2 },
+          {
+            source: { _tag: "Activity", name: "Chatty.flaky", attempt: 1 },
+            level: "Info",
+            count: 1,
+          },
+          {
+            source: { _tag: "Activity", name: "Chatty.flaky", attempt: 2 },
+            level: "Info",
+            count: 1,
+          },
+        ]);
+      }).pipe(
+        Effect.provide(Layer.unwrap(Effect.map(tempDb, (db) => runtime(db, ["./logs.ts"])))),
+        Effect.scoped,
+      ),
+    60_000,
+  );
+
+  it.live(
+    "reports log counts that sum to the lines it returns while the execution keeps logging",
     () =>
       Effect.gen(function* () {
         const executions = yield* Executions;
@@ -620,7 +659,8 @@ describe("executions", () => {
           () =>
             Effect.gen(function* () {
               while (ticking) {
-                const { total, logs } = yield* executions.logs(id, {});
+                const { counts, logs } = yield* executions.logs(id, {});
+                const total = counts.reduce((sum, { count }) => sum + count, 0);
                 if (logs.length !== total) {
                   mismatches.push(`${logs.length} lines, total ${total}`);
                 }

@@ -290,30 +290,21 @@ const LogsPanel = ({
   onLevel: (level: LevelFilter) => void;
   onSelect: (key: string) => void;
 }) => {
-  const fetched = logs.entries.length;
-  const truncated =
-    logs.total > fetched ? (
-      <Note>
-        Showing the last {fetched} of {logs.total} lines; the counts here cover only those. All
-        lines:{" "}
-        <code className="font-mono text-[11.5px] text-fg">
-          {kymoCommand(rootFlag, `execution ${shellArg(executionId)} --logs --full`)}
-        </code>
-      </Note>
-    ) : null;
+  const fullCommand = (
+    <code className="font-mono text-[11.5px] text-fg">
+      {kymoCommand(rootFlag, `execution ${shellArg(executionId)} --logs --full`)}
+    </code>
+  );
   if (view.count === 0) {
     return (
-      <>
-        <p className="text-[12.5px]/[1.55] text-fg-3">
-          {truncated === null ? "No logs." : `No logs in the last ${fetched} lines.`}{" "}
-          <code className="font-mono text-[11.5px]">Effect.log</code> calls inside{" "}
-          {view.scope._tag === "Execution" ? "the workflow and its activities" : "this Activity"}{" "}
-          show up here.
-        </p>
-        {truncated}
-      </>
+      <p className="text-[12.5px]/[1.55] text-fg-3">
+        No logs. <code className="font-mono text-[11.5px]">Effect.log</code> calls inside{" "}
+        {view.scope._tag === "Execution" ? "the workflow and its activities" : "this Activity"} show
+        up here.
+      </p>
     );
   }
+  const older = view.groups.length === 0 && view.counts[level] > 0;
   const source = view.scope._tag === "Execution";
   const columns = [
     "90px 42px",
@@ -339,9 +330,18 @@ const LogsPanel = ({
           </button>
         ))}
       </fieldset>
-      {truncated}
+      {!older && view.fetched < view.count ? (
+        <Note>
+          Showing the last {view.fetched} of {view.count} lines. All lines: {fullCommand}
+        </Note>
+      ) : null}
       <div className="mt-3 font-mono text-xs/normal">
-        {view.groups.length === 0 ? (
+        {older ? (
+          <p className="font-sans text-[12.5px]/[1.55] text-fg-3">
+            Its {plural(view.counts[level], "line is", "lines are")} older than the last{" "}
+            {logs.entries.length} fetched. {fullCommand}
+          </p>
+        ) : view.groups.length === 0 ? (
           <p className="font-sans text-[12.5px]/[1.55] text-fg-3">Nothing at this level.</p>
         ) : (
           view.groups.map((group, index) => {
@@ -590,7 +590,7 @@ export const Inspector = ({
   onLevel: (level: LevelFilter) => void;
   onSelect: (key: string) => void;
 }) => {
-  const view = logsView(span, root, logs.entries, level);
+  const view = logsView(span, root, logs, level);
   const tabs: ReadonlyArray<InspectorTab> = [
     "Overview",
     ...(span._tag === "Execution" ? (["Payload"] as const) : []),

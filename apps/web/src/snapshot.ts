@@ -8,6 +8,7 @@ import {
   Api,
   type ExecutionDetail,
   type ExecutionSummary,
+  type LogCount,
   type LogEntry,
   type WorkflowList,
 } from "kymo/api";
@@ -15,7 +16,7 @@ import {
 const logLimit = 500;
 
 export interface Logs {
-  readonly total: number;
+  readonly counts: ReadonlyArray<LogCount>;
   readonly entries: ReadonlyArray<LogEntry>;
 }
 
@@ -54,8 +55,8 @@ export const snapshot = (exec: string | undefined): Effect.Effect<Snapshot> =>
               ],
               { concurrency: "unbounded" },
             ).pipe(
-              Effect.map(([detail, { total, logs }]) =>
-                Detail.Loaded({ detail, logs: { total, entries: logs } }),
+              Effect.map(([detail, { counts, logs }]) =>
+                Detail.Loaded({ detail, logs: { counts, entries: logs } }),
               ),
               Effect.catchTags({
                 ExecutionNotFound: (error) => Effect.succeed(Detail.NotFound({ id: error.id })),

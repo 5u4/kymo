@@ -210,6 +210,7 @@ export const execution: Command = {
             query: full ? {} : { limit: logLimit },
           })
         : undefined;
+      const total = logs?.counts.reduce((sum, { count }) => sum + count, 0) ?? 0;
       const activities = full ? detail.activities : detail.activities.slice(-activityLimit);
       const parent = Option.getOrNull(detail.parentId);
       return {
@@ -253,8 +254,8 @@ export const execution: Command = {
                       : `${log.source.name}#${log.source.attempt}`,
                   message: truncate(log.message, full),
                 })),
-                ...(logs.logs.length < logs.total
-                  ? { logsShown: `${logs.logs.length} of ${logs.total}` }
+                ...(logs.logs.length < total
+                  ? { logsShown: `${logs.logs.length} of ${total}` }
                   : {}),
               }),
         },
@@ -266,11 +267,11 @@ export const execution: Command = {
             : []),
           ...(logs === undefined
             ? [`Run \`${kymo(`execution ${detail.id} --logs`)}\` to see its logs`]
-            : logs.total === 0
+            : total === 0
               ? ["No logs yet; they appear once the workflow logs with Effect.log"]
-              : logs.logs.length < logs.total
+              : logs.logs.length < total
                 ? [
-                    `Run \`${kymo(`execution ${detail.id} --logs --full`)}\` to see all ${logs.total} log lines`,
+                    `Run \`${kymo(`execution ${detail.id} --logs --full`)}\` to see all ${total} log lines`,
                   ]
                 : []),
           ...(parent === null ? [] : [`Run \`${kymo(`execution ${parent}`)}\` to see its parent`]),

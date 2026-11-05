@@ -96,8 +96,9 @@ and delete the old path in the same change, with no compatibility shims.
   every 2 seconds, and filters during render in `apps/web/src/executions-view.ts`. A 404 or 409
   from the detail or logs request shows in the detail pane, not as the daemon being down. The trace
   is derived from the detail and the list in `apps/web/src/trace-view.ts`, and each span's logs in
-  `apps/web/src/log-view.ts`; the selected span, expanded rows, zoom, split height, inspector tab
-  and log level filter stay in component state.
+  `apps/web/src/log-view.ts`, whose counts come from the response's `counts` because those cover
+  every line, not only the fetched ones; the selected span, expanded rows, zoom, split height,
+  inspector tab and log level filter stay in component state.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

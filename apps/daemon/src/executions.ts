@@ -26,8 +26,10 @@ import {
   type ExecutionQuery,
   type ExecutionStatus,
   type ExecutionSummary,
+  type LogCount,
   type LogEntry,
   LogLevel,
+  type LogSource,
   type LogsQuery,
   InvalidPayload,
   InvalidValue,
@@ -125,7 +127,17 @@ const LogRow = Schema.Struct({
   attempt: Schema.NullOr(Schema.Int),
 });
 
-const LogCount = Schema.Tuple([Schema.Struct({ total: Schema.Int })]);
+const LogCountRow = Schema.Struct({
+  activity: Schema.NullOr(Schema.String),
+  attempt: Schema.NullOr(Schema.Int),
+  level: LogLevel,
+  count: Schema.Int,
+});
+
+const sourceOf = (activity: string | null, attempt: number | null): LogSource =>
+  activity === null || attempt === null
+    ? { _tag: "Body" }
+    : { _tag: "Activity", name: activity, attempt };
 
 const JsonText = Schema.fromJsonString(Schema.Json);
 
@@ -438,10 +450,13 @@ export class Executions extends Context.Service<
 
       const logs = Effect.fn("Executions.logs")(function* (id: string, query: LogsQuery) {
         const { run } = yield* resolve(id);
-        const [[{ total }], rows] = yield* Effect.all([
-          sql`SELECT count(*) AS total FROM kymo_logs WHERE execution_id = ${run.id}`.pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(LogCount)),
-          ),
+        const [counts, rows] = yield* Effect.all([
+          sql`
+            SELECT activity, attempt, level, count(*) AS count FROM kymo_logs
+            WHERE execution_id = ${run.id}
+            GROUP BY activity, attempt, level
+            ORDER BY activity, attempt, level
+          `.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(LogCountRow)))),
           sql`
             SELECT * FROM (
               SELECT seq, pass, at, level, message, cause, activity, attempt FROM kymo_logs
@@ -452,14 +467,14 @@ export class Executions extends Context.Service<
           `.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(LogRow)))),
         ]).pipe(sql.withTransaction, Effect.orDie);
         return {
-          total,
+          counts: counts.map(({ activity, attempt, ...count }): LogCount => ({
+            ...count,
+            source: sourceOf(activity, attempt),
+          })),
           logs: rows.map(({ activity, attempt, cause, ...row }): LogEntry => ({
             ...row,
             cause: Option.fromNullOr(cause),
-            source:
-              activity === null || attempt === null
-                ? { _tag: "Body" }
-                : { _tag: "Activity", name: activity, attempt },
+            source: sourceOf(activity, attempt),
           })),
         };
       }, Effect.provideContext(context));

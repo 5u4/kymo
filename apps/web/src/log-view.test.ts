@@ -5,6 +5,7 @@ import type {
   ActivityRun,
   ActivityStatus,
   ExecutionDetail,
+  LogCount,
   LogEntry,
   LogLevel,
   LogSource,
@@ -86,8 +87,18 @@ const entries: ReadonlyArray<LogEntry> = [
 const span = (key: string): Span =>
   Option.getOrThrowWith(findSpan(root, key), () => new Error(`no span ${key}`));
 
+const countsOf = (from: ReadonlyArray<LogEntry>): ReadonlyArray<LogCount> =>
+  from.map(({ source, level }) => ({ source, level, count: 1 }));
+
+const viewOf = (
+  key: string,
+  filter: LevelFilter,
+  logs: { counts: ReadonlyArray<LogCount>; entries: ReadonlyArray<LogEntry> },
+): LogsView =>
+  Option.getOrThrowWith(logsView(span(key), root, logs, filter), () => new Error("no Logs tab"));
+
 const view = (key: string, filter: LevelFilter = "all", from = entries): LogsView =>
-  Option.getOrThrowWith(logsView(span(key), root, from, filter), () => new Error("no Logs tab"));
+  viewOf(key, filter, { counts: countsOf(from), entries: from });
 
 const seqs = (logs: LogsView) =>
   logs.groups.flatMap((group) => group.lines.map((line) => line.entry.seq));
@@ -110,9 +121,53 @@ describe("logsView", () => {
     assert.deepStrictEqual(seqs(view("a/Charge/1")), [5]);
   });
 
+  it("counts the real totals when only the newest lines were fetched", () => {
+    const fetched = [
+      entry(7, "Warn", activity("Charge", 2), "07.400"),
+      entry(8, "Info", body, "08.100"),
+    ];
+    const logs = {
+      counts: [
+        { source: body, level: "Info", count: 40 },
+        { source: activity("Charge", 1), level: "Error", count: 3 },
+        { source: activity("Charge", 2), level: "Warn", count: 5 },
+        { source: activity("Charge", 2), level: "Info", count: 10 },
+        { source: activity("Capture"), level: "Info", count: 2 },
+      ] satisfies ReadonlyArray<LogCount>,
+      entries: fetched,
+    };
+    const exec = viewOf("exec", "all", logs);
+    assert.strictEqual(exec.count, 60);
+    assert.strictEqual(exec.fetched, 2);
+    assert.deepStrictEqual(exec.counts, { all: 60, warn: 8, error: 3 });
+    assert.isTrue(exec.hasError);
+    assert.deepStrictEqual(seqs(exec), [7, 8]);
+
+    const charge = viewOf("a/Charge", "error", logs);
+    assert.strictEqual(charge.count, 18);
+    assert.strictEqual(charge.fetched, 1);
+    assert.deepStrictEqual(charge.counts, { all: 18, warn: 8, error: 3 });
+    assert.isTrue(charge.hasError);
+    assert.deepStrictEqual(seqs(charge), []);
+
+    const second = viewOf("a/Charge/2", "all", logs);
+    assert.strictEqual(second.count, 15);
+    assert.strictEqual(second.fetched, 1);
+    assert.deepStrictEqual(second.counts, { all: 15, warn: 5, error: 0 });
+    assert.isFalse(second.hasError);
+  });
+
   it("has no Logs tab on waits and children", () => {
-    assert.isTrue(Option.isNone(logsView(span("w/Deferred/Approval"), root, entries, "all")));
-    assert.isTrue(Option.isNone(logsView(span("c/child1"), root, entries, "all")));
+    assert.isTrue(
+      Option.isNone(
+        logsView(span("w/Deferred/Approval"), root, { counts: countsOf(entries), entries }, "all"),
+      ),
+    );
+    assert.isTrue(
+      Option.isNone(
+        logsView(span("c/child1"), root, { counts: countsOf(entries), entries }, "all"),
+      ),
+    );
   });
 
   it("filters by minimum level and counts each filter over the span's lines", () => {

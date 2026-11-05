@@ -146,8 +146,15 @@ export const LogsQuery = Schema.Struct({
 });
 export type LogsQuery = typeof LogsQuery.Type;
 
+export const LogCount = Schema.Struct({
+  source: LogSource,
+  level: LogLevel,
+  count: Schema.Int,
+});
+export type LogCount = typeof LogCount.Type;
+
 export const ExecutionLogs = Schema.Struct({
-  total: Schema.Int,
+  counts: Schema.Array(LogCount),
   logs: Schema.Array(LogEntry),
 });
 export type ExecutionLogs = typeof ExecutionLogs.Type;
