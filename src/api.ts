@@ -174,7 +174,9 @@ export const ExecutionList = Schema.Struct({
 export type ExecutionList = typeof ExecutionList.Type;
 
 export const WorkflowList = Schema.Struct({
-  workflows: Schema.Array(Schema.Struct({ name: Schema.String })),
+  workflows: Schema.Array(
+    Schema.Struct({ name: Schema.String, expected: Schema.OptionFromNullOr(Schema.String) }),
+  ),
 });
 export type WorkflowList = typeof WorkflowList.Type;
 
