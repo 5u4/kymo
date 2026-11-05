@@ -1,6 +1,7 @@
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import type { LogEntry, LogLevel, LogSource } from "kymo/api";
+import type { LogCount, LogEntry, LogLevel, LogSource } from "kymo/api";
+import type { Logs } from "./snapshot.ts";
 import type { ActivitySpan, ExecutionSpan, Span } from "./trace-view.ts";
 
 export type LogScope =
@@ -45,6 +46,7 @@ export interface LogGroup {
 export interface LogsView {
   readonly scope: LogScope;
   readonly count: number;
+  readonly fetched: number;
   readonly hasError: boolean;
   readonly counts: Record<LevelFilter, number>;
   readonly showPass: boolean;
@@ -75,18 +77,26 @@ const scopeOf = (span: Span): Option.Option<LogScope> => {
   }
 };
 
-const inScope = (scope: LogScope, entries: ReadonlyArray<LogEntry>): ReadonlyArray<LogEntry> =>
+const inScope = <A extends { readonly source: LogSource }>(
+  scope: LogScope,
+  items: ReadonlyArray<A>,
+): ReadonlyArray<A> =>
   scope._tag === "Execution"
-    ? entries
-    : entries.filter(
+    ? items
+    : items.filter(
         ({ source }) =>
           source._tag === "Activity" &&
           source.name === scope.name &&
           (scope._tag === "Activity" || source.attempt === scope.attempt),
       );
 
-const atLevel = (filter: LevelFilter, entries: ReadonlyArray<LogEntry>) =>
-  entries.filter((entry) => rank[entry.level] >= floor[filter]);
+const atLevel = <A extends { readonly level: LogLevel }>(
+  filter: LevelFilter,
+  items: ReadonlyArray<A>,
+): ReadonlyArray<A> => items.filter((item) => rank[item.level] >= floor[filter]);
+
+const sum = (counts: ReadonlyArray<LogCount>) =>
+  counts.reduce((total, { count }) => total + count, 0);
 
 const originOf = (root: ExecutionSpan, source: LogSource): LogOrigin => {
   if (source._tag === "Body") return source;
@@ -145,11 +155,12 @@ const groupsOf = (
 export const logsView = (
   span: Span,
   root: ExecutionSpan,
-  entries: ReadonlyArray<LogEntry>,
+  logs: Logs,
   filter: LevelFilter,
 ): Option.Option<LogsView> =>
   Option.map(scopeOf(span), (scope) => {
-    const scoped = inScope(scope, entries);
+    const scoped = inScope(scope, logs.entries);
+    const counts = inScope(scope, logs.counts);
     const shown = atLevel(filter, scoped);
     const lines = shown.map((entry) => ({
       entry,
@@ -158,12 +169,13 @@ export const logsView = (
     }));
     return {
       scope,
-      count: scoped.length,
-      hasError: scoped.some((entry) => rank[entry.level] >= rank.Error),
+      count: sum(counts),
+      fetched: scoped.length,
+      hasError: atLevel("error", counts).some(({ count }) => count > 0),
       counts: {
-        all: scoped.length,
-        warn: atLevel("warn", scoped).length,
-        error: atLevel("error", scoped).length,
+        all: sum(counts),
+        warn: sum(atLevel("warn", counts)),
+        error: sum(atLevel("error", counts)),
       },
       showPass: new Set(shown.map((entry) => entry.pass)).size > 1,
       groups: groupsOf(scope, scoped, lines),
