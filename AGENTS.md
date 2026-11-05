@@ -58,9 +58,10 @@ and delete the old path in the same change, with no compatibility shims.
 - Effect's `cluster_messages` and `cluster_replies` in `kymo.db` hold each execution's state;
   `apps/daemon/src/executions.ts` reads them and derives each execution's status in one function,
   `executionStatus`. kymo's own tables hold only what Effect does not: `kymo_labels` maps an
-  execution id to the label `kymo execute --label` gave it, and `kymo_logs` holds the log lines at
-  `Info` or above written in a workflow's body and activities. `apps/daemon/src/migrations.ts`
-  creates them through `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
+  execution id to the label that `kymo execute --label` or the web execute form gave it when it
+  created the execution, and `kymo_logs` holds the log lines at `Info` or above written in a
+  workflow's body and activities. `apps/daemon/src/migrations.ts` creates them through
+  `SqliteMigrator`, recording applied migrations in `kymo_migrations`, before the
   engine starts. The migrator skips every migration whose id is at or below the highest recorded id,
   so the daemon also compares the `kymo_*` definitions in `kymo.db` with those the same migrations
   create in an empty database. When they differ, startup fails with `SchemaOutdated`, which tells the
@@ -107,6 +108,12 @@ and delete the old path in the same change, with no compatibility shims.
   the one the POST returned, or until 10 seconds after the POST answered. An action's error shows
   in the pane, never as the daemon being down; a completion's error shows under that wait's form,
   or at the top of the inspector while the form is not shown.
+- The execute form (`apps/web/src/execute-form.tsx`) keeps its open state and per-workflow drafts
+  in the `/` route's component state, not the URL, and shows only while `?exec` keeps the value it
+  had when the form opened. Its Expected text is the `expected` that `GET /api/workflows` lists, the
+  value the daemon also puts in `InvalidPayload.expected`. It sends no payload that does not parse
+  as JSON and omits a label that is empty or only whitespace; the daemon answers an empty label with
+  a 400 that has no body. Its errors show in the form, never as the daemon being down.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

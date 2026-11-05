@@ -20,6 +20,8 @@ import {
   type Actions,
 } from "./actions.ts";
 import { ActionAlert } from "./action-alert.tsx";
+import { EscapeCancels } from "./escape-cancels.tsx";
+import type { Existed } from "./execute.ts";
 import { ago, refine, shortId, suspendTag, title } from "./executions-view.ts";
 import { StatusGlyph, StatusIcon } from "./glyphs.tsx";
 import { ExecutionLink, Note, When } from "./inspector.tsx";
@@ -142,19 +144,6 @@ const StopNoteText = ({
   }
 };
 
-const EscapeCancels = ({ onCancel }: { onCancel: () => void }) => {
-  useMountEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onCancel();
-    };
-    document.addEventListener("keydown", onKey, { capture: true });
-    return () => document.removeEventListener("keydown", onKey, { capture: true });
-  });
-  return null;
-};
-
 const InterruptConfirm = ({
   detail,
   byId,
@@ -274,11 +263,13 @@ const ExecutionHeader = ({
   now,
   rootFlag,
   actions,
+  existed,
 }: {
   detail: ExecutionDetail;
   byId: ReadonlyMap<string, ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  existed: Existed | undefined;
   actions: Actions;
 }) => {
   const status = statusName(detail.status);
@@ -368,6 +359,12 @@ const ExecutionHeader = ({
           <StopNoteText note={note} detail={detail} byId={byId} now={now} rootFlag={rootFlag} />
         </Note>
       )}
+      {existed?.id === detail.id ? (
+        <Note>
+          <span className="font-mono">{shortId(detail.id)}</span> already existed.
+          {existed.labelled ? " Its label was not changed." : null}
+        </Note>
+      ) : null}
     </section>
   );
 };
@@ -383,6 +380,7 @@ const ExecutionView = ({
   rootFlag,
   height,
   onResize,
+  existed,
 }: {
   detail: ExecutionDetail;
   logs: Logs;
@@ -392,6 +390,7 @@ const ExecutionView = ({
   rootFlag: string | undefined;
   height: Option.Option<number>;
   onResize: (height: number) => void;
+  existed: Existed | undefined;
 }) => {
   const router = useRouter();
   const [state, setState] = useState<ActionState>(idle);
@@ -419,6 +418,7 @@ const ExecutionView = ({
         now={now}
         rootFlag={rootFlag}
         actions={actions}
+        existed={existed}
       />
       <Trace
         detail={detail}
@@ -474,11 +474,17 @@ export const DetailPane = ({
   executions,
   now,
   rootFlag,
+  form,
+  existed,
+  onExecute,
 }: {
   detail: Option.Option<Detail>;
   executions: ReadonlyArray<ExecutionSummary>;
   now: DateTime.Utc;
   rootFlag: string | undefined;
+  form: ReactNode | undefined;
+  existed: Existed | undefined;
+  onExecute: (() => void) | undefined;
 }) => {
   const navigate = useNavigate({ from: "/" });
   const [height, setHeight] = useState<Option.Option<number>>(Option.none());
@@ -489,20 +495,29 @@ export const DetailPane = ({
       Back to executions
     </Button>
   );
+  const execute =
+    onExecute === undefined ? undefined : (
+      <Button variant="primary" onClick={onExecute}>
+        Execute a workflow
+      </Button>
+    );
   const scroll = "min-h-0 flex-1 overflow-auto";
   return (
     <Pane
       id="detail-title"
       title="Execution"
-      count={selected?._tag === "Loaded" ? shortId(selected.detail.id) : ""}
+      count={form === undefined && selected?._tag === "Loaded" ? shortId(selected.detail.id) : ""}
       className="bg-panel"
     >
-      {selected === undefined ? (
+      {form !== undefined ? (
+        <div className={scroll}>{form}</div>
+      ) : selected === undefined ? (
         <div className={scroll}>
           {executions.length === 0 ? (
             <Void
               code={<span className="text-fg-3">executions[0]</span>}
               heading="Nothing has run yet."
+              actions={execute}
             >
               kymo draws what the engine journals. Run{" "}
               <code className="font-mono text-[12.5px] text-fg">
@@ -514,6 +529,7 @@ export const DetailPane = ({
             <Void
               code={<span className="text-fg-3">no selection</span>}
               heading="Pick an execution."
+              actions={execute}
             >
               Move with <Kbd>j</Kbd> <Kbd>k</Kbd> through the executions or click one; its trace
               opens here.
@@ -563,6 +579,7 @@ export const DetailPane = ({
           rootFlag={rootFlag}
           height={height}
           onResize={(next) => setHeight(Option.some(next))}
+          existed={existed}
         />
       )}
     </Pane>

@@ -64,7 +64,7 @@ const subject = (target: Target): ReactNode =>
     target.action
   );
 
-const Alert = ({
+export const Alert = ({
   tone,
   code: label,
   children,
