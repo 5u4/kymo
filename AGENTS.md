@@ -96,12 +96,13 @@ and delete the old path in the same change, with no compatibility shims.
   parses every search value as a string and drops empty ones, so `?q=123` and `?exec=1` stay
   strings and `?exec=` selects nothing.
 - The `/` route loads `GET /api/health`, `GET /api/workflows` and the whole unfiltered
-  `GET /api/executions`, plus `GET /api/executions/:id` when `?exec=<id or prefix>` selects an
-  execution, reloads them every 2 seconds, and filters during render in
-  `apps/web/src/executions-view.ts`. A 404 or 409 from the detail request shows in the detail pane,
-  not as the daemon being down. The trace is derived from the detail and the list in
-  `apps/web/src/trace-view.ts`; the selected span, expanded rows, zoom and split height stay in
-  component state.
+  `GET /api/executions`, plus `GET /api/executions/:id` and the last 500 lines of
+  `GET /api/executions/:id/logs` when `?exec=<id or prefix>` selects an execution, reloads them
+  every 2 seconds, and filters during render in `apps/web/src/executions-view.ts`. A 404 or 409
+  from the detail or logs request shows in the detail pane, not as the daemon being down. The trace
+  is derived from the detail and the list in `apps/web/src/trace-view.ts`, and each span's logs in
+  `apps/web/src/log-view.ts`; the selected span, expanded rows, zoom, split height, inspector tab
+  and log level filter stay in component state.
 - Every `kymo` command the UI shows while the daemon answers goes through `kymoCommand`
   (`kymo/shell`), which the CLI uses too. It adds `--root` unless `GET /api/health` reports
   `defaultRoot` (the daemon's root is its own `$HOME/.kymo`), so a copied command run under the same

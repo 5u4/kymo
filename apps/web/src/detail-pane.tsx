@@ -353,6 +353,7 @@ export const DetailPane = ({
           <Trace
             key={selected.detail.id}
             detail={selected.detail}
+            logs={selected.logs}
             summaries={byId}
             now={now}
             rootFlag={rootFlag}
