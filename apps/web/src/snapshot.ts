@@ -4,10 +4,23 @@ import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as Option from "effect/Option";
-import { Api, type ExecutionDetail, type ExecutionSummary, type WorkflowList } from "kymo/api";
+import {
+  Api,
+  type ExecutionDetail,
+  type ExecutionSummary,
+  type LogEntry,
+  type WorkflowList,
+} from "kymo/api";
+
+const logLimit = 500;
+
+export interface Logs {
+  readonly total: number;
+  readonly entries: ReadonlyArray<LogEntry>;
+}
 
 export type Detail = Data.TaggedEnum<{
-  Loaded: { readonly detail: ExecutionDetail };
+  Loaded: { readonly detail: ExecutionDetail; readonly logs: Logs };
   NotFound: { readonly id: string };
   Ambiguous: { readonly id: string; readonly candidates: ReadonlyArray<string> };
 }>;
@@ -34,8 +47,16 @@ export const snapshot = (exec: string | undefined): Effect.Effect<Snapshot> =>
         client.executions.list({ query: {} }),
         exec === undefined
           ? Effect.succeedNone
-          : client.executions.get({ params: { id: exec } }).pipe(
-              Effect.map((detail) => Detail.Loaded({ detail })),
+          : Effect.all(
+              [
+                client.executions.get({ params: { id: exec } }),
+                client.executions.logs({ params: { id: exec }, query: { limit: logLimit } }),
+              ],
+              { concurrency: "unbounded" },
+            ).pipe(
+              Effect.map(([detail, { total, logs }]) =>
+                Detail.Loaded({ detail, logs: { total, entries: logs } }),
+              ),
               Effect.catchTags({
                 ExecutionNotFound: (error) => Effect.succeed(Detail.NotFound({ id: error.id })),
                 AmbiguousExecutionId: (error) =>
